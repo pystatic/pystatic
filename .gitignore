@@ -1,8 +1,8 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
+**/**/__pycache__/
 *.py[cod]
 *$py.class
-
+ 
 # C extensions
 *.so
 
@@ -107,9 +107,28 @@ venv.bak/
 /site
 
 # mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+**/**/.mypy_cache/
+**/**/.dmypy.json
+**/**/dmypy.json
+out/
 
 # Pyre type checker
 .pyre/
+
+# venv
+lib
+lib64
+bin
+share
+pyvenv.cfg
+include
+
+# vscode
+.vscode
+pystatic.code-workspace*
+
+# test
+tests/
+test*
+.idea/
+.mypy_cache/
