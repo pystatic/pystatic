@@ -126,9 +126,11 @@ include
 # vscode
 .vscode
 pystatic.code-workspace*
+.VSCodeCounter
 
 # test
-tests/
-test*
+tmp_test
+test.py
+
 .idea/
 .mypy_cache/
