@@ -125,7 +125,7 @@ include
 
 # vscode
 .vscode
-pystatic.code-workspace*
+*-workspace
 .VSCodeCounter
 
 # test

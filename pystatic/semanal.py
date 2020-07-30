@@ -3,13 +3,13 @@ import logging
 import os
 from typing import Optional, List, Union
 from collections import OrderedDict
-from .seman_parse import typenode_parse_type, TypeNodeTag, get_type
 from .env import Environment
 from .error import ErrHandler
 from .visitor import BaseVisitor, ParseException
 from .typesys import any_type, TypeVar, TypeClassTemp, TypeFunc
 from .arg import Arg, Argument
 from .semanal_import import ImportContent, USER_DEFINE, THIRDPARTY_DEFINE, BUILTIN_DEFINE
+from .semanal_parse import typenode_parse_type, TypeNodeTag, get_type
 
 logger = logging.getLogger(__name__)
 
