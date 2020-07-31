@@ -1,5 +1,7 @@
+import os
 from typing import Optional, Dict, List
 from collections import OrderedDict
+from .fsys import File, ModuleResolution
 
 
 class BaseType(object):
@@ -37,7 +39,7 @@ class TypeTemp(BaseType):
     def arity(self, x: int):
         self._arity = x
 
-    def instantiate(self, bind: List[BaseType]):
+    def instantiate(self, bind: List[BaseType]) -> 'TypeIns':
         return TypeIns(self, *bind)
 
 
@@ -129,10 +131,35 @@ class TypeClassTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, tp: Dict[str, TypeTemp], local: Dict[str, TypeIns]):
+    def __init__(self, file: File, tp: Dict[str, TypeTemp],
+                 local: Dict[str, TypeIns]):
         super().__init__('module')
         self.sub_type = tp
         self.attribute = local
+        self.file = file
+
+
+class TypePackageTemp(TypeClassTemp):
+    def __init__(self, file: File, pwd: str):
+        super().__init__('package')
+        self._pwd = pwd
+        self.m_finder = ModuleResolution(pwd)
+        self.file = file
+
+    def get_type(self, name: str) -> Optional[TypeTemp]:
+        from .semanal import semanal_module
+        path = os.path.join(self.file.abs_path, name)
+        if os.path.isdir(path):
+            init_path = os.path.join(path, '__init__.py')
+            if os.path.isfile(init_path):
+                return TypePackageTemp(File(path), self._pwd)
+            else:
+                return None
+        path = os.path.join(self.file.abs_path, name + '.py')
+        if os.path.isfile(path):
+            return semanal_module(File(path), self.m_finder)
+        else:
+            return None
 
 
 class TypeAny(TypeTemp):
@@ -190,7 +217,6 @@ class TypeGeneric(TypeTemp):
 class TypeClass(TypeIns):
     def __init__(self, temp: TypeClassTemp, *args):
         super().__init__(temp, *args)
-        self.temp: TypeClassTemp
 
     def has_attribute(self, name: str) -> bool:
         return self.temp.has_attribute(name)

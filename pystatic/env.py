@@ -197,7 +197,7 @@ class Environment(object):
 
     def to_module(self) -> TypeModuleTemp:
         glob = self.glob_scope
-        return TypeModuleTemp(glob.types, glob.local)
+        return TypeModuleTemp(self.file, glob.types, glob.local)
 
 
 builtin_scope = Scope(None, None, None, None)  # type: ignore

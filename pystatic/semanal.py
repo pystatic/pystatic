@@ -1,15 +1,14 @@
 import ast
 import logging
-import os
 from typing import Optional, List, Union
 from collections import OrderedDict
 from .env import Environment, get_init_env
 from .error import ErrHandler
 from .visitor import BaseVisitor, ParseException
-from .typesys import TypeModuleTemp, any_type, TypeVar, TypeClassTemp, TypeFunc
+from .typesys import (TypeModuleTemp, any_type, TypeVar, TypeClassTemp,
+                      TypeFunc, TypePackageTemp)
 from .fsys import ModuleResolution, File
 from .arg import Arg, Argument
-from .semanal_import import ImportContent, USER_DEFINE, THIRDPARTY_DEFINE, BUILTIN_DEFINE
 from .semanal_parse import typenode_parse_type, TypeNodeTag, get_type
 
 logger = logging.getLogger(__name__)
@@ -182,22 +181,13 @@ class ClassCollector(BaseVisitor):
                     self.env.add_type(target.id, TypeVar(target.id))
                     logger.debug(f'Add type var: {var_uri}')
 
-    # def visit_Import(self, node: ast.Import):
-    #     for name in node.names:
-    #         modulename, asname, filepath, typemodule = self.get_module_info(
-    #             name, self.curdirpath)
-    #         if modulename is None:
-    #             continue
-    #         self.moduleList.append(
-    #             ImportContent(modulename, asname, filepath, typemodule))
-
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
             m_file = self.m_finder.resolve(alias.name, self.env.file)
             if m_file is None:
                 self.err.add_err(node, f'module {alias.name} not found')
             else:
-                m_type = _semanal_module(m_file, self.m_finder)
+                m_type = semanal_module(m_file, self.m_finder)
                 name = alias.asname if alias.asname else alias.name
                 self.env.add_type(name, m_type)
                 logger.debug(
@@ -205,79 +195,21 @@ class ClassCollector(BaseVisitor):
                 )
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        modulename = node.module
-        curdirpath = self.curdirpath
-        isfolder = False
-        filepath = ""
-        typemodule = USER_DEFINE
-        if modulename is None:
-            if node.level == 1:
-                pass
-            elif node.level == 2:
-                curdirpath = os.path.dirname(curdirpath)
-            isfolder = True
+        modulename = node.module if node.module else ''
+        modulename = '.' * node.level + modulename
+        m_file = self.m_finder.resolve(modulename, self.env.file)
+        if m_file is None:
+            self.err.add_err(node, f'module {modulename} not found')
         else:
-            dirlist = modulename.split('.')
-            path = self.curdirpath
-            for diritem in dirlist:
-                path = path + '/' + diritem
-            if os.path.exists(path):
-                curdirpath = path
-                isfolder = True
-
-        if isfolder:
-            content = []
-            for name in node.names:
-                path = curdirpath + "/" + name.name + ".py"
-                if os.path.exists(path):
-                    modulename, asname, filepath, typemodule = self.get_module_info(
-                        name, curdirpath)
-                    if modulename is None:
-                        continue
-                    self.moduleList.append(
-                        ImportContent(modulename, asname, filepath,
-                                      typemodule))
+            m_type = semanal_module(m_file, self.m_finder)
+            for alias in node.names:
+                name = alias.asname if alias.asname else alias.name
+                res = m_type.get_type(name)
+                if res is None:
+                    self.err.add_err(alias,
+                                     f'{modulename}.{alias.name} not found')
                 else:
-
-                    content.append({'name': name.name, 'asname': name.asname})
-
-            self.moduleList.append(
-                ImportContent(modulename, None, filepath, typemodule, True,
-                              content))
-            return
-
-        modulename, asname, filepath, typemodule = self.get_module_info(
-            ast.alias(name=modulename, asname=None), curdirpath)
-        content = []
-        for name in node.names:
-            content.append({'name': name.name, 'asname': name.asname})
-
-        self.moduleList.append(
-            ImportContent(modulename, None, filepath, typemodule, True,
-                          content))
-
-    def get_module_info(self, node: ast.alias, curdirpath):
-        path = curdirpath + '/' + node.name
-        if os.path.exists(path):  # this module is a packet
-            path += "/__init__.py"  # default existing this file
-            return node.name, node.asname, path, USER_DEFINE
-
-        path += ".py"
-        if os.path.exists(path):  # this module is a file
-            return node.name, node.asname, path, USER_DEFINE
-
-        module = __import__(node.name, fromlist=[curdirpath])
-        try:
-            module = __import__(node.name)
-        except:
-            # No module named node.name
-            return None, None, None, None
-        try:
-            filepath = module.__file__
-        except:
-            return node.name, node.asname, None, BUILTIN_DEFINE
-
-        return node.name, node.asname, filepath, THIRDPARTY_DEFINE
+                    self.env.add_type(name, res)
 
 
 class AnnotationParser(object):
@@ -571,11 +503,15 @@ class TypeRecorder(BaseVisitor):
             self.err.add_redefine(node, node.name)
 
 
-def _semanal_module(module: File,
-                    m_finder: ModuleResolution) -> TypeModuleTemp:
-    env = get_init_env(module)
-    err = ErrHandler(module)
-    node = module.parse()
-    ClassCollector(env, m_finder, err).accept(node)
-    TypeRecorder(env, err).accept(node)
-    return env.to_module()
+def semanal_module(
+        module: File,
+        m_finder: ModuleResolution) -> Union[TypeModuleTemp, TypePackageTemp]:
+    if module.isdir():
+        return TypePackageTemp(module, m_finder.pwd)
+    else:
+        env = get_init_env(module)
+        err = ErrHandler(module)
+        node = module.parse()
+        ClassCollector(env, m_finder, err).accept(node)
+        TypeRecorder(env, err).accept(node)
+        return env.to_module()

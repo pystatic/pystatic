@@ -28,6 +28,9 @@ class File(object):
         else:
             self.module_name = self.filename
 
+    def isdir(self) -> bool:
+        return os.path.isdir(self._abs_path)
+
     def _read(self) -> str:
         with open(self._abs_path) as f:
             self._content = f.read()
@@ -87,8 +90,13 @@ class ModuleResolution(object):
             rel_path = os.sep.join(module.split('.'))
 
         for dir in dirs:
-            path = os.path.join(dir, rel_path) + '.py'
-            print(path)
-            if os.path.isfile(path):
-                return File(path)
+            path = os.path.join(dir, rel_path)
+            if os.path.isdir(path):
+                init_path = os.path.join(path, '__init__.py')
+                if os.path.isfile(init_path):
+                    return File(path)
+            else:
+                path = os.path.join(dir, rel_path) + '.py'
+                if os.path.isfile(path):
+                    return File(path)
         return None
