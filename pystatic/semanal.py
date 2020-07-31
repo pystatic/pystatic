@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Optional, List, Union
 from collections import OrderedDict
-from .env import Environment
+from .env import Environment, get_init_env
 from .error import ErrHandler
 from .visitor import BaseVisitor, ParseException
 from .typesys import TypeModuleTemp, any_type, TypeVar, TypeClassTemp, TypeFunc
@@ -11,7 +11,6 @@ from .fsys import ModuleResolution, File
 from .arg import Arg, Argument
 from .semanal_import import ImportContent, USER_DEFINE, THIRDPARTY_DEFINE, BUILTIN_DEFINE
 from .semanal_parse import typenode_parse_type, TypeNodeTag, get_type
-from .builtins import get_init_env
 
 logger = logging.getLogger(__name__)
 

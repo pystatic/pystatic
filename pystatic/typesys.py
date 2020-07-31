@@ -190,6 +190,7 @@ class TypeGeneric(TypeTemp):
 class TypeClass(TypeIns):
     def __init__(self, temp: TypeClassTemp, *args):
         super().__init__(temp, *args)
+        self.temp: TypeClassTemp
 
     def has_attribute(self, name: str) -> bool:
         return self.temp.has_attribute(name)
