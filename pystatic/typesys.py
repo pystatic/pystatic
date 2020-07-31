@@ -29,15 +29,15 @@ class TypeVar(BaseType):
                  name: str,
                  *args,
                  bound: Optional[BaseType] = None,
-                 convariant=False,
+                 covariant=False,
                  contravariant=False):
         super().__init__(name)
         self.bound = bound
         if contravariant:
             self.convariant = False
         else:
-            self.convariant = convariant
-        if contravariant or convariant:
+            self.convariant = covariant
+        if contravariant or covariant:
             self.invariant = False
         else:
             self.invariant = True
@@ -61,7 +61,7 @@ class TypeTemp(BaseType):
         self._arity = x
 
     def instantiate(self, bind: List[BaseType]):
-        return TypeIns(self, bind)
+        return TypeIns(self, *bind)
 
 
 class TypeIns(BaseType):
@@ -84,15 +84,15 @@ class TypeClassTemp(TypeTemp):
 
         self.typevar = OrderedDict()
 
-        self.sub_type = {}
+        self.sub_type: Dict[str, TypeTemp] = {}
 
     def instantiate(self, bind: List[BaseType]):
         return TypeClass(self, *bind)
 
-    def add_type(self, name: str, tp: BaseType):
+    def add_type(self, name: str, tp: TypeTemp):
         self.sub_type[name] = tp
 
-    def get_type(self, name: str) -> Optional[BaseType]:
+    def get_type(self, name: str) -> Optional[TypeTemp]:
         res = self.sub_type.get(name)
         if not res:
             for v in self.baseclass.values():
@@ -129,6 +129,13 @@ class TypeClassTemp(TypeTemp):
                     return True
             return False
         return True
+
+
+class TypeModuleTemp(TypeClassTemp):
+    def __init__(self, tp: Dict[str, TypeTemp], local: Dict[str, TypeIns]):
+        super().__init__('module')
+        self.sub_type = tp
+        self.attribute = local
 
 
 class TypeAny(TypeTemp):
@@ -202,11 +209,6 @@ class TypeFunc(TypeClass):
 
     def __str__(self):
         return str(self.arg) + ' -> ' + str(self.ret_type)
-
-
-class TypeModule(TypeClass):
-    def __init__(self):
-        super().__init__(module_type)
 
 
 # default types

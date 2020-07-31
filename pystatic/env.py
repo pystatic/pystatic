@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from typing import Dict, Optional
-from .typesys import BaseType, TypeClassTemp, TypeTemp, TypeIns
+from .typesys import BaseType, TypeClassTemp, TypeModuleTemp, TypeTemp, TypeIns
+from .fsys import File
 
 
 def lookup_type_scope(scope: 'Scope', name) -> Optional[BaseType]:
@@ -83,9 +84,10 @@ class Environment(object):
     FUNC_SCOPE = 1
     CLASS_SCOPE = 2
 
-    def __init__(self, scope: Scope, name: str):
+    def __init__(self, scope: Scope, file: File):
         self.scope_list = [scope]
-        self.name_list = [name]
+        self.file = file
+        self.name_list = [file.module_name]
         self.scope_type = [self.GLOB_SCOPE]
 
         self.base_index = 0
@@ -188,3 +190,7 @@ class Environment(object):
         self.name_list.pop()
         if scope_type == self.CLASS_SCOPE:
             self.cls_count -= 1
+
+    def to_module(self) -> TypeModuleTemp:
+        glob = self.glob_scope
+        return TypeModuleTemp(glob.types, glob.local)

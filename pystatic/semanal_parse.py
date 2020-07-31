@@ -20,6 +20,8 @@ class TypeNode(object):
         self.is_cons = False
         self.tag = TypeNodeTag.NAME
         self.param = []
+        self.left: TypeNode
+        self.attr: str
 
 
 def typenode_parse_type(node, is_cons: bool, cons_node):
@@ -29,6 +31,10 @@ def typenode_parse_type(node, is_cons: bool, cons_node):
             if node.value is Ellipsis:
                 new_node.tag = TypeNodeTag.ELLIPSIS
                 new_node.name = '...'
+                return new_node
+            elif node.value is None:
+                new_node.tag = TypeNodeTag.NAME
+                new_node.name = 'None'
                 return new_node
             elif not isinstance(node.value, str):
                 raise ParseException(node, 'invalid syntax')

@@ -6,10 +6,12 @@ from collections import OrderedDict
 from .env import Environment
 from .error import ErrHandler
 from .visitor import BaseVisitor, ParseException
-from .typesys import any_type, TypeVar, TypeClassTemp, TypeFunc
+from .typesys import TypeModuleTemp, any_type, TypeVar, TypeClassTemp, TypeFunc
+from .fsys import ModuleResolution, File
 from .arg import Arg, Argument
 from .semanal_import import ImportContent, USER_DEFINE, THIRDPARTY_DEFINE, BUILTIN_DEFINE
 from .semanal_parse import typenode_parse_type, TypeNodeTag, get_type
+from .builtins import get_init_env
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +28,11 @@ def _is_typevar_def(node: Union[ast.Assign, ast.AnnAssign]):
 
 class ClassCollector(BaseVisitor):
     """Build a TypeScope tree"""
-    def __init__(self, env: Environment, err: ErrHandler):
+    def __init__(self, env: Environment, m_finder: ModuleResolution,
+                 err: ErrHandler):
         self.env = env
         self.err = err
+        self.m_finder = m_finder
         self.met_gen = False
 
     def _check_appliable(self, node, tp, param_cnt: int):
@@ -179,14 +183,25 @@ class ClassCollector(BaseVisitor):
                     self.env.add_type(target.id, TypeVar(target.id))
                     logger.debug(f'Add type var: {var_uri}')
 
+    # def visit_Import(self, node: ast.Import):
+    #     for name in node.names:
+    #         modulename, asname, filepath, typemodule = self.get_module_info(
+    #             name, self.curdirpath)
+    #         if modulename is None:
+    #             continue
+    #         self.moduleList.append(
+    #             ImportContent(modulename, asname, filepath, typemodule))
+
     def visit_Import(self, node: ast.Import):
-        for name in node.names:
-            modulename, asname, filepath, typemodule = self.get_module_info(
-                name, self.curdirpath)
-            if modulename is None:
-                continue
-            self.moduleList.append(
-                ImportContent(modulename, asname, filepath, typemodule))
+        for alias in node.names:
+            m_file = self.m_finder.resolve(alias.name, self.env.file)
+            if m_file is None:
+                self.err.add_err(node, f'module {alias.name} not found')
+            else:
+                m_type = _semanal_module(m_file, self.m_finder)
+                name = alias.asname if alias.asname else alias.name
+                self.env.add_type(name, m_type)
+                logger.debug(f'Import {alias.name} as {name} (abspath: {m_file.abs_path})')
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         modulename = node.module
@@ -553,3 +568,13 @@ class TypeRecorder(BaseVisitor):
             ClassDefVisitor(self.env, self.err).accept(node)
         else:
             self.err.add_redefine(node, node.name)
+
+
+def _semanal_module(module: File,
+                    m_finder: ModuleResolution) -> TypeModuleTemp:
+    env = get_init_env(module)
+    err = ErrHandler(module)
+    node = module.parse()
+    ClassCollector(env, m_finder, err).accept(node)
+    TypeRecorder(env, err).accept(node)
+    return env.to_module()
