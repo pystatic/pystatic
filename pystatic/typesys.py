@@ -24,29 +24,6 @@ class BaseType(object):
         return self.has_method(name) or self.has_attribute(name)
 
 
-class TypeVar(BaseType):
-    def __init__(self,
-                 name: str,
-                 *args,
-                 bound: Optional[BaseType] = None,
-                 covariant=False,
-                 contravariant=False):
-        super().__init__(name)
-        self.bound = bound
-        if contravariant:
-            self.convariant = False
-        else:
-            self.convariant = covariant
-        if contravariant or covariant:
-            self.invariant = False
-        else:
-            self.invariant = True
-        self.contravariant = contravariant
-
-    def instantiate(self, bind):
-        return self
-
-
 class TypeTemp(BaseType):
     def __init__(self, name, arity=0):
         super().__init__(name)
@@ -75,12 +52,32 @@ class TypeIns(BaseType):
         return self.temp
 
 
+class TypeVar(TypeTemp):
+    def __init__(self,
+                 name: str,
+                 *args,
+                 bound: Optional[BaseType] = None,
+                 covariant=False,
+                 contravariant=False):
+        super().__init__(name)
+        self.bound = bound
+        if contravariant:
+            self.convariant = False
+        else:
+            self.convariant = covariant
+        if contravariant or covariant:
+            self.invariant = False
+        else:
+            self.invariant = True
+        self.contravariant = contravariant
+
+
 class TypeClassTemp(TypeTemp):
     def __init__(self, clsname: str):
         super().__init__(clsname)
         self.baseclass = OrderedDict()
         self.method = {}
-        self.attribute: Dict[str, BaseType] = {}
+        self.attribute: Dict[str, TypeIns] = {}
 
         self.typevar = OrderedDict()
 
@@ -119,7 +116,7 @@ class TypeClassTemp(TypeTemp):
             return False
         return True
 
-    def add_attribute(self, name: str, attr_type: BaseType):
+    def add_attribute(self, name: str, attr_type: TypeIns):
         self.attribute[name] = attr_type
 
     def has_attribute(self, name: str) -> bool:

@@ -201,7 +201,9 @@ class ClassCollector(BaseVisitor):
                 m_type = _semanal_module(m_file, self.m_finder)
                 name = alias.asname if alias.asname else alias.name
                 self.env.add_type(name, m_type)
-                logger.debug(f'Import {alias.name} as {name} (abspath: {m_file.abs_path})')
+                logger.debug(
+                    f'Import {alias.name} as {name} (abspath: {m_file.abs_path})'
+                )
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         modulename = node.module
@@ -404,7 +406,7 @@ def _def_visitAnnAssign(env: Environment, err: ErrHandler,
                         node: ast.AnnAssign):
     """Get the variables defined in an ast.AnnAssign node"""
     tp = _ann_to_type(node.annotation, env, err)
-    assign_tp = tp if tp else any_type
+    assign_tp = tp if tp else any_type.instantiate([])
     if isinstance(node.target, ast.Name):
         if not env.lookup_local_var(node.target.id):
             # this assignment is also a definition
@@ -431,7 +433,7 @@ class ClassFuncDefVisitor(BaseVisitor):
     Also collect data members defined inside the class and add them to
     the class type
     """
-    def __init__(self, env: Environment, err: ErrHandler, tp):  #L: TypeClass):
+    def __init__(self, env: Environment, err: ErrHandler, tp):
         self.env = env
         self.err = err
         self.tp = tp

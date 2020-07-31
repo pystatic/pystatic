@@ -4,7 +4,7 @@ from .typesys import BaseType, TypeClassTemp, TypeModuleTemp, TypeTemp, TypeIns
 from .fsys import File
 
 
-def lookup_type_scope(scope: 'Scope', name) -> Optional[BaseType]:
+def lookup_type_scope(scope: 'Scope', name) -> Optional[TypeTemp]:
     """Look up an type in a Scope"""
     name_list = name.split('.')
     target = scope.types.get(name_list[0])
@@ -57,22 +57,24 @@ class Scope(object):
             return res
         return func(self.builtins, *args)
 
-    def lookup_local_type(self, name: str) -> Optional[BaseType]:
+    def lookup_local_type(self, name: str) -> Optional[TypeTemp]:
         return lookup_type_scope(self, name)
 
-    def lookup_type(self, name: str) -> Optional[BaseType]:
-        return self._lookup_by_func(Scope.lookup_local_type, name)
+    def lookup_type(self, name: str) -> Optional[TypeTemp]:
+        return self._lookup_by_func(Scope.lookup_local_type,
+                                    name)  # type: ignore
 
     def add_type(self, name: str, tp):
         self.types[name] = tp
 
-    def lookup_local_var(self, name: str) -> Optional[BaseType]:
+    def lookup_local_var(self, name: str) -> Optional[TypeIns]:
         return self.local.get(name)
 
-    def lookup_var(self, name: str) -> Optional[BaseType]:
-        return self._lookup_by_func(Scope.lookup_local_var, name)
+    def lookup_var(self, name: str) -> Optional[TypeIns]:
+        return self._lookup_by_func(Scope.lookup_local_var,
+                                    name)  # type: ignore
 
-    def add_var(self, name: str, tp: BaseType):
+    def add_var(self, name: str, tp: TypeIns):
         self.local[name] = tp
 
 
@@ -128,10 +130,10 @@ class Environment(object):
     def lookup_local_type(self, name: str):
         return self.scope.lookup_local_type(name)
 
-    def lookup_type(self, name: str) -> Optional[BaseType]:
+    def lookup_type(self, name: str) -> Optional[TypeTemp]:
         return self.scope.lookup_type(name)
 
-    def add_type(self, name: str, tp: BaseType):
+    def add_type(self, name: str, tp: TypeTemp):
         if self.scope_type[-1] == self.CLASS_SCOPE:
             assert self.scope.parent is not None
             cur_tp = self.scope.parent.lookup_local_type(self.name_list[-1])
@@ -139,7 +141,7 @@ class Environment(object):
                 cur_tp.add_type(name, tp)
         return self.scope.add_type(name, tp)
 
-    def add_var(self, name: str, tp: BaseType):
+    def add_var(self, name: str, tp: TypeIns):
         return self.scope.add_var(name, tp)
 
     def lookup_local_var(self, name: str):
