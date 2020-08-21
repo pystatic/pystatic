@@ -1,7 +1,7 @@
 import os
 from typing import Optional, Dict, List
 from collections import OrderedDict
-from .fsys import File, ModuleResolution
+from .fsys import File
 
 
 class BaseType(object):
@@ -140,10 +140,8 @@ class TypeModuleTemp(TypeClassTemp):
 
 
 class TypePackageTemp(TypeClassTemp):
-    def __init__(self, file: File, pwd: str):
+    def __init__(self, file: File):
         super().__init__('package')
-        self._pwd = pwd
-        self.m_finder = ModuleResolution(pwd)
         self.file = file
 
     def get_type(self, name: str) -> Optional[TypeTemp]:
@@ -152,12 +150,12 @@ class TypePackageTemp(TypeClassTemp):
         if os.path.isdir(path):
             init_path = os.path.join(path, '__init__.py')
             if os.path.isfile(init_path):
-                return TypePackageTemp(File(path), self._pwd)
+                return TypePackageTemp(File(path))
             else:
                 return None
         path = os.path.join(self.file.abs_path, name + '.py')
         if os.path.isfile(path):
-            return semanal_module(File(path), self.m_finder)
+            return semanal_module(File(path))
         else:
             return None
 

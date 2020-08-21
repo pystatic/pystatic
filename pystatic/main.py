@@ -1,7 +1,8 @@
 import argparse
 import os
 from typing import TextIO, List
-from .fsys import File, ModuleResolution
+from . import fsys
+from .fsys import File
 from .semanal import ClassCollector, TypeRecorder
 from .env import get_init_env
 from .error import ErrHandler
@@ -10,11 +11,12 @@ from .error import ErrHandler
 def check(srcfiles: List[str], stdout: TextIO, stderr: TextIO):
     for file in srcfiles:
         f_check = File(file)
-        m_finder = ModuleResolution(f_check.dirname)
         env = get_init_env(f_check)
         err = ErrHandler(f_check)
         treenode = f_check.parse()
-        ClassCollector(env, m_finder, err).accept(treenode)
+        fsys.pwd = f_check.dirname
+        
+        ClassCollector(env, err).accept(treenode)
         TypeRecorder(env, err).accept(treenode)
 
         for e in err:

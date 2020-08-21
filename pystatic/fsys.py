@@ -66,39 +66,39 @@ class File(object):
         return hash(self.abs_path)
 
 
-class ModuleResolution(object):
-    """PEP 561
+pwd = os.path.dirname(__file__)
+typeshed = pwd
 
-    - Stubs or Python source manually put at the beginning of the path.
-    - User code - files the type checker is running on.
-    - Stub packages.
-    - Inline packages.
-    - Typeshed.
-    """
-    def __init__(self, pwd: str):
-        self.pwd = pwd
+"""PEP 561
 
-    def resolve(self, module: str, file: File) -> Optional[File]:
-        dirs = []
+- Stubs or Python source manually put at the beginning of the path.
+- User code - files the type checker is running on.
+- Stub packages.
+- Inline packages.
+- Typeshed.
+"""
+def find_module(module: str, file: File) -> Optional[File]:
+    dirs = []
+    
+    if module.startswith('..'):
+        dirs.append(os.path.dirname(file.dirname))
+        rel_path = os.sep.join(module[2:].split('.'))
+    elif module.startswith('.'):
+        dirs.append(file.dirname)
+        rel_path = os.sep.join(module[1:].split('.'))
+    else:
+        rel_path = os.sep.join(module.split('.'))
 
-        if module.startswith('..'):
-            dirs.append(os.path.dirname(file.dirname))
-            rel_path = os.sep.join(module[2:].split('.'))
-        elif module.startswith('.'):
-            dirs.append(file.dirname)
-            rel_path = os.sep.join(module[1:].split('.'))
+    dirs.append(pwd)
+
+    for dir in dirs:
+        path = os.path.join(dir, rel_path)
+        if os.path.isdir(path):
+            init_path = os.path.join(path, '__init__.py')
+            if os.path.isfile(init_path):
+                return File(path)
         else:
-            dirs.append(self.pwd)
-            rel_path = os.sep.join(module.split('.'))
-
-        for dir in dirs:
-            path = os.path.join(dir, rel_path)
-            if os.path.isdir(path):
-                init_path = os.path.join(path, '__init__.py')
-                if os.path.isfile(init_path):
-                    return File(path)
-            else:
-                path = os.path.join(dir, rel_path) + '.py'
-                if os.path.isfile(path):
-                    return File(path)
-        return None
+            path = os.path.join(dir, rel_path) + '.py'
+            if os.path.isfile(path):
+                return File(path)
+    return None    

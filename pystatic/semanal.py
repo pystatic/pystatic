@@ -7,7 +7,7 @@ from .error import ErrHandler
 from .visitor import BaseVisitor, ParseException
 from .typesys import (TypeModuleTemp, any_type, TypeVar, TypeClassTemp,
                       TypeFunc, TypePackageTemp)
-from .fsys import ModuleResolution, File
+from .fsys import File, find_module
 from .arg import Arg, Argument
 from .semanal_parse import typenode_parse_type, TypeNodeTag, get_type
 
@@ -26,11 +26,9 @@ def _is_typevar_def(node: Union[ast.Assign, ast.AnnAssign]):
 
 class ClassCollector(BaseVisitor):
     """Build a TypeScope tree"""
-    def __init__(self, env: Environment, m_finder: ModuleResolution,
-                 err: ErrHandler):
+    def __init__(self, env: Environment, err: ErrHandler):
         self.env = env
         self.err = err
-        self.m_finder = m_finder
         self.met_gen = False
 
     def _check_appliable(self, node, tp, param_cnt: int):
@@ -183,11 +181,11 @@ class ClassCollector(BaseVisitor):
 
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
-            m_file = self.m_finder.resolve(alias.name, self.env.file)
+            m_file = find_module(alias.name, self.env.file)
             if m_file is None:
                 self.err.add_err(node, f'module {alias.name} not found')
             else:
-                m_type = semanal_module(m_file, self.m_finder)
+                m_type = semanal_module(m_file)
                 name = alias.asname if alias.asname else alias.name
                 self.env.add_type(name, m_type)
                 logger.debug(
@@ -197,11 +195,11 @@ class ClassCollector(BaseVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom):
         modulename = node.module if node.module else ''
         modulename = '.' * node.level + modulename
-        m_file = self.m_finder.resolve(modulename, self.env.file)
+        m_file = find_module(modulename, self.env.file)
         if m_file is None:
             self.err.add_err(node, f'module {modulename} not found')
         else:
-            m_type = semanal_module(m_file, self.m_finder)
+            m_type = semanal_module(m_file)
             for alias in node.names:
                 name = alias.asname if alias.asname else alias.name
                 res = m_type.get_type(name)
@@ -503,15 +501,14 @@ class TypeRecorder(BaseVisitor):
             self.err.add_redefine(node, node.name)
 
 
-def semanal_module(
-        module: File,
-        m_finder: ModuleResolution) -> Union[TypeModuleTemp, TypePackageTemp]:
+def semanal_module(module: File) -> Union[TypeModuleTemp, TypePackageTemp]:
+    """before call it, make sure module is a package or a module"""
     if module.isdir():
-        return TypePackageTemp(module, m_finder.pwd)
+        return TypePackageTemp(module)
     else:
         env = get_init_env(module)
         err = ErrHandler(module)
         node = module.parse()
-        ClassCollector(env, m_finder, err).accept(node)
+        ClassCollector(env, err).accept(node)
         TypeRecorder(env, err).accept(node)
         return env.to_module()
