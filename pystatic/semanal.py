@@ -5,7 +5,7 @@ from collections import OrderedDict
 from .env import Environment, get_init_env
 from .error import ErrHandler
 from .visitor import BaseVisitor, ParseException
-from .typesys import (TypeModuleTemp, any_type, TypeVar, TypeClassTemp,
+from .typesys import (ARIBITRARY_ARITY, TypeModuleTemp, any_type, TypeVar, TypeClassTemp,
                       TypeFunc, TypePackageTemp)
 from .fsys import File, find_module
 from .arg import Arg, Argument
@@ -45,7 +45,7 @@ class ClassCollector(BaseVisitor):
                                      f'Optional require {tp.arity} parameter')
             return True
 
-        if tp.arity < 0:
+        if tp.arity == ARIBITRARY_ARITY:
             if param_cnt <= 0:
                 raise ParseException(
                     node, f'{tp.name} require at least one type parameter')

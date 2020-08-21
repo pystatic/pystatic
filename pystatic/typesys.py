@@ -3,6 +3,8 @@ from typing import Optional, Dict, List
 from collections import OrderedDict
 from .fsys import File
 
+ARIBITRARY_ARITY = -1
+
 
 class BaseType(object):
     def __init__(self, typename: str):
@@ -184,7 +186,7 @@ class TypeNone(TypeTemp):
 
 class TypeTuple(TypeTemp):
     def __init__(self):
-        super().__init__('Tuple', -1)
+        super().__init__('Tuple', ARIBITRARY_ARITY)
 
 
 class TypeDict(TypeTemp):
@@ -194,7 +196,7 @@ class TypeDict(TypeTemp):
 
 class TypeUnion(TypeTemp):
     def __init__(self):
-        super().__init__('Union', -1)
+        super().__init__('Union', ARIBITRARY_ARITY)
 
 
 class TypeOptional(TypeTemp):
@@ -209,7 +211,7 @@ class TypeCallable(TypeTemp):
 
 class TypeGeneric(TypeTemp):
     def __init__(self):
-        super().__init__('Generic', -1)
+        super().__init__('Generic', ARIBITRARY_ARITY)
 
 
 class TypeClass(TypeIns):
@@ -243,5 +245,4 @@ float_type = TypeClassTemp('float')
 complex_type = TypeClassTemp('complex')
 str_type = TypeClassTemp('str')
 bool_type = TypeClassTemp('bool')
-module_type = TypeClassTemp('module')
 func_type = TypeClassTemp('function')
