@@ -68,7 +68,6 @@ class File(object):
 
 pwd = os.path.dirname(__file__)
 typeshed = pwd
-
 """PEP 561
 
 - Stubs or Python source manually put at the beginning of the path.
@@ -77,9 +76,11 @@ typeshed = pwd
 - Inline packages.
 - Typeshed.
 """
+
+
 def find_module(module: str, file: File) -> Optional[File]:
     dirs = []
-    
+
     if module.startswith('..'):
         dirs.append(os.path.dirname(file.dirname))
         rel_path = os.sep.join(module[2:].split('.'))
@@ -101,4 +102,4 @@ def find_module(module: str, file: File) -> Optional[File]:
             path = os.path.join(dir, rel_path) + '.py'
             if os.path.isfile(path):
                 return File(path)
-    return None    
+    return None

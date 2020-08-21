@@ -85,16 +85,16 @@ class TypeClassTemp(TypeTemp):
 
         self.typevar = OrderedDict()
 
-        self.sub_type: Dict[str, TypeTemp] = {}
+        self.inner_type: Dict[str, TypeTemp] = {}
 
     def instantiate(self, bind: List[BaseType]):
         return TypeClass(self, *bind)
 
     def add_type(self, name: str, tp: TypeTemp):
-        self.sub_type[name] = tp
+        self.inner_type[name] = tp
 
     def get_type(self, name: str) -> Optional[TypeTemp]:
-        res = self.sub_type.get(name)
+        res = self.inner_type.get(name)
         if not res:
             for v in self.baseclass.values():
                 res = v.template.get_type(name)
@@ -136,7 +136,7 @@ class TypeModuleTemp(TypeClassTemp):
     def __init__(self, file: File, tp: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__('module')
-        self.sub_type = tp
+        self.inner_type = tp
         self.attribute = local
         self.file = file
 
