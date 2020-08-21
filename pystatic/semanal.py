@@ -35,7 +35,7 @@ class ClassCollector(BaseVisitor):
 
     def _check_appliable(self, node, tp, param_cnt: int):
         """Check whether the number of parameters match the type's definition
-        If lst is empty then we still consider it a valid match because the
+        If list is empty then we still consider it a valid match because the
         default is all Any.
 
         However, for Optional, you must specify a type.

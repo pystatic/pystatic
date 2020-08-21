@@ -5,12 +5,14 @@ from typing import Optional
 
 class File(object):
     def __init__(self, path: str):
+        """ path must be an absolute path """
         assert os.path.isabs(path)
         self.abs_path = path
         self.mtime = -1
 
     @property
     def abs_path(self):
+        """ absolute path """
         return self._abs_path
 
     @abs_path.setter
@@ -67,8 +69,8 @@ class File(object):
 class ModuleResolution(object):
     """PEP 561
 
-    - Stubs or Python source manually put in the beginning of the path.
-    - User code - the files the type checker is running on.
+    - Stubs or Python source manually put at the beginning of the path.
+    - User code - files the type checker is running on.
     - Stub packages.
     - Inline packages.
     - Typeshed.

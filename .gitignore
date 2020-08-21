@@ -132,5 +132,8 @@ include
 tmp_test
 test.py
 
+# script
+script
+
 .idea/
 .mypy_cache/
