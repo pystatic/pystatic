@@ -108,7 +108,7 @@ def get_type(node, env: Environment):
     elif node.tag == TypeNodeTag.ATTR:
         left_tp = get_type(node.left, env)
         if isinstance(left_tp, TypeClass):
-            tp = left_tp.template.get_type(node.attr)
+            tp = left_tp.template.get_type(node.attr)  # type: ignore
             if tp is None:
                 raise ParseException(
                     node.node, f'{left_tp.name} has no attribute {node.attr}')

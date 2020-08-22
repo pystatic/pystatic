@@ -1,7 +1,6 @@
 import os
 from typing import Optional, Dict, List
 from collections import OrderedDict
-from .fsys import File
 
 ARIBITRARY_ARITY = -1
 
@@ -132,34 +131,46 @@ class TypeClassTemp(TypeTemp):
         return True
 
 
+CheckedPacket = '__checked'
+
+
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, file: File, tp: Dict[str, TypeTemp],
+    def __init__(self, path: str, uri: str, tp: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__('module')
         self.inner_type = tp
         self.attribute = local
-        self.file = file
+        self.path = path
+        self.uri = uri
+
+    def full_uri(self):
+        if self.uri.startswith(CheckedPacket):
+            return '.'.join(self.uri.split('.')[1:])
+        else:
+            return self.uri
 
 
 class TypePackageTemp(TypeClassTemp):
-    def __init__(self, file: File):
+    def __init__(self, path: str, uri: str):
         super().__init__('package')
-        self.file = file
+        self.path = path
+        self.uri = uri
 
     def get_type(self, name: str) -> Optional[TypeTemp]:
-        from .semanal import semanal_module
-        path = os.path.join(self.file.abs_path, name)
-        if os.path.isdir(path):
-            init_path = os.path.join(path, '__init__.py')
-            if os.path.isfile(init_path):
-                return TypePackageTemp(File(path))
-            else:
-                return None
-        path = os.path.join(self.file.abs_path, name + '.py')
-        if os.path.isfile(path):
-            return semanal_module(File(path))
-        else:
-            return None
+        return None
+        # from .semanal import semanal_module
+        # path = os.path.join(self.path, name)
+        # if os.path.isdir(path):
+        #     init_path = os.path.join(path, '__init__.py')
+        #     if os.path.isfile(init_path):
+        #         return TypePackageTemp(File(path))
+        #     else:
+        #         return None
+        # path = os.path.join(self.path, name + '.py')
+        # if os.path.isfile(path):
+        #     return semanal_module(File(path))
+        # else:
+        #     return None
 
 
 class TypeAny(TypeTemp):

@@ -1,26 +1,7 @@
 import argparse
 import os
 from typing import TextIO, List
-from . import fsys
-from .fsys import File
-from .semanal import ClassCollector, TypeRecorder
-from .env import get_init_env
-from .error import ErrHandler
-
-
-def check(srcfiles: List[str], stdout: TextIO, stderr: TextIO):
-    for file in srcfiles:
-        f_check = File(file)
-        env = get_init_env(f_check)
-        err = ErrHandler(f_check)
-        treenode = f_check.parse()
-        fsys.pwd = f_check.dirname
-        
-        ClassCollector(env, err).accept(treenode)
-        TypeRecorder(env, err).accept(treenode)
-
-        for e in err:
-            stdout.write(str(e) + '\n')
+from pystatic.manager import Manager
 
 
 def cmdline(stdout: TextIO, stderr: TextIO):
@@ -39,4 +20,4 @@ def cmdline(stdout: TextIO, stderr: TextIO):
         else:
             stderr.write(f"{path} doesn't exist\n")
 
-    check(srcfiles, stdout, stderr)
+    manager = Manager(parse_res, srcfiles, stdout, stderr)

@@ -1,9 +1,9 @@
+import os
 from collections import OrderedDict
-from typing import Dict, Optional
-from .typesys import (BaseType, TypeClassTemp, TypeModuleTemp, TypeTemp,
-                      TypeIns, any_type, int_type, float_type, bool_type,
-                      str_type, generic_type, none_type)
-from .fsys import File
+from typing import Dict, Optional, List
+from .typesys import (BaseType, TypeClassTemp, TypeModuleTemp, TypePackageTemp,
+                      TypeTemp, TypeIns, any_type, int_type, float_type,
+                      bool_type, str_type, generic_type, none_type)
 
 
 def lookup_type_scope(scope: 'Scope', name) -> Optional[TypeTemp]:
@@ -88,11 +88,12 @@ class Environment(object):
     FUNC_SCOPE = 1
     CLASS_SCOPE = 2
 
-    def __init__(self, scope: Scope, file: File):
+    def __init__(self, scope: Scope, module: TypeModuleTemp):
         self.scope_list = [scope]
-        self.file = file
-        self.name_list = [file.module_name]
+        self.name_list: List[str] = [os.path.basename(module.path)]
         self.scope_type = [self.GLOB_SCOPE]
+
+        self.module = module
 
         self.base_index = 0
         self.cls_count = 0
@@ -195,10 +196,6 @@ class Environment(object):
         if scope_type == self.CLASS_SCOPE:
             self.cls_count -= 1
 
-    def to_module(self) -> TypeModuleTemp:
-        glob = self.glob_scope
-        return TypeModuleTemp(self.file, glob.types, glob.local)
-
 
 builtin_scope = Scope(None, None, None, None)  # type: ignore
 builtin_scope.glob = builtin_scope
@@ -213,7 +210,7 @@ builtin_scope.add_type('None', none_type)
 builtin_scope.add_type('Any', any_type)
 
 
-def get_init_env(module: File):
+def get_init_env(module: TypeModuleTemp):
     """Return the default environment for a module
 
     Args:
