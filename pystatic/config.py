@@ -29,13 +29,15 @@ class Config:
         self.mode: CheckMode = CheckMode.Package if get(
             'package') else CheckMode.Module
         self.package_directory: str = get('package_directory') or os.getcwd()
+        self.package_name = os.path.basename(self.package_directory)
 
         # set cwd
         self.cwd: str
         if self.mode == CheckMode.Package:
             self.cwd = self.package_directory
         elif get('cwd'):
-            self.cwd = get('cwd')  # type: ignore
+            cwd = get('cwd')
+            self.cwd = os.path.abspath(cwd)  # type: ignore
         elif targets and os.path.exists(targets[0]):
             self.cwd = os.path.dirname(os.path.abspath(targets[0]))
         else:

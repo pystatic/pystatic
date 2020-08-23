@@ -1,8 +1,11 @@
 import os
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Union, TYPE_CHECKING
 from collections import OrderedDict
 
 ARIBITRARY_ARITY = -1
+
+if TYPE_CHECKING:
+    from pystatic.manager import Manager
 
 
 class BaseType(object):
@@ -131,7 +134,7 @@ class TypeClassTemp(TypeTemp):
         return True
 
 
-CheckedPacket = '__checked'
+CHECKED_PACKET = '__checked'
 
 
 class TypeModuleTemp(TypeClassTemp):
@@ -144,20 +147,39 @@ class TypeModuleTemp(TypeClassTemp):
         self.uri = uri
 
     def exposed_uri(self):
-        if self.uri.startswith(CheckedPacket):
+        if self.uri.startswith(CHECKED_PACKET):
             return '.'.join(self.uri.split('.')[1:])
         else:
             return self.uri
 
+    def exposed_pkg(self):
+        if self.uri.startswith(CHECKED_PACKET):
+            return ''
+        else:
+            return '.'.join(self.uri.split('.')[:-1])
+
 
 class TypePackageTemp(TypeClassTemp):
-    def __init__(self, path: str, uri: str):
+    def __init__(self, path: List[str], uri: str, manager: 'Manager'):
         super().__init__('package')
         self.path = path
         self.uri = uri
+        self.manager = manager
 
-    def get_type(self, name: str) -> Optional[TypeTemp]:
-        return None
+    def get_type(self, imp: str) -> Optional[TypeTemp]:
+        return self.manager.deal_import(imp, self)
+
+    def exposed_uri(self):
+        if self.uri.startswith(CHECKED_PACKET):
+            return '.'.join(self.uri.split('.')[1:])
+        else:
+            return self.uri
+
+    def exposed_pkg(self):
+        if self.uri.startswith(CHECKED_PACKET):
+            return ''
+        else:
+            return '.'.join(self.uri.split('.')[:-1])
         # from .semanal import semanal_module
         # path = os.path.join(self.path, name)
         # if os.path.isdir(path):
@@ -245,6 +267,8 @@ class TypeFunc(TypeClass):
     def __str__(self):
         return str(self.arg) + ' -> ' + str(self.ret_type)
 
+
+ImpItem = Union[TypeModuleTemp, TypePackageTemp]
 
 # default types
 any_type = TypeAny()

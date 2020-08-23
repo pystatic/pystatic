@@ -185,30 +185,32 @@ class ClassCollector(BaseVisitor):
 
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
-            m_type = self.manager.import_find(alias.name, self.env.module)
+            m_type = self.manager.deal_import(alias.name, self.env.module)
             if m_type is None:
                 self.err.add_err(node, f'module {alias.name} not found')
             else:
                 name = alias.asname if alias.asname else alias.name
                 self.env.add_type(name, m_type)
-                logger.debug(
-                    f'Import {alias.name} as {name} (abspath: {m_type.path})')
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         imp_name = node.module if node.module else ''
         imp_name = '.' * node.level + imp_name
-        m_type = self.manager.import_find(imp_name, self.env.module)
+        m_type = self.manager.deal_import(imp_name, self.env.module)
         if m_type is None:
             self.err.add_err(node, f'module {imp_name} not found')
         else:
             for alias in node.names:
                 name = alias.asname if alias.asname else alias.name
-                res = m_type.get_type(name)
-                if res is None:
-                    self.err.add_err(alias,
-                                     f'{imp_name}.{alias.name} not found')
+                if isinstance(m_type, TypeClassTemp):
+                    res = m_type.get_type(name)
+                    if res is None:
+                        self.err.add_err(node,
+                                         f'{imp_name}.{alias.name} not found')
+                    else:
+                        self.env.add_type(name, res)
                 else:
-                    self.env.add_type(name, res)
+                    self.err.add_err(node,
+                                     f'{imp_name}.{alias.name} not found')
 
 
 class AnnotationParser(object):

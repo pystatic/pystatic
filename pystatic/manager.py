@@ -1,15 +1,13 @@
 import os
 import ast
-import copy
 import logging
-from typing import ChainMap, Optional, Union, List, Dict, Set, TextIO
-from pystatic.typesys import TypePackageTemp, TypeModuleTemp, TypeTemp, CheckedPacket
-from pystatic.config import Config, CheckMode
+from typing import Optional, List, TextIO
+from pystatic.typesys import ImpItem, TypeModuleTemp, CHECKED_PACKET, TypeTemp
+from pystatic.config import Config
 from pystatic.env import get_init_env
 from pystatic.semanal_main import ClassCollector, TypeRecorder
 from pystatic.error import ErrHandler
-
-ImpItem = Union[TypeModuleTemp, TypePackageTemp]
+from pystatic.module_cache import ModuleCache
 
 
 class Manager:
@@ -26,67 +24,138 @@ class Manager:
         self.targets = set(targets)
         self.config = Config(config, targets)
 
-        self.imp_cache = {}
-
         self.stdout = stdout
         self.stderr = stderr
 
-    def update_imp_cache(self, item: ImpItem) -> ImpItem:
-        self.imp_cache[item.uri] = item
-        return item
+        self.module_cache = ModuleCache(self)
 
-    def _find_through_path(self, to_imp: str,
-                           cur_module: TypeModuleTemp) -> Optional[ImpItem]:
-        dir_path = os.path.dirname(cur_module.path)
-        i = 0
-        while len(to_imp) > i and to_imp[i] == '.':
-            i += 1
-        to_imp = to_imp[i:]
-        while i >= 2:
-            dir_path = os.path.dirname(dir_path)
-            i -= 2
+    # def update_imp_cache(self, item: ImpItem) -> ImpItem:
+    #     self.imp_cache[item.uri] = item
+    #     return item
 
-        imp_rel_path = os.path.sep.join(to_imp.split('.'))
-        imp_path = os.path.join(dir_path, imp_rel_path)
+    # def _dot_before_imp(self, to_imp: str) -> int:
+    #     i = 0
+    #     while len(to_imp) > i and to_imp[i] == '.':
+    #         i += 1
+    #     return i
 
-        imp_uri = CheckedPacket + imp_path
-        if imp_uri in self.imp_cache:
-            return self.imp_cache[imp_uri]
+    # def _find_through_path(self, to_imp: str,
+    #                        cur_module: TypeModuleTemp) -> Optional[ImpItem]:
+    #     dir_path = os.path.dirname(cur_module.path)
+    #     i = self._dot_before_imp(to_imp)
+    #     to_imp = to_imp[i:]
+    #     while i >= 2:
+    #         dir_path = os.path.dirname(dir_path)
+    #         i -= 2
 
-        # package?
-        if os.path.isdir(imp_path):
-            if os.path.isfile(os.path.join(imp_path, '__init__.py')):
-                return self.update_imp_cache(TypePackageTemp(
-                    imp_path, imp_uri))
-            elif os.path.isfile(os.path.join(imp_path, '__init__.pyi')):
-                return self.update_imp_cache(TypePackageTemp(
-                    imp_path, imp_uri))
-            else:
-                return None
-        else:
-            if os.path.isfile(imp_path + '.pyi'):
-                return self.semanal_module(imp_path + '.pyi', imp_uri)
-            elif os.path.isfile(imp_path + '.py'):
-                return self.semanal_module(imp_path + '.py', imp_uri)
-            else:
-                return None
+    #     imp_rel_path = os.path.sep.join(to_imp.split('.'))
+    #     imp_path = os.path.join(dir_path, imp_rel_path)
 
-    def import_find(self, to_imp: str,
-                    cur_module: TypeModuleTemp) -> Optional[ImpItem]:
-        """PEP 561
+    #     imp_uri = CHECKED_PACKET + imp_path
+    #     if imp_uri in self.imp_cache:
+    #         return self.imp_cache[imp_uri]
 
-        - Stubs or Python source manually put at the beginning of the path($MYPYPATH)
-        - User code - files the type checker is running on.
-        - Stub packages.
-        - Inline packages.
-        - Typeshed.
-        """
-        if not to_imp:
-            return None
-        if to_imp[0] == '.' and cur_module.path.startswith(CheckedPacket):
-            return self._find_through_path(to_imp, cur_module)
-        else:
-            return None  # TODO
+    #     # package?
+    #     if os.path.isdir(imp_path):
+    #         if os.path.isfile(os.path.join(imp_path, '__init__.py')):
+    #             return self.update_imp_cache(
+    #                 TypePackageTemp([imp_path], imp_uri))
+    #         elif os.path.isfile(os.path.join(imp_path, '__init__.pyi')):
+    #             return self.update_imp_cache(
+    #                 TypePackageTemp([imp_path], imp_uri))
+    #         else:
+    #             return None
+    #     else:
+    #         if os.path.isfile(imp_path + '.pyi'):
+    #             return self.semanal_module(imp_path + '.pyi', imp_uri)
+    #         elif os.path.isfile(imp_path + '.py'):
+    #             return self.semanal_module(imp_path + '.py', imp_uri)
+    #         else:
+    #             return None
+
+    # def _get_imp_uri(self, to_imp: str,
+    #                  cur_module: TypeModuleTemp) -> List[str]:
+    #     i = self._dot_before_imp(to_imp)
+    #     cur_module_uri = cur_module.exposed_pkg().split('.')
+    #     if cur_module_uri[0] == '':
+    #         cur_module_uri = []
+    #     rel_uri = to_imp[i:].split('.')
+    #     if i == 0:
+    #         return cur_module_uri + rel_uri
+    #     else:
+    #         return cur_module_uri[:-(i // 2)] + rel_uri
+
+    # def _search_type_file(self, uri: List[str], pathes: List[str],
+    #                       start) -> List[str]:
+    #     len_uri = len(uri)
+    #     for i in range(start, len_uri):
+    #         if not pathes:
+    #             return []
+    #         ns_pathes = []  # namespace packages
+    #         target = None
+    #         for path in pathes:
+    #             sub_target = os.path.join(path, uri[i])
+
+    #             if i == len_uri - 1:
+    #                 pyi_file = sub_target + '.pyi'
+    #                 py_file = sub_target + '.py'
+    #                 if os.path.isfile(pyi_file):
+    #                     return [pyi_file]
+    #                 if os.path.isfile(py_file):
+    #                     return [py_file]
+
+    #             if os.path.isdir(sub_target):
+    #                 init_file = os.path.join(sub_target, '__init__.py')
+    #                 if os.path.isfile(init_file):
+    #                     target = sub_target
+    #                 else:
+    #                     ns_pathes.append(sub_target)
+
+    #         if target:
+    #             pathes = [target]
+    #         else:
+    #             pathes = ns_pathes
+    #     return pathes
+
+    # def _find_through_uri(self, uri: List[str]) -> Optional[ImpItem]:
+    #     def gen_impItem(pathes: List[str]):
+    #         isdir = False
+    #         for path in pathes:
+    #             if not os.path.exists(path):
+    #                 return None
+    #             if os.path.isdir(path):
+    #                 isdir = True
+    #             elif isdir:
+    #                 return None  # can't be package and module at the same time
+
+    #         if isdir:  # package
+    #             return TypePackageTemp(pathes, '.'.join(uri))
+    #         else:
+    #             assert len(pathes) == 1  # module
+    #             return self.semanal_module(pathes[0], '.'.join(uri))
+
+    #     # find under $MYPYPATH
+    #     pathes = self._search_type_file(uri, self.config.manual_path, 0)
+    #     if pathes:
+    #         return gen_impItem(pathes)
+    #     # find under cwd
+    #     if self.config.mode == CheckMode.Package and uri[
+    #             0] == self.config.package_name:
+    #         pathes = self._search_type_file(uri, [self.config.cwd], 1)
+    #     else:
+    #         pathes = self._search_type_file(uri, [self.config.cwd], 0)
+    #     if pathes:
+    #         return gen_impItem(pathes)
+    #     # find stub packages
+    #     pathes = self._search_type_file(uri, self.config.sitepkg, 0)
+    #     if pathes:
+    #         return gen_impItem(pathes)
+    #     # find typeshed
+    #     return None
+
+    def deal_import(self, to_imp: str,
+                    cur_module: ImpItem) -> Optional[TypeTemp]:
+        return self.module_cache.lookup_from_module(to_imp, cur_module)
 
     def semanal_module(self, path: str, uri: str) -> Optional[TypeModuleTemp]:
         try:
@@ -114,4 +183,5 @@ class Manager:
 
     def check(self):
         for path in self.targets:
-            self.semanal_module(path, CheckedPacket + path)
+            module_name = os.path.splitext(os.path.basename(path))[0]
+            self.semanal_module(path, CHECKED_PACKET + '.' + module_name)
