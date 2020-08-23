@@ -29,7 +29,7 @@ def _is_typevar_def(node: Union[ast.Assign, ast.AnnAssign]):
 
 class ClassCollector(BaseVisitor):
     """Build a TypeScope tree"""
-    def __init__(self, env: Environment, err: ErrHandler, manager: Manager):
+    def __init__(self, env: Environment, err: ErrHandler, manager: 'Manager'):
         self.env = env
         self.err = err
         self.manager = manager

@@ -1,8 +1,8 @@
 import ast
 import enum
-from .typesys import TypeClass
-from .env import Environment
-from .visitor import ParseException
+from pystatic.typesys import TypeClass
+from pystatic.env import Environment
+from pystatic.visitor import ParseException
 
 
 class TypeNodeTag(enum.Enum):

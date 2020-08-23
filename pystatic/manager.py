@@ -1,73 +1,13 @@
 import os
 import ast
 import copy
-from io import TextIO
-from typing import ChainMap, Optional, Union, List, Dict, Set
-from pystatic.typesys import TypePackageTemp, TypeModuleTemp, TypeTemp
+import logging
+from typing import ChainMap, Optional, Union, List, Dict, Set, TextIO
+from pystatic.typesys import TypePackageTemp, TypeModuleTemp, TypeTemp, CheckedPacket
 from pystatic.config import Config, CheckMode
-from pystatic.typesys import CheckedPacket
-
-# class File(object):
-#     def __init__(self, path: str):
-#         """ path must be an absolute path """
-#         assert os.path.isabs(path)
-#         self.abs_path = path
-#         self.mtime = -1
-
-#     @property
-#     def abs_path(self):
-#         """ absolute path """
-#         return self._abs_path
-
-#     @abs_path.setter
-#     def abs_path(self, path: str):
-#         self._abs_path = path
-#         self._update()
-
-#     def _update(self):
-#         self.dirname = os.path.dirname(self._abs_path)
-#         self.filename = os.path.basename(self._abs_path)
-#         if self.filename.endswith('.py'):
-#             self.module_name = self.filename[:-3]
-#         elif self.filename.endswith('.pyi'):
-#             self.module_name = self.filename[:-4]
-#         else:
-#             self.module_name = self.filename
-
-#     def isdir(self) -> bool:
-#         return os.path.isdir(self._abs_path)
-
-#     def _read(self) -> str:
-#         with open(self._abs_path) as f:
-#             self._content = f.read()
-#             return self._content
-
-#     def read(self) -> str:
-#         mtime = os.path.getmtime(self._abs_path)
-#         if mtime != self.mtime:
-#             self.mtime = mtime
-#             return self._read()
-#         else:
-#             return self._content
-
-#     def _parse(self) -> ast.AST:
-#         content = self._read()
-#         self._parse_tree = ast.parse(content, type_comments=True)
-#         return self._parse_tree
-
-#     def parse(self) -> ast.AST:
-#         mtime = os.path.getmtime(self._abs_path)
-#         if mtime != self.mtime:
-#             self.mtime = mtime
-#             return self._parse()
-#         else:
-#             return self._parse_tree
-
-#     def __eq__(self, other) -> bool:
-#         return other.abs_path == self.abs_path
-
-#     def __hash__(self) -> int:
-#         return hash(self.abs_path)
+from pystatic.env import get_init_env
+from pystatic.semanal_main import ClassCollector, TypeRecorder
+from pystatic.error import ErrHandler
 
 ImpItem = Union[TypeModuleTemp, TypePackageTemp]
 
@@ -76,7 +16,15 @@ class Manager:
     def __init__(self, config, targets: List[str], stdout: TextIO,
                  stderr: TextIO):
         self.config = Config(config, targets)
-        self.targets = set(*targets)
+        abs_targets = []
+        for path in targets:
+            if not os.path.isabs(path):
+                path = os.path.normpath(os.path.join(self.config.cwd, path))
+            if os.path.exists(path):
+                abs_targets.append(path)
+
+        self.targets = set(targets)
+        self.config = Config(config, targets)
 
         self.imp_cache = {}
 
@@ -117,9 +65,9 @@ class Manager:
                 return None
         else:
             if os.path.isfile(imp_path + '.pyi'):
-                pass
+                return self.semanal_module(imp_path + '.pyi', imp_uri)
             elif os.path.isfile(imp_path + '.py'):
-                pass
+                return self.semanal_module(imp_path + '.py', imp_uri)
             else:
                 return None
 
@@ -140,5 +88,30 @@ class Manager:
         else:
             return None  # TODO
 
-    def check(self, file: str):
-        pass
+    def semanal_module(self, path: str, uri: str) -> Optional[TypeModuleTemp]:
+        try:
+            with open(path) as f:
+                src = f.read()
+            treenode = ast.parse(src, type_comments=True)
+        except SyntaxError as e:
+            logging.debug(f'failed to parse {path}')
+            return None
+        except FileNotFoundError as e:
+            logging.debug(f'{path} not found')
+            return None
+        tmp_tp_module = TypeModuleTemp(path, uri, {}, {})
+        env = get_init_env(tmp_tp_module)
+        err = ErrHandler(tmp_tp_module.exposed_uri())
+        ClassCollector(env, err, self).accept(treenode)
+        TypeRecorder(env, err).accept(treenode)
+        glob = env.glob_scope
+
+        # output errors(only for debug)
+        for e in err:
+            self.stdout.write(str(e) + '\n')
+
+        return TypeModuleTemp(path, uri, glob.types, glob.local)
+
+    def check(self):
+        for path in self.targets:
+            self.semanal_module(path, CheckedPacket + path)

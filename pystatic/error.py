@@ -1,7 +1,6 @@
 import ast
 from typing import Optional
 from enum import IntEnum
-from .fsys import File
 
 
 class ErrId(IntEnum):
@@ -41,8 +40,8 @@ class ErrHandler(object):
     """ Error information for each file
     Each file should have an ErrHandler
     """
-    def __init__(self, file: File):
-        self.filename = file.filename
+    def __init__(self, module_uri: str):
+        self.filename = module_uri
         self.err = []
 
     def add_err(self, node: ast.AST, msg: str):

@@ -2,7 +2,7 @@ import sys
 import os
 import enum
 from typing import List, Optional, Set
-from .sitepkg import get_sitepkg
+from pystatic.sitepkg import get_sitepkg
 
 
 class CheckMode(enum.Enum):
@@ -37,7 +37,7 @@ class Config:
         elif get('cwd'):
             self.cwd = get('cwd')  # type: ignore
         elif targets and os.path.exists(targets[0]):
-            self.cwd = os.path.dirname(targets[0])
+            self.cwd = os.path.dirname(os.path.abspath(targets[0]))
         else:
             self.cwd = os.getcwd()
 

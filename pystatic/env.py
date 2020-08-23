@@ -1,7 +1,7 @@
 import os
 from collections import OrderedDict
 from typing import Dict, Optional, List
-from .typesys import (BaseType, TypeClassTemp, TypeModuleTemp, TypePackageTemp,
+from pystatic.typesys import (BaseType, TypeClassTemp, TypeModuleTemp, TypePackageTemp,
                       TypeTemp, TypeIns, any_type, int_type, float_type,
                       bool_type, str_type, generic_type, none_type)
 

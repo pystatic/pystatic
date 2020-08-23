@@ -143,7 +143,7 @@ class TypeModuleTemp(TypeClassTemp):
         self.path = path
         self.uri = uri
 
-    def full_uri(self):
+    def exposed_uri(self):
         if self.uri.startswith(CheckedPacket):
             return '.'.join(self.uri.split('.')[1:])
         else:

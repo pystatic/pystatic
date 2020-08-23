@@ -21,3 +21,4 @@ def cmdline(stdout: TextIO, stderr: TextIO):
             stderr.write(f"{path} doesn't exist\n")
 
     manager = Manager(parse_res, srcfiles, stdout, stderr)
+    manager.check()

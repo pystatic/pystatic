@@ -1,4 +1,4 @@
-from .typesys import BaseType, TypeAny, any_type
+from pystatic.typesys import BaseType, TypeAny, any_type
 from typing import Optional, List
 
 
