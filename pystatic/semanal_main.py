@@ -203,7 +203,7 @@ class ClassCollector(BaseVisitor):
             for alias in node.names:
                 name = alias.asname if alias.asname else alias.name
                 if isinstance(m_type, TypeClassTemp):
-                    res = m_type.get_type(name)
+                    res = m_type.get_type(alias.name)
                     if res is None:
                         self.err.add_err(node,
                                          f'{imp_name}.{alias.name} not found')

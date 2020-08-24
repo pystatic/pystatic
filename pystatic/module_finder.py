@@ -159,6 +159,8 @@ class ModuleFinder:
         res, i = self.search_imp(uris)
         if i == 0:
             return None
+        elif i != len(uris) and isinstance(res, TypePackageTemp):
+            return None
         else:
             for sub_name in uris[i:]:
                 if isinstance(res, TypeClassTemp):
