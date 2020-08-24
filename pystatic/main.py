@@ -1,11 +1,11 @@
 import argparse
 import os
 import sys
-from typing import TextIO, List
-# from pystatic.manager import Manager
+from typing import Text, TextIO, List
+from pystatic.manager import Manager
 
 
-def cmdline():
+def cmdline_parse():
     parser = argparse.ArgumentParser('python static type checker')
     parser.add_argument('module',
                         metavar='module',
@@ -20,18 +20,17 @@ def cmdline():
                         type=str)
     parse_res = parser.parse_args()
     return parse_res
-    # for path in parse_res.module:
-    #     if not os.path.isabs(path):
-    #         path = os.path.join(cwd, path)
 
-    #     if os.path.isdir(path) or os.path.isfile(path):
-    #         srcfiles.append(path)
-    #     else:
-    #         stderr.write(f"{path} doesn't exist\n")
 
-    # manager = Manager(parse_res, srcfiles, stdout, stderr)
-    # manager.check()
+def cmdline(stdout: TextIO, stderr: TextIO):
+    cmd_res = cmdline_parse()
+    if not cmd_res.module:
+        cmd_res.module = []
+    if not cmd_res.package:
+        cmd_res.package = []
+    manager = Manager(cmd_res, cmd_res.module, cmd_res.package, stdout, stderr)
+    manager.check()
 
 
 if __name__ == '__main__':
-    cmdline()
+    cmdline(sys.stdout, sys.stderr)
