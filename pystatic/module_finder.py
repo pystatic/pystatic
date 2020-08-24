@@ -25,18 +25,37 @@ def dot_before_imp(to_imp: str) -> int:
     return i
 
 
-def get_imp_uri(to_imp: str, cur_module: 'ImpItem') -> List[str]:
+def uri2list(uri: str) -> List[str]:
+    return [item for item in uri.split('.') if item != '']
+
+
+def module_get_imp_uri(to_imp: str, cur_module: TypeModuleTemp) -> List[str]:
     i = dot_before_imp(to_imp)
     if i == 0:
-        return [item for item in to_imp.split('.') if item != '']
+        return uri2list(to_imp)
     else:
-        cur_module_uri = cur_module.uri.split('.')
-        rel_uri = [item for item in to_imp[i:].split('.') if item != '']
+        cur_module_uri = cur_module.uri.split('.')[:-1]
+        rel_uri = uri2list(to_imp[i:])
 
         if i == 1:
             return cur_module_uri + rel_uri
         else:
             return cur_module_uri[:-(i // 2)] + rel_uri
+
+
+def package_get_imp_uri(to_imp: str,
+                        cur_package: TypePackageTemp) -> List[str]:
+    i = dot_before_imp(to_imp)
+    package_uris = uri2list(cur_package.uri)
+    if i == 0:
+        return package_uris + uri2list(to_imp)
+    else:
+        rel_uri = uri2list(to_imp[i:])
+
+        if i == 1:
+            return package_uris + rel_uri
+        else:
+            return package_uris[:-(i // 2)] + rel_uri
 
 
 class ModuleFinder:
@@ -104,7 +123,8 @@ class ModuleFinder:
                     return None
 
             if isdir:  # package
-                return TypePackageTemp(paths, '.'.join(uri), self.manager)
+                return TypePackageTemp(paths, '.'.join(uri[:end]),
+                                       self.manager)
             else:
                 assert len(paths) == 1  # module
                 return self.manager.semanal_module(paths[0],
@@ -135,15 +155,24 @@ class ModuleFinder:
                 curnode = nextnode
         return curnode.content, len(uris)
 
-    def find(self, to_imp: str, cur_module: 'ImpItem') -> Optional[TypeTemp]:
-        to_imp_uris = get_imp_uri(to_imp, cur_module)
-        res, i = self.search_imp(to_imp_uris)
+    def _find(self, uris: List[str]) -> Optional[TypeTemp]:
+        res, i = self.search_imp(uris)
         if i == 0:
             return None
         else:
-            for sub_name in to_imp_uris[i:]:
+            for sub_name in uris[i:]:
                 if isinstance(res, TypeClassTemp):
                     res = res.get_type(sub_name)
                 else:
                     return None
             return res
+
+    def find_from_module(self, to_imp: str,
+                         cur_module: TypeModuleTemp) -> Optional[TypeTemp]:
+        to_imp_uris = module_get_imp_uri(to_imp, cur_module)
+        return self._find(to_imp_uris)
+
+    def find_from_package(self, to_imp: str,
+                          cur_package: TypePackageTemp) -> Optional[TypeTemp]:
+        to_imp_uris = package_get_imp_uri(to_imp, cur_package)
+        return self._find(to_imp_uris)

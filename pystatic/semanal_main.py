@@ -185,7 +185,8 @@ class ClassCollector(BaseVisitor):
 
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
-            m_type = self.manager.deal_import(alias.name, self.env.module)
+            m_type = self.manager.deal_module_import(alias.name,
+                                                     self.env.module)
             if m_type is None:
                 self.err.add_err(node, f'module {alias.name} not found')
             else:
@@ -195,7 +196,7 @@ class ClassCollector(BaseVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom):
         imp_name = node.module if node.module else ''
         imp_name = '.' * node.level + imp_name
-        m_type = self.manager.deal_import(imp_name, self.env.module)
+        m_type = self.manager.deal_module_import(imp_name, self.env.module)
         if m_type is None:
             self.err.add_err(node, f'module {imp_name} not found')
         else:

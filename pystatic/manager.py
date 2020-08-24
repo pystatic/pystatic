@@ -3,7 +3,7 @@ import ast
 import logging
 import enum
 from typing import Optional, List, TextIO, Set
-from pystatic.typesys import ImpItem, TypeModuleTemp, TypeTemp
+from pystatic.typesys import ImpItem, TypeModuleTemp, TypePackageTemp, TypeTemp
 from pystatic.config import Config
 from pystatic.env import get_init_env
 from pystatic.semanal_main import ClassCollector, TypeRecorder
@@ -90,11 +90,18 @@ class Manager:
                 else:
                     pass  # TODO: warning here
 
-    def deal_import(self, to_imp: str,
-                    cur_module: ImpItem) -> Optional[TypeTemp]:
+    def deal_module_import(self, to_imp: str,
+                           cur_module: TypeModuleTemp) -> Optional[TypeTemp]:
         if not to_imp:
             return None
-        return self.finder.find(to_imp, cur_module)
+        return self.finder.find_from_module(to_imp, cur_module)
+
+    def deal_package_import(
+            self, to_imp: str,
+            cur_package: TypePackageTemp) -> Optional[TypeTemp]:
+        if not to_imp:
+            return None
+        return self.finder.find_from_package(to_imp, cur_package)
 
     def semanal_module(self, path: str, uri: str) -> Optional[TypeModuleTemp]:
         try:

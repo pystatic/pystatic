@@ -152,7 +152,7 @@ class TypePackageTemp(TypeClassTemp):
         self.manager = manager
 
     def get_type(self, imp: str) -> Optional[TypeTemp]:
-        return self.manager.deal_import(imp, self)
+        return self.manager.deal_package_import(imp, self)
 
 
 class TypeAny(TypeTemp):
