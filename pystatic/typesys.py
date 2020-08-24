@@ -134,9 +134,6 @@ class TypeClassTemp(TypeTemp):
         return True
 
 
-CHECKED_PACKET = '__checked'
-
-
 class TypeModuleTemp(TypeClassTemp):
     def __init__(self, path: str, uri: str, tp: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
@@ -145,18 +142,6 @@ class TypeModuleTemp(TypeClassTemp):
         self.attribute = local
         self.path = path
         self.uri = uri
-
-    def exposed_uri(self):
-        if self.uri.startswith(CHECKED_PACKET):
-            return '.'.join(self.uri.split('.')[1:])
-        else:
-            return self.uri
-
-    def exposed_pkg(self):
-        if self.uri.startswith(CHECKED_PACKET):
-            return ''
-        else:
-            return '.'.join(self.uri.split('.')[:-1])
 
 
 class TypePackageTemp(TypeClassTemp):
@@ -168,31 +153,6 @@ class TypePackageTemp(TypeClassTemp):
 
     def get_type(self, imp: str) -> Optional[TypeTemp]:
         return self.manager.deal_import(imp, self)
-
-    def exposed_uri(self):
-        if self.uri.startswith(CHECKED_PACKET):
-            return '.'.join(self.uri.split('.')[1:])
-        else:
-            return self.uri
-
-    def exposed_pkg(self):
-        if self.uri.startswith(CHECKED_PACKET):
-            return ''
-        else:
-            return '.'.join(self.uri.split('.')[:-1])
-        # from .semanal import semanal_module
-        # path = os.path.join(self.path, name)
-        # if os.path.isdir(path):
-        #     init_path = os.path.join(path, '__init__.py')
-        #     if os.path.isfile(init_path):
-        #         return TypePackageTemp(File(path))
-        #     else:
-        #         return None
-        # path = os.path.join(self.path, name + '.py')
-        # if os.path.isfile(path):
-        #     return semanal_module(File(path))
-        # else:
-        #     return None
 
 
 class TypeAny(TypeTemp):

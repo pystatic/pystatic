@@ -1,11 +1,42 @@
 import os
-from typing import List, Optional, Union, TYPE_CHECKING
-from pystatic.typesys import TypeModuleTemp, TypePackageTemp
+from typing import List, Dict, Optional, Union, TYPE_CHECKING, Tuple
+from pystatic.typesys import (TypeModuleTemp, TypePackageTemp, TypeClassTemp,
+                              TypeTemp)
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 ImpItem = Union[TypeModuleTemp, TypePackageTemp]
+
+
+class Node:
+    def __init__(self, content: 'ImpItem'):
+        self.child: Dict[str, 'Node'] = {}
+        self.content = content
+
+    def march(self, name: str) -> Optional['Node']:
+        return self.child.get(name)
+
+
+def dot_before_imp(to_imp: str) -> int:
+    i = 0
+    while len(to_imp) > i and to_imp[i] == '.':
+        i += 1
+    return i
+
+
+def get_imp_uri(to_imp: str, cur_module: 'ImpItem') -> List[str]:
+    i = dot_before_imp(to_imp)
+    if i == 0:
+        return [item for item in to_imp.split('.') if item != '']
+    else:
+        cur_module_uri = cur_module.uri.split('.')
+        rel_uri = [item for item in to_imp[i:].split('.') if item != '']
+
+        if i == 1:
+            return cur_module_uri + rel_uri
+        else:
+            return cur_module_uri[:-(i // 2)] + rel_uri
 
 
 class ModuleFinder:
@@ -17,20 +48,27 @@ class ModuleFinder:
     - Inline packages.
     - Typeshed.
     """
-    def __init__(self, manager: 'Manager'):
-        self.manager = manager
-        self.config = manager.config
+    def __init__(self, manual_path: List[str], user_path: List[str],
+                 sitepkg: List[str], typeshed: Optional[List[str]],
+                 manager: 'Manager'):
+        search_path = manual_path + user_path + sitepkg
+        if typeshed:
+            search_path += typeshed
 
-    def _search_type_file(self, uri: List[str], pathes: List[str],
+        rt_pkg = TypePackageTemp(search_path, '', manager)
+        self.manager = manager
+        self.root = Node(rt_pkg)
+
+    def _search_type_file(self, uri: List[str], paths: List[str],
                           start) -> List[str]:
         len_uri = len(uri)
         for i in range(start, len_uri):
-            if not pathes:
+            if not paths:
                 return []
-            ns_pathes = []  # namespace packages
+            ns_paths = []  # namespace packages
             target = None
-            for path in pathes:
-                sub_target = os.path.join(path, uri[i])
+            for path in paths:
+                sub_target = os.path.normpath(os.path.join(path, uri[i]))
 
                 if i == len_uri - 1:
                     pyi_file = sub_target + '.pyi'
@@ -45,19 +83,19 @@ class ModuleFinder:
                     if os.path.isfile(init_file):
                         target = sub_target
                     else:
-                        ns_pathes.append(sub_target)
+                        ns_paths.append(sub_target)
 
             if target:
-                pathes = [target]
+                paths = [target]
             else:
-                pathes = ns_pathes
-        return pathes
+                paths = ns_paths
+        return paths
 
-    def find_pathes(self, pathes: List[str],
-                    uri: List[str]) -> Optional[ImpItem]:
-        def gen_impItem(pathes: List[str]):
+    def find_by_paths(self, paths: List[str], uri: List[str], start: int,
+                      end: int) -> Optional[ImpItem]:
+        def gen_impItem(paths: List[str]):
             isdir = False
-            for path in pathes:
+            for path in paths:
                 if not os.path.exists(path):
                     return None
                 if os.path.isdir(path):
@@ -66,13 +104,46 @@ class ModuleFinder:
                     return None
 
             if isdir:  # package
-                return TypePackageTemp(pathes, '.'.join(uri), self.manager)
+                return TypePackageTemp(paths, '.'.join(uri), self.manager)
             else:
-                assert len(pathes) == 1  # module
-                return self.manager.semanal_module(pathes[0], '.'.join(uri))
+                assert len(paths) == 1  # module
+                return self.manager.semanal_module(paths[0],
+                                                   '.'.join(uri[:end]))
 
-        pathes = self._search_type_file(uri, pathes, 0)
-        if pathes:
-            return gen_impItem(pathes)
+        paths = self._search_type_file(uri[start:end], paths, 0)
+        if paths:
+            return gen_impItem(paths)
         else:
             return None
+
+    def search_imp(self, uris: List[str]) -> Tuple['ImpItem', int]:
+        curnode = self.root
+        for i, sub_uri in enumerate(uris):
+            nextnode = curnode.march(sub_uri)
+            if not nextnode:
+                if isinstance(curnode.content, TypeModuleTemp):
+                    return curnode.content, i
+                else:
+                    res = self.find_by_paths(curnode.content.path, uris, i,
+                                             i + 1)
+                    if res is None:
+                        return curnode.content, i
+                    else:
+                        curnode.child[sub_uri] = Node(res)
+                        curnode = curnode.child[sub_uri]
+            else:
+                curnode = nextnode
+        return curnode.content, len(uris)
+
+    def find(self, to_imp: str, cur_module: 'ImpItem') -> Optional[TypeTemp]:
+        to_imp_uris = get_imp_uri(to_imp, cur_module)
+        res, i = self.search_imp(to_imp_uris)
+        if i == 0:
+            return None
+        else:
+            for sub_name in to_imp_uris[i:]:
+                if isinstance(res, TypeClassTemp):
+                    res = res.get_type(sub_name)
+                else:
+                    return None
+            return res

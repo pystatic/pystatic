@@ -90,7 +90,7 @@ class Environment(object):
 
     def __init__(self, scope: Scope, module: TypeModuleTemp):
         self.scope_list = [scope]
-        self.name_list: List[str] = [module.exposed_uri()]
+        self.name_list: List[str] = [module.uri]
         self.scope_type = [self.GLOB_SCOPE]
 
         self.module = module
