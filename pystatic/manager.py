@@ -6,7 +6,7 @@ from typing import Optional, List, TextIO, Set
 from pystatic.typesys import ImpItem, TypeModuleTemp, TypePackageTemp, TypeTemp
 from pystatic.config import Config
 from pystatic.env import get_init_env
-from pystatic.semanal_main import ClassCollector, TypeRecorder
+from pystatic.semanal.main import ClassCollector, TypeRecorder
 from pystatic.error import ErrHandler
 from pystatic.module_finder import ModuleFinder
 

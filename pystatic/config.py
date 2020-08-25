@@ -1,6 +1,5 @@
 import sys
 import os
-from sys import version_info
 from typing import List, Optional
 from pystatic.sitepkg import get_sitepkg
 

@@ -9,7 +9,7 @@ from pystatic.typesys import (ARIBITRARY_ARITY, TypeModuleTemp, any_type,
                               TypeVar, TypeClassTemp, TypeFunc,
                               TypePackageTemp)
 from pystatic.arg import Arg, Argument
-from pystatic.semanal_parse import typenode_parse_type, TypeNodeTag, get_type
+from pystatic.semanal.parse import typenode_parse_type, TypeNodeTag, get_type
 from pystatic.util import ParseException
 
 logger = logging.getLogger(__name__)
