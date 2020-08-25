@@ -3,9 +3,10 @@ import ast
 
 class BaseVisitor(object):
     def visit(self, node: ast.AST, *args, **kwargs):
-        method = 'visit_' + node.__class__.__name__
-        next_visitor = getattr(self, method, self.generic_visit)
-        return next_visitor(node, *args, **kwargs)
+        if getattr(node, 'reach', True):
+            method = 'visit_' + node.__class__.__name__
+            next_visitor = getattr(self, method, self.generic_visit)
+            return next_visitor(node, *args, **kwargs)
 
     def generic_visit(self, node: ast.AST, *args, **kwargs):
         rt = None

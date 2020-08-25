@@ -10,6 +10,7 @@ from pystatic.typesys import (ARIBITRARY_ARITY, TypeModuleTemp, any_type,
                               TypePackageTemp)
 from pystatic.arg import Arg, Argument
 from pystatic.semanal.parse import typenode_parse_type, TypeNodeTag, get_type
+from pystatic.reachability import Reach, infer_reachability_if
 from pystatic.util import ParseException
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,24 @@ class ClassCollector(BaseVisitor):
                 if e.msg:
                     self.err.add_err(e.node, msg)
         return var_list, base_list
+
+    def visit_If(self, node: ast.If):
+        if_res = infer_reachability_if(node.test, self.manager.config)
+        if if_res in (Reach.ALWAYS_TRUE, Reach.TYPE_TRUE):
+            for subif in node.orelse:
+                setattr(subif, 'reach', False)
+            for stmt in node.body:  # only visit this block
+                self.visit(stmt)
+        elif if_res in (Reach.ALWAYS_FALSE, Reach.TYPE_FALSE):
+            for stmt in node.body:  # don't visit this block
+                setattr(stmt, 'reach', False)
+            for subif in node.orelse:
+                self.visit(subif)
+        else:
+            for stmt in node.body:
+                self.visit(stmt)
+            for subif in node.orelse:
+                self.visit(subif)
 
     def visit_ClassDef(self, node: ast.ClassDef):
         if not self.env.lookup_local_type(node.name):
