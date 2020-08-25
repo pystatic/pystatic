@@ -2,7 +2,7 @@ import ast
 import enum
 from pystatic.typesys import TypeClass
 from pystatic.env import Environment
-from pystatic.visitor import ParseException
+from pystatic.util import ParseException
 
 
 class TypeNodeTag(enum.Enum):

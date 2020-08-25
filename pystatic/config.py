@@ -1,5 +1,6 @@
 import sys
 import os
+from sys import version_info
 from typing import List, Optional
 from pystatic.sitepkg import get_sitepkg
 
@@ -17,8 +18,8 @@ class Config:
                     return getattr(config, attr)
                 return None
 
-        self.python_executable: str = get(
-            'python_executable') or sys.executable
+        self.python_version: tuple = (sys.version_info.major,
+                                      sys.version_info.minor)
 
         # set cwd
         self.cwd = os.getcwd()

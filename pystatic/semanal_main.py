@@ -4,12 +4,13 @@ from typing import Optional, List, Union, TYPE_CHECKING
 from collections import OrderedDict
 from pystatic.env import Environment
 from pystatic.error import ErrHandler
-from pystatic.visitor import BaseVisitor, ParseException
+from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (ARIBITRARY_ARITY, TypeModuleTemp, any_type,
                               TypeVar, TypeClassTemp, TypeFunc,
                               TypePackageTemp)
 from pystatic.arg import Arg, Argument
 from pystatic.semanal_parse import typenode_parse_type, TypeNodeTag, get_type
+from pystatic.util import ParseException
 
 logger = logging.getLogger(__name__)
 

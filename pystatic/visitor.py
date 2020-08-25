@@ -1,13 +1,6 @@
 import ast
 
 
-class ParseException(Exception):
-    def __init__(self, node, msg: str):
-        super().__init__(msg)
-        self.msg = msg
-        self.node = node
-
-
 class BaseVisitor(object):
     def visit(self, node: ast.AST, *args, **kwargs):
         method = 'visit_' + node.__class__.__name__
