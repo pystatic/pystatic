@@ -6,7 +6,7 @@ from pystatic.util import BaseVisitor
 from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
 from pystatic.typesys import TypeClassTemp, any_type, TypeVar
-from pystatic.semanal.annotation import comment_to_type, ann_to_type
+from pystatic.semanal.annotation import parse_comment_annotation, parse_annotation
 from pystatic.semanal.typing import is_special_typing, SType
 from pystatic.semanal.func import parse_func
 
@@ -178,7 +178,7 @@ class ClassFuncDefVisitor(BaseVisitor):
         return None
 
     def visit_Assign(self, node: ast.Assign):
-        com_tp = comment_to_type(node, self.env)
+        com_tp = parse_comment_annotation(node, self.env)
         assign_tp = com_tp if com_tp else any_type
         for sub_node in node.targets:
             if isinstance(sub_node, ast.Attribute):
@@ -190,7 +190,7 @@ class ClassFuncDefVisitor(BaseVisitor):
                     )
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        tp = ann_to_type(node.annotation, self.env)
+        tp = parse_annotation(node.annotation, self.env)
         assign_tp = tp if tp else any_type
         if isinstance(node.target, ast.Attribute):
             attr = self.is_cls_attr(node.target)
@@ -295,7 +295,7 @@ class TypeBinder(BaseVisitor):
 def _def_visitAssign(env: Environment, node: ast.Assign):
     """Get the variables defined in an ast.Assign node"""
     new_var = OrderedDict()
-    com_tp = comment_to_type(node, env)
+    com_tp = parse_comment_annotation(node, env)
     assign_tp = com_tp if com_tp else any_type
     for sub_node in reversed(node.targets):
         if isinstance(sub_node, ast.Name):
@@ -308,7 +308,7 @@ def _def_visitAssign(env: Environment, node: ast.Assign):
 
 def _def_visitAnnAssign(env: Environment, node: ast.AnnAssign):
     """Get the variables defined in an ast.AnnAssign node"""
-    tp = ann_to_type(node.annotation, env)
+    tp = parse_annotation(node.annotation, env)
     assign_tp = tp if tp else any_type.instantiate([])
     if isinstance(node.target, ast.Name):
         if not env.lookup_local_var(node.target.id):

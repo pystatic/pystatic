@@ -2,7 +2,7 @@ import ast
 from typing import Optional, List
 from pystatic.env import Environment
 from pystatic.arg import Argument, Arg
-from pystatic.semanal.annotation import ann_to_type
+from pystatic.semanal.annotation import parse_annotation
 from pystatic.typesys import TypeFunc, any_type
 
 
@@ -10,7 +10,7 @@ def parse_arg(node: ast.arg, tp_scope: Environment):
     """Generate an Arg instance according to an ast.arg node"""
     new_arg = Arg(node.arg)
     if node.annotation:
-        ann = ann_to_type(node.annotation, tp_scope)
+        ann = parse_annotation(node.annotation, tp_scope)
         if not ann:
             return None
         else:
@@ -81,7 +81,7 @@ def parse_func(node: ast.FunctionDef, env: Environment) -> Optional[TypeFunc]:
         return
     ret_type = None
     if node.returns:
-        ret_type = ann_to_type(node.returns, env)
+        ret_type = parse_annotation(node.returns, env)
     if not ret_type:
         ret_type = any_type  # default return type is Any
     return TypeFunc(argument, ret_type)
