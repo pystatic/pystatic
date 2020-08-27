@@ -1,10 +1,5 @@
 import ast
 from typing import Optional
-from enum import IntEnum
-
-
-class ErrId(IntEnum):
-    REDEFINE = 1
 
 
 class ErrInfo(object):
@@ -37,9 +32,6 @@ class ErrInfo(object):
 
 
 class ErrHandler(object):
-    """ Error information for each file
-    Each file should have an ErrHandler
-    """
     def __init__(self, module_uri: str):
         self.filename = module_uri
         self.err = []
@@ -47,27 +39,6 @@ class ErrHandler(object):
     def add_err(self, node: ast.AST, msg: str):
         new_err = ErrInfo.from_node(node, msg)
         self.err.append(new_err)
-
-    def add_redefine(self,
-                     node: ast.AST,
-                     name: str,
-                     old_node: Optional[ast.AST] = None):
-        if old_node:
-            msg = f'{name} already defined at line {old_node.lineno}'
-        else:
-            msg = f'{name} already defined'
-        self.add_err(node, msg)
-
-    def add_undefine(self, node: ast.AST, name: str):
-        msg = f'{name} unbound'
-        self.add_err(node, msg)
-
-    def add_apply(self, node: ast.AST, msg: str):
-        self.add_err(node, msg)
-
-    def add_annotation(self, node: ast.AST, msg=''):
-        real_msg = msg if msg else 'invalid annotation'
-        self.add_err(node, real_msg)
 
     def __iter__(self):
         self.err.sort()

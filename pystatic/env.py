@@ -1,9 +1,11 @@
-import os
+import ast
 from collections import OrderedDict
 from typing import Dict, Optional, List
-from pystatic.typesys import (BaseType, TypeClassTemp, TypeModuleTemp, TypePackageTemp,
-                      TypeTemp, TypeIns, any_type, int_type, float_type,
-                      bool_type, str_type, generic_type, none_type)
+from pystatic.typesys import (BaseType, TypeClassTemp, TypeModuleTemp,
+                              TypeTemp, TypeIns, any_type, int_type,
+                              float_type, bool_type, str_type, generic_type,
+                              none_type)
+from pystatic.error import ErrHandler
 
 
 def lookup_type_scope(scope: 'Scope', name) -> Optional[TypeTemp]:
@@ -100,6 +102,11 @@ class Environment(object):
 
         self.current_cls = None
 
+        self.err = ErrHandler(module.uri)
+
+    def add_err(self, node: ast.AST, msg: str):
+        self.err.add_err(node, msg)
+
     @property
     def scope(self):
         return self.scope_list[-1]
@@ -117,7 +124,7 @@ class Environment(object):
         return self.scope_list[0]
 
     @property
-    def absolute_name(self):
+    def current_uri(self):
         return '.'.join(self.name_list)
 
     @property

@@ -5,6 +5,44 @@ from pystatic.env import Environment
 from pystatic.util import ParseException
 
 
+def ann_to_type(node: ast.AST, env: Environment):
+    """Get the type according to the annotation"""
+    return AnnotationParser(env).accept(node)
+
+
+def comment_to_type(node: ast.AST, env: Environment):
+    """Get the type according to the type comment"""
+    comment = node.type_comment if node.type_comment else None
+    if not comment:
+        return None
+    try:
+        node = ast.parse(
+            comment,
+            mode='eval')  # for annotations that's str we first parse it
+        if isinstance(node, ast.Expression):
+            return AnnotationParser(env).accept(node.body)
+        else:
+            raise ParseException(node, '')
+    except (SyntaxError, ParseException):
+        env.add_err(node, 'broken type comment')
+        return None
+
+
+class AnnotationParser(object):
+    """Parse annotations"""
+    def __init__(self, env: Environment):
+        self.env = env
+
+    def accept(self, node: ast.AST):
+        """Return the type this node represents"""
+        try:
+            new_tree = typenode_parse_type(node, False, None)
+            return get_type(new_tree, self.env)
+        except ParseException as e:
+            self.env.add_err(e.node, e.msg)
+            return None
+
+
 class TypeNodeTag(enum.Enum):
     ATTR = 0
     NAME = 1

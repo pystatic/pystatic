@@ -1,22 +1,64 @@
-import sys
 import ast
-from typing import Optional
-from pystatic.visitor import BaseVisitor
+import enum
+from typing import Optional, Final
+
+
+class Reach(enum.Enum):
+    TYPE_TRUE = 1  # type: Final
+    TYPE_FALSE = 2  # type: Final
+    RUNTIME_TRUE = 3  # type: Final
+    RUNTIME_FALSE = 4  # type: Final
+    ALWAYS_TRUE = 5  # type: Final
+    ALWAYS_FALSE = 6  # type: Final
+    CLS_REDEF = 7  # type: Final
+    NEVER = 8
+    UNKNOWN = 9  # type: Final
+
+
+class BaseVisitor(object):
+    def __init__(self) -> None:
+        # node with reachability in reach_block will not be visited
+        self.reach_block = (Reach.NEVER, Reach.CLS_REDEF)
+
+    def visit(self, node: ast.AST, *args, **kwargs):
+        if getattr(node, 'reach', Reach.UNKNOWN) not in self.reach_block:
+            method = 'visit_' + node.__class__.__name__
+            next_visitor = getattr(self, method, self.generic_visit)
+            return next_visitor(node, *args, **kwargs)
+
+    def generic_visit(self, node: ast.AST, *args, **kwargs):
+        rt = None
+        for field, value in ast.iter_fields(node):
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, ast.AST):
+                        rt = self.visit(item)
+            elif isinstance(value, ast.AST):
+                rt = self.visit(value, *args, **kwargs)
+        return rt
+
+    def accept(self, node: ast.AST):
+        return self.visit(node)
 
 
 class ParseException(Exception):
-    def __init__(self, node, msg: str):
+    def __init__(self, node: ast.AST, msg: str):
         super().__init__(msg)
         self.msg = msg
         self.node = node
 
 
 class UnParseException(Exception):
-    pass
+    def __init__(self,
+                 node: Optional[ast.AST] = None,
+                 msg: Optional[str] = None):
+        self.node = node
+        self.msg = msg
 
 
 class UnParser(BaseVisitor):
     def __init__(self, context: Optional[dict]) -> None:
+        super().__init__()
         self.context = context
 
     def visit(self, node: ast.AST, *args, **kwargs):

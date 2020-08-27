@@ -6,7 +6,8 @@ from typing import Optional, List, TextIO, Set
 from pystatic.typesys import ImpItem, TypeModuleTemp, TypePackageTemp, TypeTemp
 from pystatic.config import Config
 from pystatic.env import get_init_env
-from pystatic.semanal.main import ClassCollector, TypeRecorder
+from pystatic.semanal.semanal import (collect_type_def, import_type_def,
+                                      generate_type_binding)
 from pystatic.error import ErrHandler
 from pystatic.module_finder import ModuleFinder
 
@@ -24,31 +25,6 @@ class CheckTarget:
 
     def __hash__(self):
         return hash(self.src)
-
-
-def crawl_path(path):
-    while True:
-        init_file = os.path.join(path, '__init__.py')
-        if os.path.isfile(init_file):
-            dirpath = os.path.dirname(path)
-            if path == dirpath:
-                # TODO: warning here
-                break
-            else:
-                path = dirpath
-        else:
-            break
-    return path
-
-
-def generate_uri(prefix_path: str, src_path: str):
-    commonpath = os.path.commonpath([prefix_path, src_path])
-    relpath = os.path.relpath(src_path, commonpath)
-    if relpath.endswith('.py'):
-        relpath = relpath[:-3]
-    elif relpath.endswith('.pyi'):
-        relpath = relpath[:-4]
-    return '.'.join(relpath.split(os.path.sep))
 
 
 class Manager:
@@ -116,13 +92,13 @@ class Manager:
             return None
         tmp_tp_module = TypeModuleTemp(path, uri, {}, {})
         env = get_init_env(tmp_tp_module)
-        err = ErrHandler(tmp_tp_module.uri)
-        ClassCollector(env, err, self).accept(treenode)
-        TypeRecorder(env, err).accept(treenode)
+        collect_type_def(treenode, env, self)
+        import_type_def(treenode, env, self)
+        generate_type_binding(treenode, env)
         glob = env.glob_scope
 
         # output errors(only for debug)
-        for e in err:
+        for e in env.err:
             self.stdout.write(str(e) + '\n')
 
         return TypeModuleTemp(path, uri, glob.types, glob.local)
@@ -131,3 +107,28 @@ class Manager:
         for target in self.targets:
             logging.info(f'Check {target.uri} {target.src}')
             self.semanal_module(target.src, target.uri)
+
+
+def crawl_path(path):
+    while True:
+        init_file = os.path.join(path, '__init__.py')
+        if os.path.isfile(init_file):
+            dirpath = os.path.dirname(path)
+            if path == dirpath:
+                # TODO: warning here
+                break
+            else:
+                path = dirpath
+        else:
+            break
+    return path
+
+
+def generate_uri(prefix_path: str, src_path: str):
+    commonpath = os.path.commonpath([prefix_path, src_path])
+    relpath = os.path.relpath(src_path, commonpath)
+    if relpath.endswith('.py'):
+        relpath = relpath[:-3]
+    elif relpath.endswith('.pyi'):
+        relpath = relpath[:-4]
+    return '.'.join(relpath.split(os.path.sep))

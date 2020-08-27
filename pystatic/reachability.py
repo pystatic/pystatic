@@ -1,27 +1,9 @@
-from typing import Final, TYPE_CHECKING
+from typing import TYPE_CHECKING
 import ast
-import enum
-from pystatic.util import unparse, UnParseException
+from pystatic.util import unparse, UnParseException, Reach
 
 if TYPE_CHECKING:
     from pystatic.config import Config
-
-
-class Reach(enum.Enum):
-    # always true when type checking
-    TYPE_TRUE = 1  # type: Final
-    # always false when type checking
-    TYPE_FALSE = 2  # type: Final
-    # always true runtime
-    RUNTIME_TRUE = 3  # type: Final
-    # always false runtime
-    RUNTIME_FALSE = 4  # type: Final
-    # always true
-    ALWAYS_TRUE = 5  # type: Final
-    # always false
-    ALWAYS_FALSE = 6  # type: Final
-    # unknown
-    UNKNOWN = 7  # type: Final
 
 
 def cal_neg(res: Reach) -> Reach:
