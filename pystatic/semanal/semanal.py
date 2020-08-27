@@ -295,7 +295,7 @@ class TypeBinder(BaseVisitor):
             func_type = parse_func(node, self.env)
             if func_type:
                 self.env.add_var(node.name, func_type)
-                logger.debug(f'Add function {func_type}')
+                logger.debug(f'Add function {func_type.name}: {func_type}')
 
     def visit_ClassDef(self, node: ast.ClassDef):
         if not self.env.lookup_local_var(node.name):

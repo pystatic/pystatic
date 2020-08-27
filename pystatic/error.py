@@ -42,7 +42,7 @@ class ErrHandler(object):
 
     def __iter__(self):
         self.err.sort()
-        return iter(self.err)
+        return iter([self.filename + ': ' + str(err) for err in self.err])
 
     def __str__(self):
         self.err.sort()
