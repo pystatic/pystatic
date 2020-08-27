@@ -156,6 +156,7 @@ class ModuleFinder:
         return curnode.content, len(uris)
 
     def _find(self, uris: List[str]) -> Optional[TypeTemp]:
+        res: Optional[TypeTemp]
         res, i = self.search_imp(uris)
         if i == 0:
             return None

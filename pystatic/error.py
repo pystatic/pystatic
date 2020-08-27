@@ -1,5 +1,5 @@
 import ast
-from typing import Optional
+from typing import Optional, List
 
 
 class ErrInfo(object):
@@ -34,7 +34,7 @@ class ErrInfo(object):
 class ErrHandler(object):
     def __init__(self, module_uri: str):
         self.filename = module_uri
-        self.err = []
+        self.err: List[ErrInfo] = []
 
     def add_err(self, node: ast.AST, msg: str):
         new_err = ErrInfo.from_node(node, msg)

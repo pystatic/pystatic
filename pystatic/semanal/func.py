@@ -78,7 +78,7 @@ def parse_func(node: ast.FunctionDef, env: Environment) -> Optional[TypeFunc]:
     """Get a function's type according to a ast.FunctionDef node"""
     argument = parse_arguments(node.args, env)
     if not argument:
-        return
+        return None
     ret_type = None
     if node.returns:
         ret_type = parse_annotation(node.returns, env)

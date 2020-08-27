@@ -18,15 +18,15 @@ class Reach(enum.Enum):
 class BaseVisitor(object):
     def __init__(self) -> None:
         # node with reachability in reach_block will not be visited
-        self.reach_block = (Reach.NEVER, Reach.CLS_REDEF)
+        self.reach_block: tuple = (Reach.NEVER, Reach.CLS_REDEF)
 
-    def visit(self, node: ast.AST, *args, **kwargs):
+    def visit(self, node, *args, **kwargs):
         if getattr(node, 'reach', Reach.UNKNOWN) not in self.reach_block:
             method = 'visit_' + node.__class__.__name__
             next_visitor = getattr(self, method, self.generic_visit)
             return next_visitor(node, *args, **kwargs)
 
-    def generic_visit(self, node: ast.AST, *args, **kwargs):
+    def generic_visit(self, node, *args, **kwargs):
         rt = None
         for field, value in ast.iter_fields(node):
             if isinstance(value, list):
@@ -37,7 +37,7 @@ class BaseVisitor(object):
                 rt = self.visit(value, *args, **kwargs)
         return rt
 
-    def accept(self, node: ast.AST):
+    def accept(self, node):
         return self.visit(node)
 
 

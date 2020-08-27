@@ -81,11 +81,11 @@ class TypeVar(TypeTemp):
 class TypeClassTemp(TypeTemp):
     def __init__(self, clsname: str):
         super().__init__(clsname)
-        self.baseclass = OrderedDict()
-        self.method = {}
+        self.baseclass: OrderedDict = OrderedDict()
+        self.method: dict = {}
         self.attribute: Dict[str, TypeIns] = {}
 
-        self.typevar = OrderedDict()
+        self.typevar: OrderedDict = OrderedDict()
 
         self.inner_type: Dict[str, TypeTemp] = {}
 

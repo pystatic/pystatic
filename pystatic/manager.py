@@ -31,7 +31,7 @@ class Manager:
     def __init__(self, config, module_files: List[str],
                  package_files: List[str], stdout: TextIO, stderr: TextIO):
         self.targets: Set[CheckTarget] = set()
-        self.user_path = set()
+        self.user_path: Set[str] = set()
         self.generate_targets(module_files, CheckMode.Module)
         self.generate_targets(package_files, CheckMode.Package)
         self.config = Config(config)
@@ -90,18 +90,19 @@ class Manager:
         except FileNotFoundError as e:
             logging.debug(f'{path} not found')
             return None
-        tmp_tp_module = TypeModuleTemp(path, uri, {}, {})
-        env = get_init_env(tmp_tp_module)
-        collect_type_def(treenode, env, self)
-        import_type_def(treenode, env, self)
-        generate_type_binding(treenode, env)
-        glob = env.glob_scope
+        else:
+            tmp_tp_module = TypeModuleTemp(path, uri, {}, {})
+            env = get_init_env(tmp_tp_module)
+            collect_type_def(treenode, env, self)
+            import_type_def(treenode, env, self)
+            generate_type_binding(treenode, env)
+            glob = env.glob_scope
 
-        # output errors(only for debug)
-        for e in env.err:
-            self.stdout.write(str(e) + '\n')
+            # output errors(only for debug)
+            for err in env.err:
+                self.stdout.write(str(err) + '\n')
 
-        return TypeModuleTemp(path, uri, glob.types, glob.local)
+            return TypeModuleTemp(path, uri, glob.types, glob.local)
 
     def check(self):
         for target in self.targets:

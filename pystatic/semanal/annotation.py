@@ -1,7 +1,8 @@
 import ast
 import enum
 from typing import Optional, List, Tuple, Union, Set
-from pystatic.typesys import TypeClass, TypeIns, TypeVar, ARIBITRARY_ARITY
+from pystatic.typesys import (TypeClass, TypeIns, TypeTemp, TypeVar,
+                              ARIBITRARY_ARITY)
 from pystatic.env import Environment
 from pystatic.util import ParseException
 
@@ -47,9 +48,9 @@ class AnnotationParser(object):
 
 def get_cls_type_params(node: ast.ClassDef,
                         env: Environment) -> Tuple[List[str], List[TypeIns]]:
-    var_list = []
-    var_set = set()
-    base_list = []
+    var_list: List[str] = []
+    var_set: Set[str] = set()
+    base_list: List[TypeIns] = []
     for base in node.bases:
         try:
             new_tree = parse_ann_ast(base, False, None)
@@ -191,7 +192,7 @@ class SimpleTypeNode(object):
         self.name = name
         self.is_cons = is_cons
         self.tag = tag
-        self.param = []
+        self.param: List[SimpleTypeNode] = []
         self.left: SimpleTypeNode
         self.attr: str
 
@@ -274,6 +275,7 @@ def _parse_ann_ast_allow_list(node, is_cons, cons_node) -> SimpleTypeNode:
 
 def get_type(node: SimpleTypeNode, env: Environment) -> Optional[TypeIns]:
     """From a simple tree node to the type it represents"""
+    tp: Union[TypeTemp, TypeIns, None]
     if node.tag == SimpleTypeNodeTag.NAME:
         tp = env.lookup_type(node.name)
         if tp is None:
@@ -282,17 +284,21 @@ def get_type(node: SimpleTypeNode, env: Environment) -> Optional[TypeIns]:
             return tp.instantiate([])
     elif node.tag == SimpleTypeNodeTag.ATTR:
         left_tp = get_type(node.left, env)
+        if not left_tp:
+            return None
         if isinstance(left_tp, TypeClass):
             tp = left_tp.template.get_type(node.attr)  # type: ignore
             if tp is None:
                 raise ParseException(
                     node.node, f'{left_tp.name} has no attribute {node.attr}')
-            return tp.instantiate([])
+            return tp.instantiate([])  # type: ignore
         else:
             raise ParseException(
                 node.node, f'{left_tp.name} has no attribute {node.attr}')
     elif node.tag == SimpleTypeNodeTag.SUBS:
         tp = get_type(node.left, env)
+        if not tp:
+            return None
         param_list = []
         for param in node.param:
             p_tp = get_type(param, env)
@@ -302,3 +308,4 @@ def get_type(node: SimpleTypeNode, env: Environment) -> Optional[TypeIns]:
         raise ParseException(node.node, 'not implemented yet')
     elif node.tag == SimpleTypeNodeTag.ELLIPSIS:
         raise ParseException(node.node, 'not implemented yet')
+    return None
