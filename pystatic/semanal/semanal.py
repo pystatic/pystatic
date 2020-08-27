@@ -6,7 +6,8 @@ from pystatic.util import BaseVisitor
 from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
 from pystatic.typesys import TypeClassTemp, any_type, TypeVar
-from pystatic.semanal.annotation import parse_comment_annotation, parse_annotation
+from pystatic.semanal.annotation import (parse_comment_annotation,
+                                         parse_annotation, get_cls_type_params)
 from pystatic.semanal.typing import is_special_typing, SType
 from pystatic.semanal.func import parse_func
 
@@ -66,10 +67,21 @@ class TypeDefCollector(BaseVisitor):
                 self.visit(subif)
 
     def visit_ClassDef(self, node: ast.ClassDef):
-        cls_uri = self.env.current_uri + f'.{node.name}'
-        tp = TypeClassTemp(cls_uri)
         if not self.env.lookup_local_type(node.name):
+            cls_uri = self.env.current_uri + f'.{node.name}'
             tp = TypeClassTemp(cls_uri)
+
+            var_lst, base_lst = get_cls_type_params(node, self.env)
+            tpvar_dict = OrderedDict()
+            for tpvar_name in var_lst:
+                tpvar = self.env.lookup_type(tpvar_name)
+                assert isinstance(tpvar, TypeVar)
+                tpvar_dict[tpvar_name] = tpvar
+            tp.set_typevar(tpvar_dict)
+            for base_tp in base_lst:
+                tp.add_base(base_tp.name, base_tp)
+                logger.debug(f'Add base class {base_tp.name} to {cls_uri}')
+
             self.env.add_type(node.name, tp)
             logger.debug(f'Add class {cls_uri}')
 
