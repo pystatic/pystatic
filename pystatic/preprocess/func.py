@@ -2,7 +2,7 @@ import ast
 from typing import Optional, List
 from pystatic.env import Environment
 from pystatic.arg import Argument, Arg
-from pystatic.semanal.annotation import parse_annotation
+from pystatic.preprocess.annotation import parse_annotation
 from pystatic.typesys import TypeFunc, any_type
 
 

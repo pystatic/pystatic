@@ -6,10 +6,11 @@ from pystatic.util import BaseVisitor
 from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
 from pystatic.typesys import TypeClassTemp, any_type, TypeVar
-from pystatic.semanal.annotation import (parse_comment_annotation,
-                                         parse_annotation, get_cls_type_params)
-from pystatic.semanal.typing import is_special_typing, SType
-from pystatic.semanal.func import parse_func
+from pystatic.preprocess.annotation import (parse_comment_annotation,
+                                            parse_annotation,
+                                            get_cls_type_params)
+from pystatic.preprocess.typing import is_special_typing, SType
+from pystatic.preprocess.func import parse_func
 
 logger = logging.getLogger(__name__)
 
