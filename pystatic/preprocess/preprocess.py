@@ -7,8 +7,7 @@ from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
 from pystatic.typesys import TypeClassTemp, any_type, TypeVar
 from pystatic.preprocess.annotation import (parse_comment_annotation,
-                                            parse_annotation,
-                                            get_cls_type_params)
+                                            parse_annotation, get_cls_typevars)
 from pystatic.preprocess.typing import is_special_typing, SType
 from pystatic.preprocess.func import parse_func
 
@@ -72,7 +71,7 @@ class TypeDefCollector(BaseVisitor):
             cls_uri = self.env.current_uri + f'.{node.name}'
             tp = TypeClassTemp(cls_uri)
 
-            var_lst, base_lst = get_cls_type_params(node, self.env)
+            var_lst, base_lst = get_cls_typevars(node, self.env)
             tpvar_dict = OrderedDict()
             for tpvar_name in var_lst:
                 tpvar = self.env.lookup_type(tpvar_name)
@@ -84,7 +83,8 @@ class TypeDefCollector(BaseVisitor):
                 logger.debug(f'Add base class {base_tp.name} to {cls_uri}')
 
             self.env.add_type(node.name, tp)
-            logger.debug(f'Add class {cls_uri}')
+
+            logger.debug(f'Add class {cls_uri}(' + ', '.join(var_lst) + ')')
 
             # try to get nested classes
             self.env.enter_class(node.name)
@@ -97,22 +97,24 @@ class TypeDefCollector(BaseVisitor):
             setattr(node, 'reach', Reach.CLS_REDEF)
 
     def visit_Assign(self, node: ast.Assign):
-        special = is_special_typing(node)
-        if special == SType.TypeVar:
-            tpvar = TypeVar('')
+        spec = is_special_typing(node)
+        if spec == SType.TypeVar:
+            new_typevar = TypeVar('')
             for target in node.targets:
-                try:
-                    pass
-                except:
-                    pass
-        else:
-            pass
+                if isinstance(target, ast.Name):
+                    if not self.env.lookup_local_type(target.id):
+                        self.env.add_type(target.id, new_typevar)
+                        logger.debug(f'Add TypeVar {target.id}')
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        if is_special_typing(node):
-            pass
-        else:
-            pass
+        spec = is_special_typing(node)
+        if spec == SType.TypeVar:
+            new_typevar = TypeVar('')
+            target = node.target
+            if isinstance(target, ast.Name):
+                if not self.env.lookup_local_type(target.id):
+                    self.env.add_type(target.id, new_typevar)
+                    logger.debug(f'Add TypeVar {target.id}')
 
     # don't visit types defined inside a function
     def visit_FunctionDef(self, node):
@@ -296,7 +298,7 @@ class TypeBinder(BaseVisitor):
             func_type = parse_func(node, self.env)
             if func_type:
                 self.env.add_var(node.name, func_type)
-                logger.debug(f'Add function {func_type.name}: {func_type}')
+                logger.debug(f'Add function {node.name}: {func_type}')
 
     def visit_ClassDef(self, node: ast.ClassDef):
         if not self.env.lookup_local_var(node.name):

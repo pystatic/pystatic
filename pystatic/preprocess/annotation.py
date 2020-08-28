@@ -31,6 +31,11 @@ def parse_comment_annotation(node: ast.AST,
         return None
 
 
+def get_cls_typevars(node: ast.ClassDef,
+                     env: Environment) -> Tuple[List[str], List[TypeIns]]:
+    return ClassTypeVarGetter().get_cls_typevars(node, env)
+
+
 class AnnotationParser(object):
     """Parse annotations"""
     def __init__(self, env: Environment):
@@ -46,24 +51,116 @@ class AnnotationParser(object):
             return None
 
 
-def get_cls_type_params(node: ast.ClassDef,
-                        env: Environment) -> Tuple[List[str], List[TypeIns]]:
-    """Get TypeVar used in class definition and return list of base classes"""
-    var_list: List[str] = []
-    var_set: Set[str] = set()
-    base_list: List[TypeIns] = []
-    for base in node.bases:
-        try:
-            new_tree = parse_ann_ast(base, False, None)
-            _get_cls_type_params(new_tree, var_set, var_list, env, False)
-            base_tp = get_type(new_tree, env)
-            if base_tp:
-                base_list.append(base_tp)
-        except ParseException as e:
-            msg = e.msg if e.msg else 'invalid base class'
-            if e.msg:
-                env.add_err(e.node, msg)
-    return var_list, base_list
+class ClassTypeVarGetter:
+    def __init__(self) -> None:
+        self.met_gen = False
+
+    def get_cls_typevars(self, node: ast.ClassDef,
+                         env: Environment) -> Tuple[List[str], List[TypeIns]]:
+        """Get TypeVar used in class definition and return list of base classes"""
+        var_list: List[str] = []
+        var_set: Set[str] = set()
+        base_list: List[TypeIns] = []
+
+        for base in node.bases:
+            try:
+                simple_tree = parse_ann_ast(base, False, None)
+
+                # To see whether this base class is Generic
+                if (simple_tree.tag == SimpleTypeNodeTag.SUBS
+                        or simple_tree.tag == SimpleTypeNodeTag.NAME):
+                    if simple_tree.name == 'Generic':
+                        pass
+
+                self._get_cls_typevars(simple_tree, var_set, var_list, env)
+                base_tp = get_type(simple_tree, env)
+                if base_tp:
+                    base_list.append(base_tp)
+            except ParseException as e:
+                msg = e.msg if e.msg else 'invalid base class'
+                if e.msg:
+                    env.add_err(e.node, msg)
+        return var_list, base_list
+
+    def _get_cls_typevars(self, node: 'SimpleTypeNode', var_set: Set[str],
+                          var_list: List[str], env: Environment) -> None:
+        """Get TypeVar used in an annotation represented by a simple tree"""
+        def check_type(type_name: str):
+            """If type_name is a TypeVar, then check and add it to the list
+
+            Return the type type_name represents.
+            """
+            nonlocal var_set, var_list, env
+            tp = env.lookup_type(type_name)
+            if tp is None:
+                raise ParseException(node.node, f'{type_name} is unbound')
+            elif isinstance(tp, TypeVar):
+                if type_name not in var_set:
+                    if self.met_gen:
+                        raise ParseException(node.node,
+                                             f'{type_name} should in Generic')
+                    else:
+                        var_list.append(type_name)
+                        var_set.add(type_name)
+            return tp
+
+        def meet_generic():
+            """Meet Generic
+
+            - All type variable should be included in the Generic.
+            - There should only be one Generic
+            """
+            nonlocal var_list, var_set, node, self
+            if self.met_gen:
+                raise ParseException(ast_node, 'only one Generic allowed')
+            self.met_gen = True
+
+            var_list.clear()
+            gen_set = set()
+            for sub_node in node.param:
+                tp_var = env.lookup_type(sub_node.name)
+                if not isinstance(tp_var, TypeVar):
+                    raise ParseException(
+                        ast_node, 'only typevar allowed inside Generic')
+                else:
+                    if sub_node.name in gen_set:
+                        raise ParseException(
+                            ast_node, f'duplicate typevar {sub_node.name}')
+                    gen_set.add(sub_node.name)
+                    var_list.append(sub_node.name)
+
+            if len(var_set - gen_set) > 0:
+                free_var = list(var_set - gen_set)
+                raise ParseException(
+                    ast_node, f'{", ".join(free_var)} should inside Generic')
+            var_set = gen_set
+
+        ast_node = node.node
+
+        if node.tag == SimpleTypeNodeTag.ATTR:
+            self._get_cls_typevars(node.left, var_set, var_list, env)
+            check_type(node.name)
+            return None
+        elif node.tag == SimpleTypeNodeTag.NAME:
+            check_type(node.name)
+            return None
+        elif node.tag == SimpleTypeNodeTag.SUBS:
+            tp = check_type(node.name)
+            self._get_cls_typevars(node.left, var_set, var_list, env)
+            if node.name == 'Generic':
+                meet_generic()
+            else:
+                for sub_node in node.param:
+                    self._get_cls_typevars(sub_node, var_set, var_list, env)
+                check_appliable(ast_node, tp, len(node.param))
+        elif node.tag == SimpleTypeNodeTag.LIST:
+            for sub_node in node.param:
+                self._get_cls_typevars(sub_node, var_set, var_list, env)
+            return None
+        elif node.tag == SimpleTypeNodeTag.ELLIPSIS:
+            pass
+        else:
+            raise ParseException(ast_node, 'invalid syntax')
 
 
 def check_appliable(node: ast.AST, tp, param_cnt: int):
@@ -116,88 +213,6 @@ class SimpleTypeNode(object):
         self.param: List[SimpleTypeNode] = []
         self.left: SimpleTypeNode
         self.attr: str
-
-
-def _get_cls_type_params(node: 'SimpleTypeNode', var_set: Set[str],
-                         var_list: List[str], env: Environment,
-                         met_gen: bool) -> None:
-    """Get TypeVar used in an annotation represented by a simple tree"""
-    def check_type(type_name: str):
-        """If type_name is a TypeVar, then check and add it to the list
-
-        Return the type type_name represents.
-        """
-        nonlocal var_set, var_list, env, met_gen
-        tp = env.lookup_type(type_name)
-        if tp is None:
-            raise ParseException(node.node, f'{type_name} is unbound')
-        elif isinstance(tp, TypeVar):
-            if type_name not in var_set:
-                if met_gen:
-                    raise ParseException(node.node,
-                                         'all typevar should in Generic')
-                else:
-                    var_list.append(type_name)
-                    var_set.add(type_name)
-        return tp
-
-    def meet_generic():
-        """Meet Generic
-
-        - All type variable should be included in the Generic.
-        - There should only be one Generic
-        """
-        nonlocal met_gen, var_list, var_set, node
-        if met_gen:
-            raise ParseException(ast_node, 'only one Generic allowed')
-        met_gen = True
-
-        var_list.clear()
-        gen_set = set()
-        for sub_node in node.param:
-            tp_var = env.lookup_type(sub_node.name)
-            if not isinstance(tp_var, TypeVar):
-                raise ParseException(ast_node,
-                                     'only typevar allowed inside Generic')
-            else:
-                if sub_node.name in gen_set:
-                    raise ParseException(ast_node,
-                                         f'duplicate typevar {sub_node.name}')
-                gen_set.add(sub_node.name)
-                var_list.append(sub_node.name)
-
-        if len(var_set - gen_set) > 0:
-            free_var = list(var_set - gen_set)
-            raise ParseException(
-                ast_node, f'{", ".join(free_var)} should inside Generic')
-        var_set = gen_set
-
-    ast_node = node.node
-
-    if node.tag == SimpleTypeNodeTag.ATTR:
-        _get_cls_type_params(node.left, var_set, var_list, env, met_gen)
-        check_type(node.name)
-        return None
-    elif node.tag == SimpleTypeNodeTag.NAME:
-        check_type(node.name)
-        return None
-    elif node.tag == SimpleTypeNodeTag.SUBS:
-        tp = check_type(node.name)
-        _get_cls_type_params(node.left, var_set, var_list, env, met_gen)
-        if node.name == 'Generic':
-            meet_generic()
-        else:
-            for sub_node in node.param:
-                _get_cls_type_params(sub_node, var_set, var_list, env, met_gen)
-            check_appliable(ast_node, tp, len(node.param))
-    elif node.tag == SimpleTypeNodeTag.LIST:
-        for sub_node in node.param:
-            _get_cls_type_params(sub_node, var_set, var_list, env, met_gen)
-        return None
-    elif node.tag == SimpleTypeNodeTag.ELLIPSIS:
-        pass
-    else:
-        raise ParseException(ast_node, 'invalid syntax')
 
 
 def parse_ann_ast(node, is_cons: bool, cons_node) -> SimpleTypeNode:

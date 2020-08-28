@@ -41,21 +41,6 @@ class BaseVisitor(object):
         return self.visit(node)
 
 
-class ParseException(Exception):
-    def __init__(self, node: ast.AST, msg: str):
-        super().__init__(msg)
-        self.msg = msg
-        self.node = node
-
-
-class UnParseException(Exception):
-    def __init__(self,
-                 node: Optional[ast.AST] = None,
-                 msg: Optional[str] = None):
-        self.node = node
-        self.msg = msg
-
-
 class UnParser(BaseVisitor):
     def __init__(self, context: Optional[dict]) -> None:
         super().__init__()
@@ -88,3 +73,19 @@ class UnParser(BaseVisitor):
 
 def unparse(node: ast.AST, context: Optional[dict] = None):
     return UnParser(context).accept(node)
+
+
+class ParseException(Exception):
+    def __init__(self, node: ast.AST, msg: str):
+        super().__init__(msg)
+        self.msg = msg
+        self.node = node
+
+
+class UnParseException(Exception):
+    """Exceptions used in unparse"""
+    def __init__(self,
+                 node: Optional[ast.AST] = None,
+                 msg: Optional[str] = None):
+        self.node = node
+        self.msg = msg
