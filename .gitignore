@@ -131,6 +131,7 @@ include
 # test
 tmp_test
 test.py
+test1.py
 
 # script
 script
