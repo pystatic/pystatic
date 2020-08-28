@@ -134,25 +134,19 @@ class TypeClassTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, path: str, uri: str, tp: Dict[str, TypeTemp],
+    def __init__(self, uri: str, tp: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__('module')
         self.inner_type = tp
         self.attribute = local
-        self.path = path
         self.uri = uri
 
 
-class TypePackageTemp(TypeClassTemp):
-    # TODO: support attribute defined in __init__.py
-    def __init__(self, path: List[str], uri: str, manager: 'Manager'):
+class TypePackageTemp(TypeModuleTemp):
+    def __init__(self, path: List[str], uri: str, tp: Dict[str, TypeTemp],
+                 local: Dict[str, TypeIns]):
+        super().__init__(uri, tp, local)
         self.path = path
-        self.uri = uri
-        self.manager = manager
-
-    def get_type(self, name: str) -> Optional[TypeTemp]:
-        target_uri = self.uri + '.' + name
-        return self.manager.deal_import(target_uri, self)
 
 
 class TypeAny(TypeTemp):

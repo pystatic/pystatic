@@ -106,6 +106,7 @@ def unparse(node: ast.AST, context: Optional[dict] = None):
     return UnParser(context).accept(node)
 
 
+# exception part
 class ParseException(Exception):
     def __init__(self, node: ast.AST, msg: str):
         super().__init__(msg)

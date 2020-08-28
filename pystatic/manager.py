@@ -2,14 +2,14 @@ import os
 import ast
 import logging
 import enum
-from typing import Optional, List, TextIO, Set, Union
+from typing import Optional, List, TextIO, Set, Dict
 from pystatic.typesys import ImpItem, TypeModuleTemp, TypePackageTemp, TypeTemp
 from pystatic.config import Config
 from pystatic.env import get_init_env
 from pystatic.preprocess.preprocess import (collect_type_def, import_type_def,
                                             generate_type_binding)
 from pystatic.error import ErrHandler
-from pystatic.module_finder import ModuleFinder
+from pystatic.module_finder import (ModuleFinder, ModuleFindRes)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class AnalysisState(enum.IntEnum):
     TypeCollected = 2
     Imported = 3
     Binded = 4
+    Checked = 5
 
 
 # TODO: add support for Package Mode (with -p attribute in the cmdline)
@@ -33,10 +34,6 @@ class AnalysisTarget:
         self.src = src
         self.uri = uri
         self.mode = mode
-
-        # create environment for the target
-        tmp_tp_module = TypeModuleTemp(src, uri, {}, {})
-        self.env = get_init_env(tmp_tp_module)
 
         self.state = AnalysisState.UnTouched
 
@@ -54,15 +51,23 @@ class Manager:
         self.config = Config(config)
         self.finder = ModuleFinder(self.config.manual_path,
                                    list(self.user_path), self.config.sitepkg,
-                                   self.config.typeshed, self)
+                                   self.config.typeshed)
 
         self.stdout = stdout
         self.stderr = stderr
+
+        self.check_set: Dict[str, AnalysisTarget] = {}
 
     def check(self):
         for target in self.targets:
             logging.info(f'Check {target.uri} {target.src}')
             self.semanal_module(target.src, target.uri)
+
+    def register(self, uri: str):
+        pass
+
+    def get_cached(self) -> Optional[AnalysisTarget]:
+        return self.check_set.get()
 
     def generate_targets(self, srcfiles: List[str], mode: AnalysisMode):
         """Generate AnalysisTarget according to the srcfiles
@@ -93,37 +98,48 @@ class Manager:
                 else:
                     pass  # TODO: warning here
 
-    def deal_import(
-        self, imp: str, cur_item: Union[TypePackageTemp, TypeModuleTemp]
-    ) -> Optional[TypeTemp]:
-        if not imp:
+    def deal_import(self, uri: str,
+                    module: TypeModuleTemp) -> Optional[TypeTemp]:
+        if not uri:
             return None
-        return self.finder.find(imp, cur_item)
 
-    def semanal_module(self, path: str, uri: str) -> Optional[TypeModuleTemp]:
-        try:
-            with open(path) as f:
-                src = f.read()
-            treenode = ast.parse(src, type_comments=True)
-        except SyntaxError as e:
-            logging.debug(f'failed to parse {path}')
-            return None
-        except FileNotFoundError as e:
-            logging.debug(f'{path} not found')
-            return None
+        find_res = self.finder.relative_find(uri, module)
+        if find_res.res_type == ModuleFindRes.Module:
+            pass
+        elif find_res.res_type == ModuleFindRes.Package:
+            pass
+        elif find_res.res_type == ModuleFindRes.Namespace:
+            pass
         else:
-            tmp_tp_module = TypeModuleTemp(path, uri, {}, {})
-            env = get_init_env(tmp_tp_module)
-            collect_type_def(treenode, env, self)
-            import_type_def(treenode, env, self)
-            generate_type_binding(treenode, env)
-            glob = env.glob_scope
+            return None
 
-            # output errors(only for debug)
-            for err in env.err:
-                self.stdout.write(str(err) + '\n')
+    def semanal_module(self, uri: str) -> Optional[TypeModuleTemp]:
+        pass
 
-            return TypeModuleTemp(path, uri, glob.types, glob.local)
+    # def semanal_module(self, path: str, uri: str) -> Optional[TypeModuleTemp]:
+    #     try:
+    #         with open(path) as f:
+    #             src = f.read()
+    #         treenode = ast.parse(src, type_comments=True)
+    #     except SyntaxError as e:
+    #         logging.debug(f'failed to parse {path}')
+    #         return None
+    #     except FileNotFoundError as e:
+    #         logging.debug(f'{path} not found')
+    #         return None
+    #     else:
+    #         tmp_tp_module = TypeModuleTemp(path, uri, {}, {})
+    #         env = get_init_env(tmp_tp_module)
+    #         collect_type_def(treenode, env, self)
+    #         import_type_def(treenode, env, self)
+    #         generate_type_binding(treenode, env)
+    #         glob = env.glob_scope
+
+    #         # output errors(only for debug)
+    #         for err in env.err:
+    #             self.stdout.write(str(err) + '\n')
+
+    #         return TypeModuleTemp(path, uri, glob.types, glob.local)
 
 
 def crawl_path(path):
