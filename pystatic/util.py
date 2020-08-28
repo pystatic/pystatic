@@ -1,8 +1,38 @@
 import ast
 import enum
-from typing import Optional, Final
+from typing import Optional, Final, List
 
 
+# Uri part
+def count_uri_head_dots(uri: str) -> int:
+    """find out how many dots at the begining of a uri"""
+    i = 0
+    while len(uri) > i and uri[i] == '.':
+        i += 1
+    return i
+
+
+def uri2list(uri: str) -> List[str]:
+    return [item for item in uri.split('.') if item != '']
+
+
+def list2uri(urilist: List[str]) -> str:
+    return '.'.join(urilist)
+
+
+def absolute_urilist(uri: str, cur_uri: str) -> List[str]:
+    i = count_uri_head_dots(uri)
+    if i == 0:  # the uri itself is an absolute uri
+        return uri2list(uri)
+    else:
+        rel_uri = uri2list(uri[i:])
+        if i == 1:
+            return uri2list(cur_uri) + rel_uri
+        else:
+            return uri2list(cur_uri)[:-(i // 2)] + rel_uri
+
+
+# Enum constant part
 class Reach(enum.Enum):
     TYPE_TRUE = 1  # type: Final
     TYPE_FALSE = 2  # type: Final
@@ -15,6 +45,7 @@ class Reach(enum.Enum):
     UNKNOWN = 9  # type: Final
 
 
+# Unparse part
 class BaseVisitor(object):
     def __init__(self) -> None:
         # node with reachability in reach_block will not be visited

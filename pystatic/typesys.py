@@ -144,14 +144,15 @@ class TypeModuleTemp(TypeClassTemp):
 
 
 class TypePackageTemp(TypeClassTemp):
+    # TODO: support attribute defined in __init__.py
     def __init__(self, path: List[str], uri: str, manager: 'Manager'):
-        super().__init__('package')
         self.path = path
         self.uri = uri
         self.manager = manager
 
-    def get_type(self, imp: str) -> Optional[TypeTemp]:
-        return self.manager.deal_package_import(imp, self)
+    def get_type(self, name: str) -> Optional[TypeTemp]:
+        target_uri = self.uri + '.' + name
+        return self.manager.deal_import(target_uri, self)
 
 
 class TypeAny(TypeTemp):
