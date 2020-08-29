@@ -2,9 +2,11 @@ import ast
 import enum
 from typing import Optional, Final, List
 
-
 # Uri part
-def count_uri_head_dots(uri: str) -> int:
+Uri = str
+
+
+def count_uri_head_dots(uri: Uri) -> int:
     """find out how many dots at the begining of a uri"""
     i = 0
     while len(uri) > i and uri[i] == '.':
@@ -12,15 +14,27 @@ def count_uri_head_dots(uri: str) -> int:
     return i
 
 
-def uri2list(uri: str) -> List[str]:
+def uri2list(uri: Uri) -> List[str]:
     return [item for item in uri.split('.') if item != '']
 
 
-def list2uri(urilist: List[str]) -> str:
+def list2uri(urilist: List[str]) -> Uri:
     return '.'.join(urilist)
 
 
-def absolute_urilist(uri: str, cur_uri: str) -> List[str]:
+def uri_parent(uri: Uri) -> Uri:
+    """Return the parent uri(a.b.c -> a.b, a -> '')"""
+    return '.'.join(uri2list(uri)[:-1])
+
+
+def uri_last(uri: Uri) -> str:
+    """Return the last(a.b.c -> c, a -> a)"""
+    if not uri:
+        return ''
+    return uri2list(uri)[-1]
+
+
+def absolute_urilist(uri: Uri, cur_uri: Uri) -> List[str]:
     i = count_uri_head_dots(uri)
     if i == 0:  # the uri itself is an absolute uri
         return uri2list(uri)

@@ -1,5 +1,6 @@
 from typing import Optional, Dict, List, Union, TYPE_CHECKING
 from collections import OrderedDict
+from pystatic.util import Uri
 
 ARIBITRARY_ARITY = -1
 
@@ -134,7 +135,7 @@ class TypeClassTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: str, tp: Dict[str, TypeTemp],
+    def __init__(self, uri: Uri, tp: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__('module')
         self.inner_type = tp
@@ -143,10 +144,10 @@ class TypeModuleTemp(TypeClassTemp):
 
 
 class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, path: List[str], uri: str, tp: Dict[str, TypeTemp],
+    def __init__(self, paths: List[str], uri: Uri, tp: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__(uri, tp, local)
-        self.path = path
+        self.paths = paths
 
 
 class TypeAny(TypeTemp):

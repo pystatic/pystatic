@@ -15,9 +15,9 @@ class ModuleFindRes:
     def __init__(self, res_type: int, paths: List[str],
                  target_file: Optional[str]) -> None:
         self.res_type = res_type
-        # for package to set correct paths attribute
+        # For package to set correct paths attribute
         self.paths = paths
-        # file to analyse, if result is a namespace package, target_file is None
+        # File to analyse, if result is a namespace package, target_file is None
         self.target_file = target_file
 
 
@@ -74,7 +74,7 @@ class ModuleFinder:
         return cur_res
 
     def relative_find(self, uri: str,
-                      module: TypeModuleTemp) -> Optional[ModuleFindRes]:
+                      module: 'TypeModuleTemp') -> Optional[ModuleFindRes]:
         abs_uri = urilist_from_impitem(uri, module)
         return self.find(list2uri(abs_uri))
 
@@ -109,6 +109,10 @@ def _walk_single(suburi: str, paths: List[str]) -> Optional[ModuleFindRes]:
         return None
 
 
-def urilist_from_impitem(uri: str, curmodule: TypeModuleTemp) -> List[str]:
+def uri_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> str:
+    return list2uri(urilist_from_impitem(uri, curmodule))
+
+
+def urilist_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> List[str]:
     package = uri2list(curmodule.uri)[:-1]  # the package that cur_module in
     return absolute_urilist(uri, list2uri(package))

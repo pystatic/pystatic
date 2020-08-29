@@ -1,11 +1,12 @@
 import ast
 import logging
+from pystatic.module_finder import uri_from_impitem
 from typing import TYPE_CHECKING
 from collections import OrderedDict
-from pystatic.util import BaseVisitor
+from pystatic.util import BaseVisitor, uri_parent, uri_last
 from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
-from pystatic.typesys import TypeClassTemp, any_type, TypeVar
+from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypePackageTemp, any_type, TypeVar
 from pystatic.preprocess.annotation import (parse_comment_annotation,
                                             parse_annotation, get_cls_typevars)
 from pystatic.preprocess.typing import is_special_typing, SType
@@ -33,7 +34,7 @@ def import_type_def(ast_root: ast.AST, env: Environment, manager: 'Manager'):
     return ImportResolver(env, manager).accept(ast_root)
 
 
-def generate_type_binding(ast_root: ast.AST, env: Environment):
+def bind_type_name(ast_root: ast.AST, env: Environment):
     """Bind variable's name and type and gather type information"""
     return TypeBinder(env).accept(ast_root)
 
@@ -127,31 +128,46 @@ class ImportResolver(BaseVisitor):
         self.env = env
         self.manager = manager
 
+    # NOTE: import system may be wrong
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
-            m_type = self.manager.deal_import(alias.name, self.env.module)
-            if m_type is None:
+            parent_uri = uri_parent(alias.name)
+            last_uri = uri_last(alias.name)
+            if parent_uri:
+                parent_type = self.manager.deal_import(parent_uri)
+                if isinstance(parent_type, TypePackageTemp):
+                    res_type = self.manager.deal_import(alias.name)
+                else:
+                    res_type = parent_type.get_type(last_uri)
+            else:
+                res_type = self.manager.deal_import(alias.name)
+            if res_type is None:
                 self.env.add_err(node, f'module {alias.name} not found')
             else:
                 name = alias.asname if alias.asname else alias.name
-                self.env.add_type(name, m_type)
+                self.env.add_type(name, res_type)
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         imp_name = node.module if node.module else ''
         imp_name = '.' * node.level + imp_name
-        m_type = self.manager.deal_import(imp_name, self.env.module)
-        if m_type is None:
+        # get absolute uri
+        imp_name = uri_from_impitem(imp_name, self.env.module)
+
+        parent_type = self.manager.deal_import(imp_name)
+        if parent_type is None:
             self.env.add_err(node, f'module {imp_name} not found')
         else:
             for alias in node.names:
-                name = alias.asname if alias.asname else alias.name
-                if isinstance(m_type, TypeClassTemp):
-                    res = m_type.get_type(alias.name)
-                    if res is None:
-                        self.env.add_err(node,
-                                         f'{imp_name}.{alias.name} not found')
-                    else:
-                        self.env.add_type(name, res)
+                if isinstance(parent_type, TypePackageTemp):
+                    res_name = imp_name + '.' + alias.name
+                    res_type = self.manager.deal_import(res_name)
+                elif isinstance(parent_type, TypeClassTemp):
+                    res_type = parent_type.get_type(alias.name)
+                else:
+                    res_type = None
+                if res_type:
+                    name = alias.asname if alias.asname else alias.name
+                    self.env.add_type(name, res_type)
                 else:
                     self.env.add_err(node,
                                      f'{imp_name}.{alias.name} not found')
@@ -232,7 +248,7 @@ class ClassDefVisitor(BaseVisitor):
 
                 self.env.pop_scope()
             else:
-                logger.warn(f"ClassDefVisitor doesn't catch {node.name}")
+                logger.warning(f"ClassDefVisitor doesn't catch {node.name}")
         else:
             self.env.add_err(node, f'{node.name} redefined')
 
