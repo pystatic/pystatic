@@ -23,7 +23,7 @@ def list2uri(urilist: List[str]) -> Uri:
 
 
 def uri_parent(uri: Uri) -> Uri:
-    """Return the parent uri(a.b.c -> a.b, a -> '')"""
+    """Return the parent uri(a.b.c -> a.b, a -> ''), uri should be absolute"""
     return '.'.join(uri2list(uri)[:-1])
 
 

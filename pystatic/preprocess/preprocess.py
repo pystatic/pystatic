@@ -131,6 +131,8 @@ class ImportResolver(BaseVisitor):
     # NOTE: import system may be wrong
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
+            # NOTE: alias.name must be an absolute uri? I'm not sure about it
+            # NOTE: if not, please let me know
             parent_uri = uri_parent(alias.name)
             last_uri = uri_last(alias.name)
             if parent_uri:
