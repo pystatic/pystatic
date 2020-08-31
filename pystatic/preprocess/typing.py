@@ -1,7 +1,7 @@
 import ast
 import enum
 from typing import Optional, Union, TYPE_CHECKING
-from pystatic.util import liter_unparse, LiterUnParseException
+from pystatic.util import liter_unparse, ParseException
 
 if TYPE_CHECKING:
     from pystatic.env import Environment
@@ -32,9 +32,9 @@ def analyse_special_typing(kind: SType, node: ast.AST, env: 'Environment'):
 
 
 def analyse_typevar(node: ast.AST, env: 'Environment'):
-    # TODO: to impl
     try:
         liter = liter_unparse(node)
-    except LiterUnParseException as e:
+        pass
+    except ParseException as e:
         msg = e.msg or 'invalid syntax'
         env.add_err(e.node, msg)

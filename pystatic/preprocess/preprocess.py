@@ -6,9 +6,10 @@ from collections import OrderedDict
 from pystatic.util import BaseVisitor, uri_parent, uri_last
 from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
-from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypePackageTemp, any_type, TypeVar
+from pystatic.typesys import TypeClassTemp, TypePackageTemp, any_type, TypeVar
 from pystatic.preprocess.annotation import (parse_comment_annotation,
-                                            parse_annotation, get_cls_typevars)
+                                            parse_annotation)
+from pystatic.preprocess.cls import get_cls_typevars
 from pystatic.preprocess.typing import is_special_typing, SType
 from pystatic.preprocess.func import parse_func
 

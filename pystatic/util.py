@@ -95,7 +95,7 @@ class VarUnParser(BaseVisitor):
         method = 'visit_' + node.__class__.__name__
         next_visitor = getattr(self, method, None)
         if not next_visitor:
-            raise VarUnParseException(node)
+            raise ParseException(node, '')
         return next_visitor(node, *args, **kwargs)
 
     def visit_Tuple(self, node: ast.Tuple):
@@ -107,7 +107,7 @@ class VarUnParser(BaseVisitor):
     def visit_Name(self, node: ast.Name):
         if self.context and node.id in self.context:
             return self.context[node.id]
-        raise VarUnParseException(node)
+        raise ParseException(node, '')
 
     def visit_Constant(self, node: ast.Constant):
         try:
@@ -132,7 +132,7 @@ class LiterUnParser(BaseVisitor):
         method = 'visit_' + node.__class__.__name__
         next_visitor = getattr(self, method, None)
         if not next_visitor:
-            raise LiterUnParseException(node)
+            raise ParseException(node, f'{method} not implemented')
         return next_visitor(node, *args, **kwargs)
 
     def visit_Name(self, node: ast.Name):
@@ -148,7 +148,7 @@ class LiterUnParser(BaseVisitor):
             else:
                 return str(node.value)
         except ValueError:
-            raise LiterUnParseException(node)
+            raise ParseException(node, "can't convert to str")
 
     def visit_Tuple(self, node: ast.Tuple):
         items = []
@@ -213,21 +213,13 @@ def liter_unparse(node: ast.AST):
 
 # exception part
 class ParseException(Exception):
+    """ParseException is used when working on the ast tree however the tree
+    doesn't match the structure and the process failed.
+
+    node points to the position where the process failed.
+    msg is used to describe why it failed(it can be omitted by set it to '').
+    """
     def __init__(self, node: ast.AST, msg: str):
         super().__init__(msg)
-        self.msg = msg
-        self.node = node
-
-
-class VarUnParseException(Exception):
-    """Exceptions used in var_unparse"""
-    def __init__(self, node: ast.AST, msg: Optional[str] = None):
-        self.node = node
-        self.msg = msg
-
-
-class LiterUnParseException(Exception):
-    """Exceptions used in liter_unparse"""
-    def __init__(self, node: ast.AST, msg: Optional[str] = None):
         self.node = node
         self.msg = msg
