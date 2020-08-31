@@ -86,7 +86,7 @@ class BaseVisitor(object):
         return self.visit(node)
 
 
-class UnParser(BaseVisitor):
+class VarUnParser(BaseVisitor):
     def __init__(self, context: Optional[dict]) -> None:
         super().__init__()
         self.context = context
@@ -95,7 +95,7 @@ class UnParser(BaseVisitor):
         method = 'visit_' + node.__class__.__name__
         next_visitor = getattr(self, method, None)
         if not next_visitor:
-            raise UnParseException()
+            raise VarUnParseException(node)
         return next_visitor(node, *args, **kwargs)
 
     def visit_Tuple(self, node: ast.Tuple):
@@ -107,7 +107,7 @@ class UnParser(BaseVisitor):
     def visit_Name(self, node: ast.Name):
         if self.context and node.id in self.context:
             return self.context[node.id]
-        raise UnParseException()
+        raise VarUnParseException(node)
 
     def visit_Constant(self, node: ast.Constant):
         try:
@@ -116,8 +116,99 @@ class UnParser(BaseVisitor):
             return node.value
 
 
-def unparse(node: ast.AST, context: Optional[dict] = None):
-    return UnParser(context).accept(node)
+def var_unparse(node: ast.AST, context: Optional[dict] = None):
+    """Tries to unparse node to exact values.
+
+    Look up context when meeting variable names
+    """
+    return VarUnParser(context).accept(node)
+
+
+class LiterUnParser(BaseVisitor):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def visit(self, node: ast.AST, *args, **kwargs):
+        method = 'visit_' + node.__class__.__name__
+        next_visitor = getattr(self, method, None)
+        if not next_visitor:
+            raise LiterUnParseException(node)
+        return next_visitor(node, *args, **kwargs)
+
+    def visit_Name(self, node: ast.Name):
+        return node.id
+
+    def visit_Ellipsis(self, node: ast.Ellipsis):
+        return '...'
+
+    def visit_Constant(self, node: ast.Constant):
+        try:
+            if node.value is Ellipsis:
+                return '...'
+            else:
+                return str(node.value)
+        except ValueError:
+            raise LiterUnParseException(node)
+
+    def visit_Tuple(self, node: ast.Tuple):
+        items = []
+        for subnode in node.elts:
+            items.append(self.visit(subnode))
+        return '(' + ','.join(items) + ')'
+
+    def visit_List(self, node: ast.List):
+        items = []
+        for subnode in node.elts:
+            items.append(self.visit(subnode))
+        return '[' + ','.join(items) + ']'
+
+    def visit_Attribute(self, node: ast.Attribute):
+        value = self.visit(node.value)
+        return value + '.' + node.attr
+
+    def visit_Subscript(self, node: ast.Subscript):
+        value = self.visit(node.value)
+        if isinstance(node.slice, ast.Tuple):
+            slc = self.visit(node.slice)
+            assert (slc[0] == '(')
+            assert (slc[-1] == ')')
+            slc[0] = '['
+            slc[-1] = ']'
+        else:
+            slc = '[' + self.visit(node.slice) + ']'
+        return value + slc
+
+    def visit_Slice(self, node: ast.Slice):
+        lower = ''
+        upper = ''
+        step = ''
+        if node.lower:
+            lower = self.visit(node.lower)
+        if node.upper:
+            upper = self.visit(node.upper)
+        if node.step:
+            step = self.visit(node.step)
+        return ':'.join([lower, upper, step])
+
+    def visit_Index(self, node: ast.Index):
+        # ast.Index is deprecated since python3.9
+        if isinstance(node.value, ast.Tuple):
+            res = self.visit(node.value)
+            assert res[0] == '(' and res[-1] == ')'
+            return res[1:-1]
+        else:
+            return self.visit(node.value)
+
+    def visit_ExtSlice(self, node: ast.ExtSlice):
+        items = []
+        for subnode in node.dims:
+            items.append(self.visit(subnode))
+        return ','.join(items)
+
+
+def liter_unparse(node: ast.AST):
+    """Tries to change the ast to the str format"""
+    return LiterUnParser().accept(node)
 
 
 # exception part
@@ -128,10 +219,15 @@ class ParseException(Exception):
         self.node = node
 
 
-class UnParseException(Exception):
-    """Exceptions used in unparse"""
-    def __init__(self,
-                 node: Optional[ast.AST] = None,
-                 msg: Optional[str] = None):
+class VarUnParseException(Exception):
+    """Exceptions used in var_unparse"""
+    def __init__(self, node: ast.AST, msg: Optional[str] = None):
+        self.node = node
+        self.msg = msg
+
+
+class LiterUnParseException(Exception):
+    """Exceptions used in liter_unparse"""
+    def __init__(self, node: ast.AST, msg: Optional[str] = None):
         self.node = node
         self.msg = msg

@@ -299,6 +299,8 @@ class TypeBinder(BaseVisitor):
             for name, tp in res.items():
                 self.env.add_var(name, tp)
                 logger.debug(f'Add {self.env.current_uri}.{name}, type: {tp}')
+        else:
+            pass
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         if not is_special_typing(node):
@@ -306,6 +308,8 @@ class TypeBinder(BaseVisitor):
             if name and tp:
                 self.env.add_var(name, tp)
                 logger.debug(f'Add {self.env.current_uri}.{name}, type: {tp}')
+        else:
+            pass
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         if self.env.lookup_local_var(node.name):
