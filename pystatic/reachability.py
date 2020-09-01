@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 import ast
-from pystatic.util import var_unparse, ParseException, Reach
+from pystatic.util import val_unparse, ParseException, Reach
 
 if TYPE_CHECKING:
     from pystatic.config import Config
@@ -82,7 +82,7 @@ def compare_python_version(sys_node: ast.expr,
                            atright=False) -> Reach:
     py_version = config.python_version
     try:
-        right = var_unparse(cmp_node)
+        right = val_unparse(cmp_node)
     except ParseException:
         return Reach.UNKNOWN
     if not isinstance(right, tuple):

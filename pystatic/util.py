@@ -1,6 +1,9 @@
 import ast
 import enum
-from typing import Optional, Final, List
+from typing import Optional, Final, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pystatic.env import Environment
 
 # Uri part
 Uri = str
@@ -86,7 +89,8 @@ class BaseVisitor(object):
         return self.visit(node)
 
 
-class VarUnParser(BaseVisitor):
+class ValueUnParser(BaseVisitor):
+    """Try to convert an ast to a python value"""
     def __init__(self, context: Optional[dict]) -> None:
         super().__init__()
         self.context = context
@@ -107,7 +111,8 @@ class VarUnParser(BaseVisitor):
     def visit_Name(self, node: ast.Name):
         if self.context and node.id in self.context:
             return self.context[node.id]
-        raise ParseException(node, '')
+        else:
+            raise ParseException(node, f'{node.id} not found')
 
     def visit_Constant(self, node: ast.Constant):
         try:
@@ -116,12 +121,12 @@ class VarUnParser(BaseVisitor):
             return node.value
 
 
-def var_unparse(node: ast.AST, context: Optional[dict] = None):
+def val_unparse(node: ast.AST, context: Optional[dict] = None):
     """Tries to unparse node to exact values.
 
     Look up context when meeting variable names
     """
-    return VarUnParser(context).accept(node)
+    return ValueUnParser(context).accept(node)
 
 
 class LiterUnParser(BaseVisitor):
