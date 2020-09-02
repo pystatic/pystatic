@@ -61,21 +61,22 @@ class TypeIns(BaseType):
 class TypeVar(TypeTemp):
     def __init__(self,
                  name: str,
-                 *args,
+                 *args: TypeIns,
                  bound: Optional[BaseType] = None,
                  covariant=False,
                  contravariant=False):
         super().__init__(name)
         self.bound = bound
         if contravariant:
-            self.convariant = False
+            self.covariant = False
         else:
-            self.convariant = covariant
+            self.covariant = covariant
         if contravariant or covariant:
             self.invariant = False
         else:
             self.invariant = True
         self.contravariant = contravariant
+        self.constrains = list(*args)
 
 
 class TypeClassTemp(TypeTemp):
@@ -150,7 +151,7 @@ class TypePackageTemp(TypeModuleTemp):
         self.paths = paths
 
 
-class TypeAny(TypeTemp):
+class TypeAnyTemp(TypeTemp):
     def __init__(self):
         super().__init__('Any', 0)
 
@@ -161,7 +162,7 @@ class TypeAny(TypeTemp):
         return True
 
 
-class TypeNone(TypeTemp):
+class TypeNoneTemp(TypeTemp):
     def __init__(self):
         super().__init__('None', 0)
 
@@ -172,32 +173,32 @@ class TypeNone(TypeTemp):
         return False
 
 
-class TypeTuple(TypeTemp):
+class TypeTupleTemp(TypeTemp):
     def __init__(self):
         super().__init__('Tuple', ARIBITRARY_ARITY)
 
 
-class TypeDict(TypeTemp):
+class TypeDictTemp(TypeTemp):
     def __init__(self):
         super().__init__('Dict', 2)
 
 
-class TypeUnion(TypeTemp):
+class TypeUnionTemp(TypeTemp):
     def __init__(self):
         super().__init__('Union', ARIBITRARY_ARITY)
 
 
-class TypeOptional(TypeTemp):
+class TypeOptionalTemp(TypeTemp):
     def __init__(self):
         super().__init__('Optional', 1)
 
 
-class TypeCallable(TypeTemp):
+class TypeCallableTemp(TypeTemp):
     def __init__(self):
         super().__init__('Callable', 2)
 
 
-class TypeGeneric(TypeTemp):
+class TypeGenericTemp(TypeTemp):
     def __init__(self):
         super().__init__('Generic', ARIBITRARY_ARITY)
 
@@ -223,16 +224,20 @@ class TypeFunc(TypeClass):
         return str(self.arg) + ' -> ' + str(self.ret_type)
 
 
+class TypeType(TypeClass):
+    pass
+
+
 ImpItem = Union[TypeModuleTemp, TypePackageTemp]
 
 # default types
-any_type = TypeAny()
-none_type = TypeNone()
-generic_type = TypeGeneric()
+any_temp = TypeAnyTemp()
+none_temp = TypeNoneTemp()
+generic_temp = TypeGenericTemp()
 
-int_type = TypeClassTemp('int')
-float_type = TypeClassTemp('float')
-complex_type = TypeClassTemp('complex')
-str_type = TypeClassTemp('str')
-bool_type = TypeClassTemp('bool')
-func_type = TypeClassTemp('function')
+int_temp = TypeClassTemp('int')
+float_temp = TypeClassTemp('float')
+complex_temp = TypeClassTemp('complex')
+str_temp = TypeClassTemp('str')
+bool_temp = TypeClassTemp('bool')
+func_temp = TypeClassTemp('function')

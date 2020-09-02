@@ -6,11 +6,12 @@ from collections import OrderedDict
 from pystatic.util import BaseVisitor, uri_parent, uri_last
 from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
-from pystatic.typesys import TypeClassTemp, TypePackageTemp, any_type, TypeVar
+from pystatic.typesys import TypeClassTemp, TypePackageTemp, any_temp, TypeVar
 from pystatic.preprocess.annotation import (parse_comment_annotation,
                                             parse_annotation)
 from pystatic.preprocess.cls import get_cls_typevars
-from pystatic.preprocess.typing import is_special_typing, SType
+from pystatic.preprocess.typing import (special_typing_kind, SType,
+                                        analyse_special_typing)
 from pystatic.preprocess.func import parse_func
 
 logger = logging.getLogger(__name__)
@@ -99,7 +100,7 @@ class TypeDefCollector(BaseVisitor):
             setattr(node, 'reach', Reach.CLS_REDEF)
 
     def visit_Assign(self, node: ast.Assign):
-        spec = is_special_typing(node)
+        spec = special_typing_kind(node)
         if spec == SType.TypeVar:
             new_typevar = TypeVar('')
             for target in node.targets:
@@ -109,7 +110,7 @@ class TypeDefCollector(BaseVisitor):
                         logger.debug(f'Add TypeVar {target.id}')
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        spec = is_special_typing(node)
+        spec = special_typing_kind(node)
         if spec == SType.TypeVar:
             new_typevar = TypeVar('')
             target = node.target
@@ -211,8 +212,8 @@ class ClassFuncDefVisitor(BaseVisitor):
         return None
 
     def visit_Assign(self, node: ast.Assign):
-        com_tp = parse_comment_annotation(node, self.env)
-        assign_tp = com_tp if com_tp else any_type
+        com_tp = parse_comment_annotation(node, self.env, False)
+        assign_tp = com_tp if com_tp else any_temp
         for sub_node in node.targets:
             if isinstance(sub_node, ast.Attribute):
                 attr = self.is_cls_attr(sub_node)
@@ -223,8 +224,8 @@ class ClassFuncDefVisitor(BaseVisitor):
                     )
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        tp = parse_annotation(node.annotation, self.env)
-        assign_tp = tp if tp else any_type
+        tp = parse_annotation(node.annotation, self.env, False)
+        assign_tp = tp if tp else any_temp
         if isinstance(node.target, ast.Attribute):
             attr = self.is_cls_attr(node.target)
             if attr and attr not in self.tp:
@@ -256,7 +257,7 @@ class ClassDefVisitor(BaseVisitor):
             self.env.add_err(node, f'{node.name} redefined')
 
     def visit_Assign(self, node: ast.Assign):
-        if not is_special_typing(node):
+        if not special_typing_kind(node):
             res = _def_visitAssign(self.env, node)
             for name, var_tp in res.items():
                 self.env.add_var(name, var_tp)
@@ -266,7 +267,7 @@ class ClassDefVisitor(BaseVisitor):
                 )
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        if not is_special_typing(node):
+        if not special_typing_kind(node):
             name, var_tp = _def_visitAnnAssign(self.env, node)
             if name and var_tp:
                 self.env.add_var(name, var_tp)
@@ -295,22 +296,28 @@ class TypeBinder(BaseVisitor):
         self.visit(node)
 
     def visit_Assign(self, node: ast.Assign):
-        if not is_special_typing(node):
+        spec = special_typing_kind(node)
+        if not spec:
             res = _def_visitAssign(self.env, node)
             for name, tp in res.items():
                 self.env.add_var(name, tp)
                 logger.debug(f'Add {self.env.current_uri}.{name}, type: {tp}')
+        elif spec == SType.TypeVar:
+            analyse_special_typing(spec, node, self.env)
         else:
-            pass
+            assert 0, "Not implemented yet"
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        if not is_special_typing(node):
+        spec = special_typing_kind(node)
+        if not spec:
             name, tp = _def_visitAnnAssign(self.env, node)
             if name and tp:
                 self.env.add_var(name, tp)
                 logger.debug(f'Add {self.env.current_uri}.{name}, type: {tp}')
+        elif spec == SType.TypeVar:
+            analyse_special_typing(spec, node, self.env)
         else:
-            pass
+            assert 0, "Not implemented yet"
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         if self.env.lookup_local_var(node.name):
@@ -328,12 +335,18 @@ class TypeBinder(BaseVisitor):
         else:
             self.env.add_err(node, node.name)
 
+    def visit_Import(self, node: ast.Import):
+        pass
+
+    def visit_ImportFrom(self, node: ast.ImportFrom):
+        pass
+
 
 def _def_visitAssign(env: Environment, node: ast.Assign):
     """Get the variables defined in an ast.Assign node"""
     new_var = OrderedDict()
-    com_tp = parse_comment_annotation(node, env)
-    assign_tp = com_tp if com_tp else any_type
+    com_tp = parse_comment_annotation(node, env, False)
+    assign_tp = com_tp if com_tp else any_temp
     for sub_node in reversed(node.targets):
         if isinstance(sub_node, ast.Name):
             if not env.lookup_local_var(
@@ -345,8 +358,8 @@ def _def_visitAssign(env: Environment, node: ast.Assign):
 
 def _def_visitAnnAssign(env: Environment, node: ast.AnnAssign):
     """Get the variables defined in an ast.AnnAssign node"""
-    tp = parse_annotation(node.annotation, env)
-    assign_tp = tp if tp else any_type.instantiate([])
+    tp = parse_annotation(node.annotation, env, False)
+    assign_tp = tp if tp else any_temp.instantiate([])
     if isinstance(node.target, ast.Name):
         if not env.lookup_local_var(node.target.id):
             # this assignment is also a definition

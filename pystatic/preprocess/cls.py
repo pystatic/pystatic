@@ -4,7 +4,8 @@ from pystatic.env import Environment
 from pystatic.typesys import TypeIns, TypeVar
 from pystatic.util import ParseException
 from pystatic.preprocess.annotation import (parse_ann_ast, SimpleTypeNode,
-                                            SimpleTypeNodeTag, get_type,
+                                            SimpleTypeNodeTag,
+                                            get_type_from_snode,
                                             check_appliable)
 
 
@@ -29,7 +30,7 @@ class ClassTypeVarGetter:
                 simple_tree = parse_ann_ast(base, False, None)
 
                 self._get_cls_typevars(simple_tree, var_set, var_list, env)
-                base_tp = get_type(simple_tree, env)
+                base_tp = get_type_from_snode(simple_tree, env, False)
                 if base_tp:
                     base_list.append(base_tp)
             except ParseException as e:

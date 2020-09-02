@@ -6,23 +6,30 @@ from pystatic.env import Environment
 from pystatic.util import ParseException
 
 
-def parse_annotation(node: ast.AST, env: Environment) -> Optional[TypeIns]:
-    """Get the type according to the annotation"""
-    return AnnotationParser(env).accept(node)
+def parse_annotation(node: ast.AST, env: Environment,
+                     def_check: bool) -> Optional[TypeIns]:
+    """Get the type according to the annotation
+    
+    If def_check is True, then it will make sure that the annotation not
+    surrounded by quotes must be defined earlier.
+    """
+    return AnnotationParser(env, def_check).accept(node)
 
 
-def parse_comment_annotation(node: ast.AST,
-                             env: Environment) -> Optional[TypeIns]:
+def parse_comment_annotation(node: ast.AST, env: Environment,
+                             def_check: bool) -> Optional[TypeIns]:
     """Get the type according to the type comment"""
     comment = node.type_comment if node.type_comment else None
     if not comment:
         return None
     try:
-        node = ast.parse(
+        str_node = ast.parse(
             comment,
             mode='eval')  # for annotations that's str we first parse it
-        if isinstance(node, ast.Expression):
-            return AnnotationParser(env).accept(node.body)
+        if isinstance(str_node, ast.Expression):
+            return AnnotationParser(env,
+                                    def_check).accept(str_node.body, True,
+                                                      node)
         else:
             raise ParseException(node, '')
     except (SyntaxError, ParseException):
@@ -32,14 +39,18 @@ def parse_comment_annotation(node: ast.AST,
 
 class AnnotationParser(object):
     """Parse annotations"""
-    def __init__(self, env: Environment):
+    def __init__(self, env: Environment, def_check: bool):
         self.env = env
+        self.def_check = def_check
 
-    def accept(self, node: ast.AST) -> Optional[TypeIns]:
+    def accept(self,
+               node: ast.AST,
+               is_cons: bool = False,
+               cons_node: Optional[ast.AST] = None) -> Optional[TypeIns]:
         """Return the type this node represents"""
         try:
-            new_tree = parse_ann_ast(node, False, None)
-            return get_type(new_tree, self.env)
+            new_tree = parse_ann_ast(node, is_cons, cons_node)
+            return get_type_from_snode(new_tree, self.env, self.def_check)
         except ParseException as e:
             self.env.add_err(e.node, e.msg)
             return None
@@ -88,7 +99,7 @@ class SimpleTypeNode(object):
                  tag: SimpleTypeNodeTag = SimpleTypeNodeTag.NAME):
         self.node = node
         self.name = name
-        self.is_cons = is_cons
+        self.is_cons = is_cons  # whether this node comes from a str
         self.tag = tag
         self.param: List[SimpleTypeNode] = []
         self.left: SimpleTypeNode
@@ -174,39 +185,47 @@ def _parse_ann_ast_allow_list(node, is_cons, cons_node) -> SimpleTypeNode:
         return parse_ann_ast(node, is_cons, cons_node)
 
 
-def get_type(node: SimpleTypeNode, env: Environment) -> Optional[TypeIns]:
+def get_type_from_snode(s_node: SimpleTypeNode, env: Environment,
+                        def_check: bool) -> Optional[TypeIns]:
     """From a simple tree node to the type it represents"""
+    def check_defined(node: ast.AST, name: str):
+        if def_check and env.lookup_var(name) is None:
+            raise ParseException(node, f'{name} is not defined')
+
     tp: Union[TypeTemp, TypeIns, None]
-    if node.tag == SimpleTypeNodeTag.NAME:
-        tp = env.lookup_type(node.name)
+    if s_node.tag == SimpleTypeNodeTag.NAME:
+        tp = env.lookup_type(s_node.name)
         if tp is None:
-            raise ParseException(node.node, f'{node.name} unbound')
+            raise ParseException(s_node.node, f'{s_node.name} unbound')
         else:
+            check_defined(s_node.node, s_node.name)
             return tp.instantiate([])
-    elif node.tag == SimpleTypeNodeTag.ATTR:
-        left_tp = get_type(node.left, env)
+    elif s_node.tag == SimpleTypeNodeTag.ATTR:
+        left_tp = get_type_from_snode(s_node.left, env, def_check)
         if not left_tp:
             return None
         if isinstance(left_tp, TypeClass):
-            tp = left_tp.template.get_type(node.attr)  # type: ignore
+            tp = left_tp.template.get_type(s_node.attr)  # type: ignore
             if tp is None:
                 raise ParseException(
-                    node.node, f'{left_tp.name} has no attribute {node.attr}')
+                    s_node.node,
+                    f'{left_tp.name} has no attribute {s_node.attr}')
+            check_defined(s_node.node, s_node.name)
             return tp.instantiate([])  # type: ignore
         else:
             raise ParseException(
-                node.node, f'{left_tp.name} has no attribute {node.attr}')
-    elif node.tag == SimpleTypeNodeTag.SUBS:
-        tp = get_type(node.left, env)
+                s_node.node, f'{left_tp.name} has no attribute {s_node.attr}')
+    elif s_node.tag == SimpleTypeNodeTag.SUBS:
+        tp = get_type_from_snode(s_node.left, env, def_check)
         if not tp:
             return None
         param_list = []
-        for param in node.param:
-            p_tp = get_type(param, env)
+        for param in s_node.param:
+            p_tp = get_type_from_snode(param, env, def_check)
             param_list.append(p_tp)
         return tp.template.instantiate(param_list)
-    elif node.tag == SimpleTypeNodeTag.LIST:
-        raise ParseException(node.node, 'not implemented yet')
-    elif node.tag == SimpleTypeNodeTag.ELLIPSIS:
-        raise ParseException(node.node, 'not implemented yet')
+    elif s_node.tag == SimpleTypeNodeTag.LIST:
+        raise ParseException(s_node.node, 'not implemented yet')
+    elif s_node.tag == SimpleTypeNodeTag.ELLIPSIS:
+        raise ParseException(s_node.node, 'not implemented yet')
     return None

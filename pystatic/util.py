@@ -115,10 +115,7 @@ class ValueUnParser(BaseVisitor):
             raise ParseException(node, f'{node.id} not found')
 
     def visit_Constant(self, node: ast.Constant):
-        try:
-            return int(node.value)
-        except ValueError:
-            return node.value
+        return node.value
 
 
 def val_unparse(node: ast.AST, context: Optional[dict] = None):
