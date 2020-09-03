@@ -3,7 +3,7 @@ import logging
 from pystatic.module_finder import uri_from_impitem
 from typing import TYPE_CHECKING
 from collections import OrderedDict
-from pystatic.util import BaseVisitor, uri_parent, uri_last
+from pystatic.util import BaseVisitor, ParseException, uri_parent, uri_last
 from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
 from pystatic.typesys import TypeClassTemp, TypePackageTemp, any_temp, TypeVar
@@ -11,7 +11,8 @@ from pystatic.preprocess.annotation import (parse_comment_annotation,
                                             parse_annotation)
 from pystatic.preprocess.cls import get_cls_typevars
 from pystatic.preprocess.typing import (special_typing_kind, SType,
-                                        analyse_special_typing)
+                                        analyse_special_typing,
+                                        get_typevar_name)
 from pystatic.preprocess.func import parse_func
 
 logger = logging.getLogger(__name__)
@@ -102,12 +103,17 @@ class TypeDefCollector(BaseVisitor):
     def visit_Assign(self, node: ast.Assign):
         spec = special_typing_kind(node)
         if spec == SType.TypeVar:
-            new_typevar = TypeVar('')
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    if not self.env.lookup_local_type(target.id):
-                        self.env.add_type(target.id, new_typevar)
-                        logger.debug(f'Add TypeVar {target.id}')
+            try:
+                # assert isinstance(node.value, ast.Call)
+                tpvar_name = get_typevar_name(node.value)  # type: ignore
+                new_typevar = TypeVar(tpvar_name)
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        if not self.env.lookup_local_type(target.id):
+                            self.env.add_type(target.id, new_typevar)
+                            logger.debug(f'Add TypeVar {target.id}')
+            except ParseException as e:
+                self.env.add_err(e.node, e.msg or f'invalid syntax')
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         spec = special_typing_kind(node)

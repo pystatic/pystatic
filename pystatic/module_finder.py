@@ -3,8 +3,7 @@ from typing import List, Dict, Optional, Union, TYPE_CHECKING
 from pystatic.util import uri2list, absolute_urilist, list2uri
 
 if TYPE_CHECKING:
-    from pystatic.typesys import (TypeModuleTemp, TypePackageTemp)
-    ImpItem = Union[TypeModuleTemp, TypePackageTemp]
+    from pystatic.typesys import (TypeModuleTemp)
 
 
 class ModuleFindRes:

@@ -65,17 +65,11 @@ def analyse_typevar(node: Union[ast.Assign, ast.AnnAssign],
 
 
 def collect_typevar_info(call_expr: ast.Call, env: 'Environment') -> TypeVar:
-    if len(call_expr.args) <= 0:
-        raise ParseException(call_expr, f'TypeVar need at least one parameter')
-
-    tpvar_name = liter_unparse(call_expr.args[0])
-    if tpvar_name:
-        tpvar = env.lookup_local_type(tpvar_name)
-        assert tpvar.name == tpvar_name
-        if not tpvar or not isinstance(tpvar, TypeVar):
-            raise ParseException(call_expr.args[0], f'{tpvar_name} unbound')
-    else:
-        raise ParseException(call_expr.args[0], f'invalid syntax')
+    tpvar_name = get_typevar_name(call_expr)
+    tpvar = env.lookup_local_type(tpvar_name)
+    assert tpvar.name == tpvar_name, f'get {tpvar_name}, expect {tpvar.name}'
+    if not tpvar or not isinstance(tpvar, TypeVar):
+        raise ParseException(call_expr.args[0], f'{tpvar_name} unbound')
 
     # complete the content in the TypeVar which stored in tpvar
     # analyse the type constrains
@@ -154,3 +148,13 @@ def collect_typevar_info(call_expr: ast.Call, env: 'Environment') -> TypeVar:
         tpvar.invariant = True
 
     return tpvar
+
+
+def get_typevar_name(call_expr: ast.Call) -> str:
+    if len(call_expr.args) <= 0:
+        raise ParseException(call_expr, f'TypeVar need at least one parameter')
+
+    tpvar_name = liter_unparse(call_expr.args[0])
+    if not tpvar_name:
+        raise ParseException(call_expr.args[0], f'invalid syntax')
+    return tpvar_name

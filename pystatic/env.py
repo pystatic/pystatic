@@ -2,9 +2,9 @@ import ast
 from collections import OrderedDict
 from typing import Dict, Optional, List
 from pystatic.typesys import (BaseType, TypeClassTemp, TypeModuleTemp,
-                              TypeTemp, TypeIns, any_type, int_type,
-                              float_type, bool_type, str_type, generic_type,
-                              none_type)
+                              TypeTemp, TypeIns, any_temp, int_temp,
+                              float_temp, bool_temp, str_temp, generic_temp,
+                              none_temp)
 from pystatic.error import ErrHandler
 
 
@@ -207,14 +207,14 @@ class Environment(object):
 builtin_scope = Scope(None, None, None, None)  # type: ignore
 builtin_scope.glob = builtin_scope
 builtin_scope.builtins = builtin_scope
-builtin_scope.add_type('float', float_type)
-builtin_scope.add_type('int', int_type)
-builtin_scope.add_type('str', str_type)
-builtin_scope.add_type('bool', bool_type)
-builtin_scope.add_type('Generic', generic_type)
-builtin_scope.add_type('float', float_type)
-builtin_scope.add_type('None', none_type)
-builtin_scope.add_type('Any', any_type)
+builtin_scope.add_type('float', float_temp)
+builtin_scope.add_type('int', int_temp)
+builtin_scope.add_type('str', str_temp)
+builtin_scope.add_type('bool', bool_temp)
+builtin_scope.add_type('Generic', generic_temp)
+builtin_scope.add_type('float', float_temp)
+builtin_scope.add_type('None', none_temp)
+builtin_scope.add_type('Any', any_temp)
 
 
 def get_init_env(module: TypeModuleTemp):

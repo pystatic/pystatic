@@ -1,11 +1,8 @@
-from typing import Optional, Dict, List, Union, TYPE_CHECKING
+from typing import Optional, Dict, List
 from collections import OrderedDict
 from pystatic.util import Uri
 
 ARIBITRARY_ARITY = -1
-
-if TYPE_CHECKING:
-    from pystatic.manager import Manager
 
 
 class BaseType(object):
@@ -34,6 +31,7 @@ class TypeTemp(BaseType):
     def __init__(self, name, arity=0):
         super().__init__(name)
         self._arity = arity
+        self._type: 'TypeType'
 
     @property
     def arity(self):
@@ -57,6 +55,12 @@ class TypeIns(BaseType):
     def template(self):
         return self.temp
 
+    def has_attribute(self, name: str) -> bool:
+        return self.temp.has_attribute(name)
+
+    def has_method(self, name: str) -> bool:
+        return self.temp.has_method(name)
+
 
 class TypeVar(TypeTemp):
     def __init__(self,
@@ -79,6 +83,16 @@ class TypeVar(TypeTemp):
         self.constrains = list(*args)
 
 
+class TypeType(TypeIns):
+    def __init__(self, temp: TypeTemp):
+        super().__init__(temp)
+
+
+class TypeTypeClass(TypeType):
+    def __init__(self, temp: 'TypeClassTemp'):
+        super().__init__(temp)
+
+
 class TypeClassTemp(TypeTemp):
     def __init__(self, clsname: str):
         super().__init__(clsname)
@@ -88,16 +102,18 @@ class TypeClassTemp(TypeTemp):
 
         self.typevar: OrderedDict = OrderedDict()
 
-        self.inner_type: Dict[str, TypeTemp] = {}
+        self.inner_cls: Dict[str, TypeTemp] = {}  # classes defined inside
+
+        self._type = TypeTypeClass(self)
 
     def instantiate(self, bind: List[BaseType]):
         return TypeClass(self, *bind)
 
     def add_type(self, name: str, tp: TypeTemp):
-        self.inner_type[name] = tp
+        self.inner_cls[name] = tp
 
     def get_type(self, name: str) -> Optional[TypeTemp]:
-        res = self.inner_type.get(name)
+        res = self.inner_cls.get(name)
         if not res:
             for v in self.baseclass.values():
                 res = v.template.get_type(name)
@@ -135,11 +151,16 @@ class TypeClassTemp(TypeTemp):
         return True
 
 
+class TypeClass(TypeIns):
+    def __init__(self, temp: TypeClassTemp, *args):
+        super().__init__(temp, *args)
+
+
 class TypeModuleTemp(TypeClassTemp):
     def __init__(self, uri: Uri, tp: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__('module')
-        self.inner_type = tp
+        self.inner_cls = tp
         self.attribute = local
         self.uri = uri
 
@@ -203,32 +224,15 @@ class TypeGenericTemp(TypeTemp):
         super().__init__('Generic', ARIBITRARY_ARITY)
 
 
-class TypeClass(TypeIns):
-    def __init__(self, temp: TypeClassTemp, *args):
-        super().__init__(temp, *args)
-
-    def has_attribute(self, name: str) -> bool:
-        return self.temp.has_attribute(name)
-
-    def has_method(self, name: str) -> bool:
-        return self.temp.has_method(name)
-
-
 class TypeFunc(TypeClass):
     def __init__(self, arg, ret_type: BaseType):
-        super().__init__(func_type)
+        super().__init__(func_temp)
         self.arg = arg
         self.ret_type = ret_type
 
     def __str__(self):
         return str(self.arg) + ' -> ' + str(self.ret_type)
 
-
-class TypeType(TypeClass):
-    pass
-
-
-ImpItem = Union[TypeModuleTemp, TypePackageTemp]
 
 # default types
 any_temp = TypeAnyTemp()
