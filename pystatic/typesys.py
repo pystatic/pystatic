@@ -83,22 +83,13 @@ class TypeVar(TypeTemp):
         self.constrains = list(*args)
 
 
-class TypeType(TypeIns):
-    def __init__(self, temp: TypeTemp):
-        super().__init__(temp)
-
-
-class TypeTypeClass(TypeType):
-    def __init__(self, temp: 'TypeClassTemp'):
-        super().__init__(temp)
-
-
 class TypeClassTemp(TypeTemp):
     def __init__(self, clsname: str):
         super().__init__(clsname)
         self.baseclass: OrderedDict = OrderedDict()
         self.method: dict = {}
-        self.attribute: Dict[str, TypeIns] = {}
+        self.cls_attr: Dict[str, TypeIns] = {}
+        self.var_attr: Dict[str, TypeIns] = {}
 
         self.typevar: OrderedDict = OrderedDict()
 
@@ -109,14 +100,15 @@ class TypeClassTemp(TypeTemp):
     def instantiate(self, bind: List[BaseType]):
         return TypeClass(self, *bind)
 
-    def add_type(self, name: str, tp: TypeTemp):
+    def add_inner_type(self, name: str, tp: TypeTemp):
         self.inner_cls[name] = tp
 
-    def get_type(self, name: str) -> Optional[TypeTemp]:
+    def get_inner_type(self, name: str) -> Optional[TypeTemp]:
+        """Return the type defined inside the class"""
         res = self.inner_cls.get(name)
         if not res:
             for v in self.baseclass.values():
-                res = v.template.get_type(name)
+                res = v.template.get_inner_type(name)
                 if res:
                     return res
         return res
@@ -139,21 +131,39 @@ class TypeClassTemp(TypeTemp):
             return False
         return True
 
+    def add_var_attr(self, name: str, attr_type: TypeIns):
+        self.var_attr[name] = attr_type
+
+    def add_cls_attr(self, name: str, attr_type: TypeIns):
+        self.cls_attr[name] = attr_type
+
     def add_attribute(self, name: str, attr_type: TypeIns):
-        self.attribute[name] = attr_type
+        """Same as add_var_attr"""
+        self.add_var_attr(name, attr_type)
 
     def has_attribute(self, name: str) -> bool:
-        if not (name in self.attribute):
+        if name in self.var_attr or name in self.cls_attr:
+            return True
+        else:
             for v in self.baseclass.values():
                 if v.has_attribute(name):
                     return True
             return False
-        return True
 
 
 class TypeClass(TypeIns):
     def __init__(self, temp: TypeClassTemp, *args):
         super().__init__(temp, *args)
+
+
+class TypeType(TypeIns):
+    def __init__(self, temp: TypeTemp):
+        super().__init__(temp)
+
+
+class TypeTypeClass(TypeType):
+    def __init__(self, temp: 'TypeClassTemp'):
+        super().__init__(temp)
 
 
 class TypeModuleTemp(TypeClassTemp):

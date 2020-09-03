@@ -1,7 +1,8 @@
 import ast
 import enum
 from typing import Optional, List, Union, Tuple
-from pystatic.typesys import (TypeClass, TypeIns, TypeTemp, ARIBITRARY_ARITY)
+from pystatic.typesys import (TypeClass, TypeIns, TypeTemp, ARIBITRARY_ARITY,
+                              TypeClassTemp)
 from pystatic.env import Environment
 from pystatic.util import ParseException
 
@@ -187,7 +188,10 @@ def _parse_ann_ast_allow_list(node, is_cons, cons_node) -> SimpleTypeNode:
 
 def get_type_from_snode(s_node: SimpleTypeNode, env: Environment,
                         def_check: bool) -> Optional[TypeIns]:
-    """From a simple tree node to the type it represents"""
+    """From a simple tree node to the type it represents.
+
+    def_check: if true, then will check the type has defined or not.
+    """
     def check_defined(node: ast.AST, name: str):
         if def_check and env.lookup_var(name) is None:
             raise ParseException(node, f'{name} is not defined')
@@ -205,13 +209,14 @@ def get_type_from_snode(s_node: SimpleTypeNode, env: Environment,
         if not left_tp:
             return None
         if isinstance(left_tp, TypeClass):
-            tp = left_tp.template.get_type(s_node.attr)  # type: ignore
+            assert isinstance(left_tp.template, TypeClassTemp)
+            tp = left_tp.template.get_inner_type(s_node.attr)
             if tp is None:
                 raise ParseException(
                     s_node.node,
                     f'{left_tp.name} has no attribute {s_node.attr}')
             check_defined(s_node.node, s_node.name)
-            return tp.instantiate([])  # type: ignore
+            return tp.instantiate([])
         else:
             raise ParseException(
                 s_node.node, f'{left_tp.name} has no attribute {s_node.attr}')

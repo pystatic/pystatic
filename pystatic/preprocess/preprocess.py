@@ -104,8 +104,8 @@ class TypeDefCollector(BaseVisitor):
         spec = special_typing_kind(node)
         if spec == SType.TypeVar:
             try:
-                # assert isinstance(node.value, ast.Call)
-                tpvar_name = get_typevar_name(node.value)  # type: ignore
+                assert isinstance(node.value, ast.Call)
+                tpvar_name = get_typevar_name(node.value)
                 new_typevar = TypeVar(tpvar_name)
                 for target in node.targets:
                     if isinstance(target, ast.Name):
@@ -148,7 +148,7 @@ class ImportResolver(BaseVisitor):
                 if isinstance(parent_type, TypePackageTemp):
                     res_type = self.manager.deal_import(alias.name)
                 else:
-                    res_type = parent_type.get_type(last_uri)
+                    res_type = parent_type.get_inner_type(last_uri)
             else:
                 res_type = self.manager.deal_import(alias.name)
             if res_type is None:
@@ -172,7 +172,7 @@ class ImportResolver(BaseVisitor):
                     res_name = imp_name + '.' + alias.name
                     res_type = self.manager.deal_import(res_name)
                 elif isinstance(parent_type, TypeClassTemp):
-                    res_type = parent_type.get_type(alias.name)
+                    res_type = parent_type.get_inner_type(alias.name)
                 else:
                     res_type = None
                 if res_type:
@@ -193,8 +193,7 @@ class ImportResolver(BaseVisitor):
 class ClassFuncDefVisitor(BaseVisitor):
     """Visit methods defined in a class and add it to the class type.
     Also collect data members defined inside the class and add them to
-    the class type
-    """
+    the class type"""
     def __init__(self, env: Environment, tp):
         super().__init__()
         self.env = env
