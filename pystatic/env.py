@@ -2,26 +2,20 @@ import ast
 import enum
 from collections import OrderedDict
 from typing import Dict, Optional, List
-from pystatic.typesys import (BaseType, TypeClassTemp, TypeModuleTemp,
-                              TypeTemp, TypeIns, any_temp, int_temp,
-                              float_temp, bool_temp, str_temp, generic_temp,
-                              none_temp)
+from pystatic.typesys import (TypeClassTemp, TypeModuleTemp, TypeTemp, TypeIns,
+                              any_temp, int_temp, float_temp, bool_temp,
+                              str_temp, generic_temp, none_temp)
 from pystatic.error import ErrHandler
 
 
 def lookup_type_scope(scope: 'Scope', name) -> Optional[TypeTemp]:
-    """Look up an type in a Scope"""
+    """Look up an type in a Scope
+
+    Deprecated, now used to detect errors caused by old code.
+    """
     name_list = name.split('.')
+    assert len(name_list) == 1
     target = scope.types.get(name_list[0])
-    i = 1
-    while i < len(name_list):
-        if isinstance(target, TypeClassTemp):
-            target = target.get_inner_type(name_list[i])
-        else:
-            return None
-        if target is None:
-            return None
-        i += 1
     return target
 
 
@@ -145,13 +139,17 @@ class Environment(object):
         return self.scope.lookup_type(name)
 
     def add_type(self, name: str, tp: TypeTemp):
-        """If the base scope is class scope, this function will add the type to
-        that class"""
+        """If the current scope is class scope, this function will add the type to
+        that class, if the current scope is glob scope(module), this function will
+        add the typetype to the module's cls_attr"""
         if self.scope_type[-1] == ScopeType.CLASS:
             assert self.scope.parent is not None
             cur_tp = self.scope.parent.lookup_local_type(self.name_list[-1])
             if isinstance(cur_tp, TypeClassTemp):
                 cur_tp.add_inner_type(name, tp)
+        elif self.scope_type[-1] == ScopeType.GLOB:
+            self.module.add_cls_attr(name, tp.get_type())
+
         return self.scope.add_type(name, tp)
 
     def add_var(self, name: str, tp: TypeIns):
@@ -160,7 +158,7 @@ class Environment(object):
     def lookup_local_var(self, name: str):
         return self.scope.lookup_local_var(name)
 
-    def lookup_var(self, name: str) -> Optional[BaseType]:
+    def lookup_var(self, name: str) -> Optional[TypeIns]:
         return self.scope.lookup_var(name)
 
     def get_non_local(self) -> Optional[Scope]:
@@ -215,9 +213,13 @@ builtin_scope.add_type('int', int_temp)
 builtin_scope.add_type('str', str_temp)
 builtin_scope.add_type('bool', bool_temp)
 builtin_scope.add_type('Generic', generic_temp)
-builtin_scope.add_type('float', float_temp)
 builtin_scope.add_type('None', none_temp)
 builtin_scope.add_type('Any', any_temp)
+
+builtin_scope.add_var('float', float_temp.get_type())
+builtin_scope.add_var('int', int_temp.get_type())
+builtin_scope.add_var('str', str_temp.get_type())
+builtin_scope.add_var('bool', bool_temp.get_type())
 
 
 def get_init_env(module: TypeModuleTemp):

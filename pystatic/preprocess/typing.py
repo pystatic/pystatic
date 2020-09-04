@@ -3,10 +3,8 @@ import enum
 import logging
 from typing import Optional, Union, TYPE_CHECKING, List
 from pystatic.typesys import TypeIns, TypeVar
-from pystatic.util import (BaseVisitor, liter_unparse, val_unparse,
-                           ParseException)
-from pystatic.preprocess.annotation import (get_type_from_snode, parse_ann_ast,
-                                            parse_annotation)
+from pystatic.util import (liter_unparse, val_unparse, ParseException)
+from pystatic.preprocess.annotation import parse_annotation
 
 if TYPE_CHECKING:
     from pystatic.env import Environment

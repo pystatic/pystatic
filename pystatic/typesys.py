@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple, Union
 from collections import OrderedDict
 from pystatic.util import Uri
 
@@ -12,6 +12,11 @@ class BaseType(object):
     @property
     def arity(self):
         return 0
+
+    @property
+    def basename(self) -> str:
+        rpos = self.name.rfind('.')
+        return self.name[rpos + 1:]
 
     def has_method(self, name: str) -> bool:
         return False
@@ -31,7 +36,7 @@ class TypeTemp(BaseType):
     def __init__(self, name, arity=0):
         super().__init__(name)
         self._arity = arity
-        self._type: 'TypeType'
+        self._type = TypeType(self, [])
 
     @property
     def arity(self):
@@ -41,25 +46,34 @@ class TypeTemp(BaseType):
     def arity(self, x: int):
         self._arity = x
 
-    def instantiate(self, bind: List[BaseType]) -> 'TypeIns':
+    def instantiate(self, bind: List['TypeType']) -> 'TypeIns':
         return TypeIns(self, *bind)
+
+    def getattr(self, name: str) -> Optional['TypeIns']:
+        """get attribute's type"""
+        return None
+
+    def get_type(self) -> 'TypeType':
+        return self._type
 
 
 class TypeIns(BaseType):
-    def __init__(self, temp: TypeTemp, *args: BaseType):
+    def __init__(self, temp: TypeTemp, *args: 'TypeType'):
         super().__init__(temp.name)
         self.temp = temp
-        self.param = list(args)
+        self.params = list(args)
 
-    @property
-    def template(self):
-        return self.temp
+    def set_params(self, params: List['TypeType']):
+        self.params = params
 
     def has_attribute(self, name: str) -> bool:
         return self.temp.has_attribute(name)
 
     def has_method(self, name: str) -> bool:
         return self.temp.has_method(name)
+
+    def getattr(self, name: str) -> Optional['TypeIns']:
+        return self.temp.getattr(name)
 
 
 class TypeVar(TypeTemp):
@@ -80,38 +94,29 @@ class TypeVar(TypeTemp):
         else:
             self.invariant = True
         self.contravariant = contravariant
-        self.constrains = list(*args)
+        self.constrains: List[TypeIns] = list(*args)
 
 
 class TypeClassTemp(TypeTemp):
     def __init__(self, clsname: str):
         super().__init__(clsname)
-        self.baseclass: OrderedDict = OrderedDict()
+        self.baseclass: Dict[str, TypeClass] = OrderedDict()
         self.method: dict = {}
         self.cls_attr: Dict[str, TypeIns] = {}
         self.var_attr: Dict[str, TypeIns] = {}
 
-        self.typevar: OrderedDict = OrderedDict()
+        self.typevar: Dict[str, TypeVar] = OrderedDict()
 
-        self.inner_cls: Dict[str, TypeTemp] = {}  # classes defined inside
+        self._type: TypeTypeClass = TypeTypeClass(self)
 
-        self._type = TypeTypeClass(self)
-
-    def instantiate(self, bind: List[BaseType]):
+    def instantiate(self, bind: List['TypeType']):
         return TypeClass(self, *bind)
 
-    def add_inner_type(self, name: str, tp: TypeTemp):
-        self.inner_cls[name] = tp
-
-    def get_inner_type(self, name: str) -> Optional[TypeTemp]:
-        """Return the type defined inside the class"""
-        res = self.inner_cls.get(name)
-        if not res:
-            for v in self.baseclass.values():
-                res = v.template.get_inner_type(name)
-                if res:
-                    return res
-        return res
+    def add_inner_type(self, name: str, tp: 'TypeTemp'):
+        if tp.basename in self.cls_attr:
+            #TODO: warning here
+            return None
+        self.cls_attr[tp.basename] = tp._type
 
     def set_typevar(self, typevar: OrderedDict):
         self.arity = len(typevar)
@@ -150,6 +155,21 @@ class TypeClassTemp(TypeTemp):
                     return True
             return False
 
+    def getattr(self, name: str) -> Optional['TypeIns']:
+        if name in self.var_attr:
+            return self.var_attr[name]
+        elif name in self.cls_attr:
+            return self.cls_attr[name]
+        else:
+            for base in self.baseclass.values():
+                res = base.getattr(name)
+                if res:
+                    return res
+            return None
+
+    def get_type(self) -> 'TypeTypeClass':
+        return self._type
+
 
 class TypeClass(TypeIns):
     def __init__(self, temp: TypeClassTemp, *args):
@@ -157,22 +177,38 @@ class TypeClass(TypeIns):
 
 
 class TypeType(TypeIns):
-    def __init__(self, temp: TypeTemp):
+    def __init__(self, temp: TypeTemp, params: List['TypeType']):
         super().__init__(temp)
+        self.params = params
+
+    def getitem(self, params: Union['TypeType',
+                                    Tuple['TypeType']]) -> 'TypeType':
+        if isinstance(params, tuple):
+            return TypeType(self.temp, list(params))
+        else:
+            assert isinstance(params, TypeType)
+            return TypeType(self.temp, [params])
+
+    def instantiate(self) -> TypeIns:
+        return self.temp.instantiate(self.params)
 
 
 class TypeTypeClass(TypeType):
     def __init__(self, temp: 'TypeClassTemp'):
-        super().__init__(temp)
+        super().__init__(temp, [])
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: Uri, tp: Dict[str, TypeTemp],
+    def __init__(self, uri: Uri, types: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
-        super().__init__('module')
-        self.inner_cls = tp
-        self.attribute = local
-        self.uri = uri
+        super().__init__(uri)
+        for tpname in types.keys():
+            self.cls_attr[tpname] = types[tpname].get_type()
+        self.cls_attr.update(local)
+
+    @property
+    def uri(self):
+        return self.name
 
 
 class TypePackageTemp(TypeModuleTemp):
@@ -244,6 +280,14 @@ class TypeFunc(TypeClass):
         return str(self.arg) + ' -> ' + str(self.ret_type)
 
 
+class EllipsisIns(TypeClass):
+    def __init__(self) -> None:
+        super().__init__(ellipsis_temp)
+
+    def __str__(self):
+        return '...'
+
+
 # default types
 any_temp = TypeAnyTemp()
 none_temp = TypeNoneTemp()
@@ -255,3 +299,8 @@ complex_temp = TypeClassTemp('complex')
 str_temp = TypeClassTemp('str')
 bool_temp = TypeClassTemp('bool')
 func_temp = TypeClassTemp('function')
+ellipsis_temp = TypeClassTemp('ellipsis')
+
+ellipsis_type = ellipsis_temp.get_type()
+none_type = none_temp.get_type()
+any_type = any_temp.get_type()

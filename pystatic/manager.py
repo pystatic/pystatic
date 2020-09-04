@@ -134,7 +134,7 @@ class Manager:
     def deal_import(self, uri: Uri) -> Optional[TypeModuleTemp]:
         """uri must be absolute"""
         if not uri:
-            logger.warning(f'Module {uri} not found')
+            logger.warning(f'module {uri} not found')
             return None
 
         # cached result
@@ -185,9 +185,9 @@ class Manager:
                 try:
                     target.ast_rt = self.uri2ast(target.uri)
                     collect_type_def(target.ast_rt, target.env, self)
-                    glob = target.env.glob_scope
-                    target.module = TypeModuleTemp(target.uri, glob.types,
-                                                   glob.local)
+                    # glob = target.env.glob_scope
+                    # target.module = TypeModuleTemp(target.uri, glob.types,
+                    #                                glob.local)
 
                     target.stage = AnalysisStage.Collected
                 except ReadNsAst:
@@ -228,6 +228,8 @@ class Manager:
         May throw SyntaxError or FileNotFoundError or ReadNsAst exception.
         """
         find_res = self.finder.find(uri)
+        if not find_res:
+            raise FileNotFoundError
         if find_res.res_type == ModuleFindRes.Module:
             assert len(find_res.paths) == 1
             assert find_res.target_file

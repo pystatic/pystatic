@@ -1,7 +1,6 @@
 import argparse
-import os
 import sys
-from typing import Text, TextIO, List
+from typing import TextIO
 from pystatic.manager import Manager
 
 

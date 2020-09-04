@@ -3,7 +3,7 @@ from typing import Optional, List
 from pystatic.env import Environment
 from pystatic.arg import Argument, Arg
 from pystatic.preprocess.annotation import parse_annotation
-from pystatic.typesys import TypeFunc, any_temp
+from pystatic.typesys import TypeFunc, any_type
 
 
 def parse_arg(node: ast.arg, tp_scope: Environment):
@@ -83,5 +83,5 @@ def parse_func(node: ast.FunctionDef, env: Environment) -> Optional[TypeFunc]:
     if node.returns:
         ret_type = parse_annotation(node.returns, env, False)
     if not ret_type:
-        ret_type = any_temp  # default return type is Any
+        ret_type = any_type  # default return type is Any
     return TypeFunc(argument, ret_type)

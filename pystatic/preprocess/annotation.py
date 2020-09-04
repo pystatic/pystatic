@@ -1,10 +1,10 @@
 import ast
-import enum
-from typing import Optional, List, Union, Tuple
-from pystatic.typesys import (TypeClass, TypeIns, TypeTemp, ARIBITRARY_ARITY,
-                              TypeClassTemp)
+import copy
+from typing import Optional, Tuple, Dict
+from pystatic.typesys import (TypeIns, ARIBITRARY_ARITY, TypeType, TypeVar,
+                              ellipsis_type, none_type)
 from pystatic.env import Environment
-from pystatic.util import ParseException
+from pystatic.util import ParseException, BaseVisitor
 
 
 def parse_annotation(node: ast.AST, env: Environment,
@@ -14,11 +14,15 @@ def parse_annotation(node: ast.AST, env: Environment,
     If def_check is True, then it will make sure that the annotation not
     surrounded by quotes must be defined earlier.
     """
-    return AnnotationParser(env, def_check).accept(node)
+    tp_res = AnnotationEval(env, def_check, False, None).accept(node)
+    if tp_res:
+        return tp_res.instantiate()
+    else:
+        return None
 
 
-def parse_comment_annotation(node: ast.AST, env: Environment,
-                             def_check: bool) -> Optional[TypeIns]:
+def parse_comment_annotation(node: ast.AST,
+                             env: Environment) -> Optional[TypeIns]:
     """Get the type according to the type comment"""
     comment = node.type_comment if node.type_comment else None
     if not comment:
@@ -28,33 +32,16 @@ def parse_comment_annotation(node: ast.AST, env: Environment,
             comment,
             mode='eval')  # for annotations that's str we first parse it
         if isinstance(str_node, ast.Expression):
-            return AnnotationParser(env,
-                                    def_check).accept(str_node.body, True,
-                                                      node)
+            tp_res = AnnotationEval(env, False, True, node).accept(str_node)
+            if tp_res:
+                return tp_res.instantiate()
+            else:
+                return None
         else:
             raise ParseException(node, '')
     except (SyntaxError, ParseException):
         env.add_err(node, 'broken type comment')
         return None
-
-
-class AnnotationParser(object):
-    """Parse annotations"""
-    def __init__(self, env: Environment, def_check: bool):
-        self.env = env
-        self.def_check = def_check
-
-    def accept(self,
-               node: ast.AST,
-               is_cons: bool = False,
-               cons_node: Optional[ast.AST] = None) -> Optional[TypeIns]:
-        """Return the type this node represents"""
-        try:
-            new_tree = parse_ann_ast(node, is_cons, cons_node)
-            return get_type_from_snode(new_tree, self.env, self.def_check)
-        except ParseException as e:
-            self.env.add_err(e.node, e.msg)
-            return None
 
 
 def check_appliable(tp, param_cnt: int) -> Tuple[bool, str]:
@@ -82,155 +69,112 @@ def check_appliable(tp, param_cnt: int) -> Tuple[bool, str]:
         return False, f'{tp.name} require {tp.arity} but {param_cnt} given'
 
 
-# Parse annotation nodes
-# first convert ast to a simpler tree structure and then analyse this tree
-class SimpleTypeNodeTag(enum.Enum):
-    ATTR = 0
-    NAME = 1
-    SUBS = 2
-    LIST = 4
-    ELLIPSIS = 5
+def get_typevar_from_ann(node: ast.AST, env: Environment,
+                         collect: Dict[str, TypeVar]):
+    TypeVarCollector(env, collect).accept(node)
 
 
-class SimpleTypeNode(object):
-    def __init__(self,
-                 node: ast.AST,
-                 name: str,
-                 is_cons: bool = False,
-                 tag: SimpleTypeNodeTag = SimpleTypeNodeTag.NAME):
-        self.node = node
-        self.name = name
-        self.is_cons = is_cons  # whether this node comes from a str
-        self.tag = tag
-        self.param: List[SimpleTypeNode] = []
-        self.left: SimpleTypeNode
-        self.attr: str
+class TypeVarCollector(BaseVisitor):
+    def __init__(self, env: 'Environment', collect: Dict[str, TypeVar]):
+        super().__init__()
+        self.env = env
+        self.collect = collect
+
+    def visit_Name(self, node: ast.Name):
+        tp = self.env.lookup_type(node.id)
+        if isinstance(tp, TypeVar) and tp.name not in self.collect:
+            self.collect[tp.name] = copy.deepcopy(tp)
 
 
-def parse_ann_ast(node, is_cons: bool, cons_node) -> SimpleTypeNode:
-    """Parse an annotation ast to a simpler tree.
+class AnnotationEval(BaseVisitor):
+    def __init__(self, env: 'Environment', def_check: bool, is_cons: bool,
+                 cons_node: Optional[ast.AST]):
+        super().__init__()
+        self.env = env
+        self.def_check = def_check
+        self.is_cons = is_cons
+        self.cons_node = cons_node
 
-    If it fails, throw ParseException.
-    """
-    new_node = SimpleTypeNode(node, '', is_cons)
-    if isinstance(node, ast.Constant):
-        try:
-            if node.value is Ellipsis:
-                new_node.tag = SimpleTypeNodeTag.ELLIPSIS
-                new_node.name = '...'
-                return new_node
-            elif node.value is None:
-                new_node.tag = SimpleTypeNodeTag.NAME
-                new_node.name = 'None'
-                return new_node
-            elif not isinstance(node.value, str):
-                raise ParseException(node, 'invalid syntax')
-            parsed_node = ast.parse(node.value, mode='eval')
-            if isinstance(parsed_node, ast.Expression):
-                if not is_cons:
-                    is_cons = True
-                    cons_node = node
-                node = parsed_node.body
-            else:
-                raise ParseException(node, 'invalid syntax')
-        except SyntaxError:
-            raise ParseException(node, 'invalid syntax')
+        if self.is_cons:
+            assert self.cons_node
+            assert not self.def_check
 
-    new_node.node = node
-    new_node.is_cons = is_cons
-    if isinstance(node, ast.Attribute):
-        new_node.tag = SimpleTypeNodeTag.ATTR
-        new_node.left = parse_ann_ast(node.value, is_cons, cons_node)
-        new_node.attr = str(node.attr)
-        new_node.name = new_node.left.name + '.' + new_node.attr
-        return new_node
-    elif isinstance(node, ast.Name):
-        new_node.tag = SimpleTypeNodeTag.NAME
-        new_node.name = node.id
-        return new_node
-    elif isinstance(node, ast.Subscript):
-        new_node.tag = SimpleTypeNodeTag.SUBS
-        new_node.left = parse_ann_ast(node.value, is_cons, cons_node)
-        new_node.name = new_node.left.name
-        if isinstance(node.slice, ast.Index):
-            new_node.param = []
-            if isinstance(node.slice.value, ast.Tuple):
-                for sub_node in node.slice.value.elts:
-                    new_node.param.append(
-                        _parse_ann_ast_allow_list(sub_node, is_cons,
-                                                  cons_node))
-            else:
-                new_node.param = [
-                    _parse_ann_ast_allow_list(node.slice.value, is_cons,
-                                              cons_node)
-                ]
+    def visit_Attribute(self, node: ast.Attribute) -> Optional[TypeType]:
+        left_tp = self.visit(node.value)
+        if left_tp:
+            return left_tp.getattr(node.attr)
+        return None
+
+    def visit_Constant(self, node: ast.Constant) -> Optional[TypeType]:
+        if node.value is Ellipsis:
+            return ellipsis_type
+        elif node.value is None:
+            return none_type
         else:
-            raise ParseException(node, 'invalid syntax')
-        return new_node
-    else:
-        src_node = node if not is_cons else cons_node
-        raise ParseException(src_node, '')
+            try:
+                tree_node = ast.parse(node.value, mode='eval')
+                return AnnotationEval(self.env, False, True,
+                                      node).accept(tree_node)
+            except SyntaxError:
+                real_node = self.cons_node if self.is_cons else node
+                assert real_node
+                raise ParseException(real_node, f'invalid syntax')
 
-
-def _parse_ann_ast_allow_list(node, is_cons, cons_node) -> SimpleTypeNode:
-    """allow list node as root"""
-    if isinstance(node, ast.List):
-        new_node = SimpleTypeNode(node,
-                                  'list',
-                                  is_cons=is_cons,
-                                  tag=SimpleTypeNodeTag.LIST)
-        for sub_node in node.elts:
-            new_node.param.append(parse_ann_ast(sub_node, is_cons, cons_node))
-        return new_node
-    else:
-        return parse_ann_ast(node, is_cons, cons_node)
-
-
-def get_type_from_snode(s_node: SimpleTypeNode, env: Environment,
-                        def_check: bool) -> Optional[TypeIns]:
-    """From a simple tree node to the type it represents.
-
-    def_check: if true, then will check the type has defined or not.
-    """
-    def check_defined(node: ast.AST, name: str):
-        if def_check and env.lookup_var(name) is None:
-            raise ParseException(node, f'{name} is not defined')
-
-    tp: Union[TypeTemp, TypeIns, None]
-    if s_node.tag == SimpleTypeNodeTag.NAME:
-        tp = env.lookup_type(s_node.name)
-        if tp is None:
-            raise ParseException(s_node.node, f'{s_node.name} unbound')
-        else:
-            check_defined(s_node.node, s_node.name)
-            return tp.instantiate([])
-    elif s_node.tag == SimpleTypeNodeTag.ATTR:
-        left_tp = get_type_from_snode(s_node.left, env, def_check)
-        if not left_tp:
+    def visit_Name(self, node: ast.Name) -> Optional[TypeType]:
+        real_node = self.cons_node if self.is_cons else node
+        assert real_node
+        tp_temp = self.env.lookup_type(node.id)
+        if not tp_temp:
+            self.env.add_err(real_node, f'{node.id} undefined')
             return None
-        if isinstance(left_tp, TypeClass):
-            assert isinstance(left_tp.template, TypeClassTemp)
-            tp = left_tp.template.get_inner_type(s_node.attr)
-            if tp is None:
-                raise ParseException(
-                    s_node.node,
-                    f'{left_tp.name} has no attribute {s_node.attr}')
-            check_defined(s_node.node, s_node.name)
-            return tp.instantiate([])
         else:
-            raise ParseException(
-                s_node.node, f'{left_tp.name} has no attribute {s_node.attr}')
-    elif s_node.tag == SimpleTypeNodeTag.SUBS:
-        tp = get_type_from_snode(s_node.left, env, def_check)
+            tp = tp_temp.get_type()
+
         if not tp:
+            self.env.add_err(real_node, f'{node.id} undefined')
             return None
-        param_list = []
-        for param in s_node.param:
-            p_tp = get_type_from_snode(param, env, def_check)
-            param_list.append(p_tp)
-        return tp.template.instantiate(param_list)
-    elif s_node.tag == SimpleTypeNodeTag.LIST:
-        raise ParseException(s_node.node, 'not implemented yet')
-    elif s_node.tag == SimpleTypeNodeTag.ELLIPSIS:
-        raise ParseException(s_node.node, 'not implemented yet')
-    return None
+        elif not isinstance(tp, TypeType):
+            self.env.add_err(real_node, f'{node.id} is not a type')
+            return None
+        else:
+            if self.def_check:
+                assert not self.is_cons
+                if not self.env.lookup_var(tp.basename):
+                    self.env.add_err(real_node, f'{node.id} undefined')
+            return tp
+
+    def visit_Subscript(self, node: ast.Subscript) -> Optional[TypeType]:
+        assert 0, "generic currently is not supported"
+        value_tp = self.visit(node.value)
+        if isinstance(value_tp, TypeType):
+            if isinstance(node.slice, ast.Index):
+                index_tp = self.visit(node.slice)
+                if index_tp:
+                    return value_tp.getitem(index_tp)
+        return None
+
+    def visit_Tuple(self, node: ast.Tuple):
+        tp_list = []
+        for subnode in node.elts:
+            res = self.visit(subnode)
+            if res is None:
+                self.env.add_err(subnode, f'type undefined')
+            else:
+                tp_list.append(res)
+        return tuple(tp_list)
+
+    def visit_List(self, node: ast.List):
+        tp_list = []
+        for subnode in node.elts:
+            res = self.visit(subnode)
+            if res is None:
+                self.env.add_err(subnode, f'type undefined')
+            else:
+                tp_list.append(res)
+        return tp_list
+
+    def visit_Index(self, node: ast.Index):
+        return self.visit(node.value)
+
+    def accept(self, node: ast.AST) -> Optional[TypeType]:
+        return self.visit(node)

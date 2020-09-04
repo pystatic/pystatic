@@ -4,6 +4,7 @@ from typing import Optional, Final, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pystatic.env import Environment
+    from pystatic.typesys import TypeIns
 
 # Uri part
 Uri = str

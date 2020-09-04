@@ -1,15 +1,16 @@
 import ast
 import logging
 from pystatic.module_finder import uri_from_impitem
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Union, Any
 from collections import OrderedDict
 from pystatic.util import BaseVisitor, ParseException, uri_parent, uri_last
 from pystatic.env import Environment
 from pystatic.reachability import Reach, infer_reachability_if
-from pystatic.typesys import TypeClassTemp, TypePackageTemp, any_temp, TypeVar
+from pystatic.typesys import (TypeClassTemp, TypeModuleTemp, TypePackageTemp,
+                              any_temp, TypeVar, TypeType)
 from pystatic.preprocess.annotation import (parse_comment_annotation,
                                             parse_annotation)
-from pystatic.preprocess.cls import get_cls_typevars
+from pystatic.preprocess.cls import analyse_cls_def
 from pystatic.preprocess.typing import (special_typing_kind, SType,
                                         analyse_special_typing,
                                         get_typevar_name)
@@ -74,28 +75,14 @@ class TypeDefCollector(BaseVisitor):
         if not self.env.lookup_local_type(node.name):
             cls_uri = self.env.current_uri + f'.{node.name}'
             tp = TypeClassTemp(cls_uri)
-
-            var_lst, base_lst = get_cls_typevars(node, self.env)
-            tpvar_dict = OrderedDict()
-            for tpvar_name in var_lst:
-                tpvar = self.env.lookup_type(tpvar_name)
-                assert isinstance(tpvar, TypeVar)
-                tpvar_dict[tpvar_name] = tpvar
-            tp.set_typevar(tpvar_dict)
-            for base_tp in base_lst:
-                tp.add_base(base_tp.name, base_tp)
-                logger.debug(f'Add base class {base_tp.name} to {cls_uri}')
-
             self.env.add_type(node.name, tp)
-
-            logger.debug(f'Add class {cls_uri}(' + ', '.join(var_lst) + ')')
+            logger.debug(f'add class {cls_uri}')
 
             # try to get nested classes
             self.env.enter_class(node.name)
             for sub_node in node.body:
                 self.visit(sub_node)
             self.env.pop_scope()
-
         else:
             self.env.add_err(node, f'{node.name} already defined')
             setattr(node, 'reach', Reach.CLS_REDEF)
@@ -136,26 +123,34 @@ class ImportResolver(BaseVisitor):
         self.env = env
         self.manager = manager
 
-    # NOTE: import system may be wrong
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
             # NOTE: alias.name must be an absolute uri? I'm not sure about it
             # NOTE: if not, please let me know
             parent_uri = uri_parent(alias.name)
             last_uri = uri_last(alias.name)
+
+            res_type: Any
             if parent_uri:
                 parent_type = self.manager.deal_import(parent_uri)
                 if isinstance(parent_type, TypePackageTemp):
                     res_type = self.manager.deal_import(alias.name)
+                elif isinstance(parent_type, TypeModuleTemp):
+                    res_type = parent_type.getattr(last_uri)
                 else:
-                    res_type = parent_type.get_inner_type(last_uri)
+                    res_type = None
             else:
                 res_type = self.manager.deal_import(alias.name)
-            if res_type is None:
-                self.env.add_err(node, f'module {alias.name} not found')
-            else:
+            if isinstance(res_type, TypeModuleTemp) or isinstance(
+                    res_type, TypeType):
+                if isinstance(res_type, TypeType):
+                    res_type = res_type.temp
                 name = alias.asname if alias.asname else alias.name
                 self.env.add_type(name, res_type)
+                logger.debug(
+                    f'Add {res_type.name} to {self.env.module.name} as {name}')
+            else:
+                self.env.add_err(node, f'{alias.name} not found')
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         imp_name = node.module if node.module else ''
@@ -164,27 +159,46 @@ class ImportResolver(BaseVisitor):
         imp_name = uri_from_impitem(imp_name, self.env.module)
 
         parent_type = self.manager.deal_import(imp_name)
+        res_type: Any
+
         if parent_type is None:
             self.env.add_err(node, f'module {imp_name} not found')
-        else:
+        elif isinstance(parent_type, TypePackageTemp) or isinstance(
+                parent_type, TypeModuleTemp):
             for alias in node.names:
                 if isinstance(parent_type, TypePackageTemp):
                     res_name = imp_name + '.' + alias.name
                     res_type = self.manager.deal_import(res_name)
-                elif isinstance(parent_type, TypeClassTemp):
-                    res_type = parent_type.get_inner_type(alias.name)
+                elif isinstance(parent_type, TypeModuleTemp):
+                    res_type = parent_type.getattr(alias.name)
                 else:
                     res_type = None
-                if res_type:
+                if isinstance(res_type, TypeModuleTemp) or isinstance(
+                        res_type, TypeType):
+                    if isinstance(res_type, TypeType):
+                        res_type = res_type.temp
                     name = alias.asname if alias.asname else alias.name
                     self.env.add_type(name, res_type)
+                    logger.debug(
+                        f'Add {res_type.name} to {self.env.module.name} as {name}'
+                    )
                 else:
                     self.env.add_err(node,
                                      f'{imp_name}.{alias.name} not found')
+        else:
+            self.env.add_err(node, f'{imp_name} is not a module')
 
     # don't visit import statement inside a function or class definition
-    def visit_ClassDef(self, node):
-        pass
+    def visit_ClassDef(self, node: ast.ClassDef):
+        tp = self.env.lookup_local_type(node.name)
+        assert isinstance(tp, TypeClassTemp)
+        base_list, var_list = analyse_cls_def(node, self.env)
+        for base_tp in base_list:
+            tp.add_base(base_tp.name, base_tp)
+            logger.debug(f'Add base class {base_tp.name} to {tp.name}')
+        tp.set_typevar(var_list)
+
+        self.env.add_type(node.name, tp)
 
     def visit_FunctionDef(self, node):
         pass
@@ -217,7 +231,7 @@ class ClassFuncDefVisitor(BaseVisitor):
         return None
 
     def visit_Assign(self, node: ast.Assign):
-        com_tp = parse_comment_annotation(node, self.env, False)
+        com_tp = parse_comment_annotation(node, self.env)
         assign_tp = com_tp if com_tp else any_temp
         for sub_node in node.targets:
             if isinstance(sub_node, ast.Attribute):
@@ -337,20 +351,23 @@ class TypeBinder(BaseVisitor):
     def visit_ClassDef(self, node: ast.ClassDef):
         if not self.env.lookup_local_var(node.name):
             ClassDefVisitor(self.env).accept(node)
+
+            # add class var to local scope
+            cls_tp = self.env.lookup_local_type(node.name)
+            assert isinstance(
+                cls_tp,
+                TypeClassTemp), f"{cls_tp} should be collected and is a class"
+            self.env.add_var(node.name, cls_tp.get_type())
+
+            logging.debug(f'finish visit class {cls_tp.name}')
         else:
             self.env.add_err(node, node.name)
-
-    def visit_Import(self, node: ast.Import):
-        pass
-
-    def visit_ImportFrom(self, node: ast.ImportFrom):
-        pass
 
 
 def _def_visitAssign(env: Environment, node: ast.Assign):
     """Get the variables defined in an ast.Assign node"""
     new_var = OrderedDict()
-    com_tp = parse_comment_annotation(node, env, False)
+    com_tp = parse_comment_annotation(node, env)
     assign_tp = com_tp if com_tp else any_temp
     for sub_node in reversed(node.targets):
         if isinstance(sub_node, ast.Name):
