@@ -1,8 +1,10 @@
 from typing import Optional, Dict, List, Tuple, Union
 from collections import OrderedDict
-from pystatic.util import Uri
+from pystatic.util import Uri, BindException
 
 ARIBITRARY_ARITY = -1
+
+TypeBind = Dict['TypeVar', 'TypeType']
 
 
 class BaseType(object):
@@ -33,35 +35,35 @@ class BaseType(object):
 
 
 class TypeTemp(BaseType):
-    def __init__(self, name, arity=0):
+    def __init__(self, name):
         super().__init__(name)
-        self._arity = arity
-        self._type = TypeType(self, [])
 
-    @property
-    def arity(self):
-        return self._arity
-
-    @arity.setter
-    def arity(self, x: int):
-        self._arity = x
-
-    def instantiate(self, bind: List['TypeType']) -> 'TypeIns':
-        return TypeIns(self, *bind)
+    def _bind_types(self, bindlist: List['TypeType']) -> TypeBind:
+        if len(bindlist) == 0:
+            return {}
+        raise BindException([], f"No binding is allowed in {self.basename}")
 
     def getattr(self, name: str) -> Optional['TypeIns']:
         """get attribute's type"""
         return None
 
-    def get_type(self) -> 'TypeType':
-        return self._type
+    def get_type(self,
+                 bindlist: List['TypeType'],
+                 binded: Optional[TypeBind] = None) -> 'TypeType':
+        """May throw BindException
+
+        Usually you should make sure when binded and bindlist both are empty then
+        it will not fail"""
+        new_bind = self._bind_types(bindlist)
+        old_bind = binded or {}
+        return TypeType(self, dict(old_bind, **new_bind))
 
 
 class TypeIns(BaseType):
-    def __init__(self, temp: TypeTemp, *args: 'TypeType'):
+    def __init__(self, temp: TypeTemp, binds: TypeBind):
         super().__init__(temp.name)
         self.temp = temp
-        self.params = list(args)
+        self.binds = binds
 
     def set_params(self, params: List['TypeType']):
         self.params = params
@@ -74,6 +76,26 @@ class TypeIns(BaseType):
 
     def getattr(self, name: str) -> Optional['TypeIns']:
         return self.temp.getattr(name)
+
+
+class TypeType(TypeIns):
+    def __init__(self, temp: TypeTemp, binds: TypeBind):
+        super().__init__(temp, binds)
+
+    def getitem(
+        self, tp_args: Union['TypeType', Tuple['TypeType']]
+    ) -> Optional['TypeType']:
+        """getitem of typetype returns a new typetype with new bindings"""
+        if isinstance(tp_args, tuple):
+            bindlist = list(tp_args)
+        else:
+            bindlist = [tp_args]
+        return self.temp.get_type(bindlist, self.binds)
+
+
+class TypeTypeClass(TypeType):
+    def __init__(self, temp: 'TypeClassTemp', binds: TypeBind):
+        super().__init__(temp, binds)
 
 
 class TypeVar(TypeTemp):
@@ -101,25 +123,20 @@ class TypeClassTemp(TypeTemp):
     def __init__(self, clsname: str):
         super().__init__(clsname)
         self.baseclass: Dict[str, TypeClass] = OrderedDict()
+
         self.method: dict = {}
         self.cls_attr: Dict[str, TypeIns] = {}
         self.var_attr: Dict[str, TypeIns] = {}
 
         self.typevar: Dict[str, TypeVar] = OrderedDict()
 
-        self._type: TypeTypeClass = TypeTypeClass(self)
-
-    def instantiate(self, bind: List['TypeType']):
-        return TypeClass(self, *bind)
-
     def add_inner_type(self, name: str, tp: 'TypeTemp'):
         if tp.basename in self.cls_attr:
             #TODO: warning here
             return None
-        self.cls_attr[tp.basename] = tp._type
+        self.cls_attr[tp.basename] = tp.get_type([])
 
     def set_typevar(self, typevar: OrderedDict):
-        self.arity = len(typevar)
         self.typevar = typevar
 
     def add_base(self, basename: str, base_type):
@@ -167,8 +184,26 @@ class TypeClassTemp(TypeTemp):
                     return res
             return None
 
-    def get_type(self) -> 'TypeTypeClass':
-        return self._type
+    def bind_types(self, bind: List['TypeType']) -> TypeBind:
+        if len(bind) == 0:
+            # default is all Any
+            bind = [any_type for i in range(len(self.typevar))]
+
+        if len(bind) != len(self.typevar):
+            raise BindException(
+                [], f"get {len(bind)} arguments, require {len(self.typevar)}")
+        res = {}
+        for tpvar, bind_type in zip(self.typevar, bind):
+            # TODO: check consistence
+            res[tpvar] = bind_type
+        return res
+
+    def get_type(self,
+                 bind: List['TypeType'],
+                 binded: Optional[TypeBind] = None) -> 'TypeTypeClass':
+        new_bind = self.bind_types(bind)
+        old_bind = binded or {}
+        return TypeTypeClass(self, dict(old_bind, **new_bind))
 
 
 class TypeClass(TypeIns):
@@ -176,34 +211,15 @@ class TypeClass(TypeIns):
         super().__init__(temp, *args)
 
 
-class TypeType(TypeIns):
-    def __init__(self, temp: TypeTemp, params: List['TypeType']):
-        super().__init__(temp)
-        self.params = params
-
-    def getitem(self, params: Union['TypeType',
-                                    Tuple['TypeType']]) -> 'TypeType':
-        if isinstance(params, tuple):
-            return TypeType(self.temp, list(params))
-        else:
-            assert isinstance(params, TypeType)
-            return TypeType(self.temp, [params])
-
-    def instantiate(self) -> TypeIns:
-        return self.temp.instantiate(self.params)
-
-
-class TypeTypeClass(TypeType):
-    def __init__(self, temp: 'TypeClassTemp'):
-        super().__init__(temp, [])
-
-
 class TypeModuleTemp(TypeClassTemp):
     def __init__(self, uri: Uri, types: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__(uri)
         for tpname in types.keys():
-            self.cls_attr[tpname] = types[tpname].get_type()
+            tpres = types[tpname].get_type([])
+            assert tpres
+            if tpres:
+                self.cls_attr[tpname] = tpres
         self.cls_attr.update(local)
 
     @property
@@ -220,7 +236,7 @@ class TypePackageTemp(TypeModuleTemp):
 
 class TypeAnyTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Any', 0)
+        super().__init__('Any')
 
     def has_method(self, name: str) -> bool:
         return True
@@ -231,7 +247,7 @@ class TypeAnyTemp(TypeTemp):
 
 class TypeNoneTemp(TypeTemp):
     def __init__(self):
-        super().__init__('None', 0)
+        super().__init__('None')
 
     def has_method(self, name: str) -> bool:
         return False
@@ -242,32 +258,32 @@ class TypeNoneTemp(TypeTemp):
 
 class TypeTupleTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Tuple', ARIBITRARY_ARITY)
+        super().__init__('Tuple')
 
 
 class TypeDictTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Dict', 2)
+        super().__init__('Dict')
 
 
 class TypeUnionTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Union', ARIBITRARY_ARITY)
+        super().__init__('Union')
 
 
 class TypeOptionalTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Optional', 1)
+        super().__init__('Optional')
 
 
 class TypeCallableTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Callable', 2)
+        super().__init__('Callable')
 
 
 class TypeGenericTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Generic', ARIBITRARY_ARITY)
+        super().__init__('Generic')
 
 
 class TypeFunc(TypeClass):
@@ -301,6 +317,6 @@ bool_temp = TypeClassTemp('bool')
 func_temp = TypeClassTemp('function')
 ellipsis_temp = TypeClassTemp('ellipsis')
 
-ellipsis_type = ellipsis_temp.get_type()
-none_type = none_temp.get_type()
-any_type = any_temp.get_type()
+ellipsis_type = ellipsis_temp.get_type([])
+none_type = none_temp.get_type([])
+any_type = any_temp.get_type([])
