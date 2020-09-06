@@ -1,21 +1,20 @@
 import ast
-from typing import Tuple, List, Set
+from typing import Tuple, List
 from collections import OrderedDict
 from pystatic.env import Environment
-from pystatic.typesys import TypeGenericTemp, TypeIns, TypeVar
+from pystatic.typesys import TypeGenericTemp, TypeIns, TypeVar, TypeType, TypeList
 from pystatic.util import ParseException
 from pystatic.preprocess.annotation import (parse_annotation,
                                             get_typevar_from_ann)
 
 
-def analyse_cls_def(
-        node: ast.ClassDef,
-        env: Environment) -> Tuple[List[TypeIns], OrderedDict[str, TypeVar]]:
+def analyse_cls_def(node: ast.ClassDef,
+                    env: Environment) -> Tuple[List[TypeType], TypeList]:
     met_generic = False
-    typevar_set: OrderedDict[str, TypeVar] = OrderedDict()
-    normal_set: OrderedDict[str, TypeVar] = OrderedDict()
+    typevar_set: 'OrderedDict[str, TypeVar]' = OrderedDict()
+    normal_set: 'OrderedDict[str, TypeVar]' = OrderedDict()
     generic_node = None
-    base_list = []
+    base_list: List[TypeType] = []
     for base in node.bases:
         try:
             base_tp = parse_annotation(base, env, False)
@@ -46,6 +45,6 @@ def analyse_cls_def(
             env.add_err(generic_node,
                         ','.join(missing_typevar) + ' should in Generic')
         normal_set.update(typevar_set)
-        return base_list, normal_set
+        return base_list, list(normal_set.values())
     else:
-        return base_list, typevar_set
+        return base_list, list(typevar_set.values())

@@ -9,7 +9,7 @@ from pystatic.error import ErrHandler
 
 
 def lookup_type_scope(scope: 'Scope', name) -> Optional[TypeTemp]:
-    """Look up an type in a Scope
+    """Look up an type in a Scope.
 
     Deprecated, now used to detect errors caused by old code.
     """
@@ -89,6 +89,7 @@ class Environment(object):
         self.scope_list = [scope]
         self.name_list: List[str] = [module.uri]
         self.scope_type: List[ScopeType] = [ScopeType.GLOB]
+        self.scope_temp: List[TypeTemp] = [module]
 
         self.module = module
 
@@ -123,6 +124,10 @@ class Environment(object):
         return '.'.join(self.name_list)
 
     @property
+    def current_cls_temp(self):
+        return self.scope_temp[-1]
+
+    @property
     def in_class(self):
         """Whether we are inside a class scope or not"""
         return self.cls_count > 0
@@ -138,22 +143,21 @@ class Environment(object):
     def lookup_type(self, name: str) -> Optional[TypeTemp]:
         return self.scope.lookup_type(name)
 
-    def add_type(self, name: str, tp: TypeTemp):
-        """If the current scope is class scope, this function will add the type to
-        that class, if the current scope is glob scope(module), this function will
-        add the typetype to the module's cls_attr"""
-        if self.scope_type[-1] == ScopeType.CLASS:
-            assert self.scope.parent is not None
-            cur_tp = self.scope.parent.lookup_local_type(self.name_list[-1])
-            if isinstance(cur_tp, TypeClassTemp):
-                cur_tp.add_inner_type(name, tp)
-        elif self.scope_type[-1] == ScopeType.GLOB:
-            self.module.add_cls_attr(name, tp.get_type())
+    def add_type(self, name: str, tp_temp: TypeTemp):
+        """If the current scope is class scope(include module scope), then it
+        will also add tp_temp to the cls_attr"""
+        base_cls_temp = self.current_cls_temp
+        assert isinstance(base_cls_temp, TypeClassTemp)
+        base_cls_temp.setattr(name, tp_temp.get_default_type())
 
-        return self.scope.add_type(name, tp)
+        return self.scope.add_type(name, tp_temp)
 
-    def add_var(self, name: str, tp: TypeIns):
-        return self.scope.add_var(name, tp)
+    def add_var(self, name: str, tp_ins: TypeIns):
+        base_cls_temp = self.current_cls_temp
+        assert isinstance(base_cls_temp, TypeClassTemp)
+        base_cls_temp.setattr(name, tp_ins)
+
+        return self.scope.add_var(name, tp_ins)
 
     def lookup_local_var(self, name: str):
         return self.scope.lookup_local_var(name)
@@ -172,17 +176,19 @@ class Environment(object):
         if name not in self.scope.sub_scopes:
             self.scope.sub_scopes[name] = new_scope
 
-    def _enter_scope(self, name: str, new_scope: 'Scope', scope_type):
+    def _enter_scope(self, name: str, new_scope: 'Scope',
+                     scope_type: 'ScopeType', cls_temp: TypeClassTemp):
         self._try_add_scope(name, new_scope)
         self.scope_list.append(new_scope)
         self.scope_type.append(scope_type)
+        self.scope_temp.append(cls_temp)
         self.name_list.append(name)
 
     def enter_class(self, name: str) -> Optional[TypeClassTemp]:
         """Enter a class scope"""
-        res = self.lookup_local_type(name)
-        if res:
-            assert isinstance(res, TypeClassTemp)
+        cls_temp = self.lookup_local_type(name)
+        if cls_temp:
+            assert isinstance(cls_temp, TypeClassTemp)
             self.cls_count += 1
             if name in self.scope.sub_scopes:
                 new_scope = self.scope.sub_scopes[name]
@@ -190,8 +196,8 @@ class Environment(object):
                 non_local = self.get_non_local()
                 new_scope = Scope(self.glob_scope, non_local,
                                   self.scope.builtins, self.scope)
-            self._enter_scope(name, new_scope, ScopeType.CLASS)
-            return res
+            self._enter_scope(name, new_scope, ScopeType.CLASS, cls_temp)
+            return cls_temp
         else:
             return None
 
@@ -201,6 +207,7 @@ class Environment(object):
         scope_type = self.scope_type.pop()
         self.scope_list.pop()
         self.name_list.pop()
+        self.scope_temp.pop()
         if scope_type == ScopeType.CLASS:
             self.cls_count -= 1
 
@@ -216,10 +223,11 @@ builtin_scope.add_type('Generic', generic_temp)
 builtin_scope.add_type('None', none_temp)
 builtin_scope.add_type('Any', any_temp)
 
-builtin_scope.add_var('float', float_temp.get_type())
-builtin_scope.add_var('int', int_temp.get_type())
-builtin_scope.add_var('str', str_temp.get_type())
-builtin_scope.add_var('bool', bool_temp.get_type())
+builtin_scope.add_var('float', float_temp.get_default_type())
+builtin_scope.add_var('int', int_temp.get_default_type())
+builtin_scope.add_var('str', str_temp.get_default_type())
+builtin_scope.add_var('bool', bool_temp.get_default_type())
+builtin_scope.add_var('Generic', generic_temp.get_default_type())
 
 
 def get_init_env(module: TypeModuleTemp):

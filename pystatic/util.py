@@ -228,6 +228,9 @@ class ParseException(Exception):
         self.msg = msg
 
 
+BindError = List[Tuple[int, str]]
+
+
 class BindException(Exception):
     """BindException is used when some error happens trying to bind types to
     typevars.
@@ -237,6 +240,6 @@ class BindException(Exception):
 
     If index is empty([]), then the error information is stored in msg.
     """
-    def __init__(self, index: List[Tuple[int, str]], msg: str) -> None:
+    def __init__(self, errors: List[Tuple[int, str]], msg: str) -> None:
         self.msg = msg
-        self.index = index
+        self.errors = errors

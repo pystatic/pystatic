@@ -42,7 +42,7 @@ def analyse_special_typing(kind: SType, node: Union[ast.Assign, ast.AnnAssign],
 
 
 def analyse_typevar(node: Union[ast.Assign, ast.AnnAssign],
-                    env: 'Environment'):
+                    env: 'Environment') -> Optional[TypeVar]:
     assert isinstance(node.value, ast.Call)
     try:
         tpvar = collect_typevar_info(node.value, env)
@@ -58,8 +58,10 @@ def analyse_typevar(node: Union[ast.Assign, ast.AnnAssign],
             if var_name != tpvar.name:
                 env.add_err(node.target,
                             f"{var_name} doesn't match {tpvar.name}")
+        return tpvar
     except ParseException as e:
         env.add_err(e.node, e.msg or '')
+        return None
 
 
 def collect_typevar_info(call_expr: ast.Call, env: 'Environment') -> TypeVar:
