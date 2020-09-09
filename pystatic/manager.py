@@ -66,7 +66,8 @@ class Manager:
         self.set_user_path(package_files)
         self.finder = ModuleFinder(self.config.manual_path,
                                    list(self.user_path), self.config.sitepkg,
-                                   self.config.typeshed)
+                                   self.config.typeshed,
+                                   self.config.python_version)
 
         # Modules that need to be analysed
         # Not all modules need to go on to the check stage

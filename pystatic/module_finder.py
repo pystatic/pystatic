@@ -1,9 +1,11 @@
 import os
+from pystatic.config import PY_VERSION
 from typing import List, Dict, Optional, Union, TYPE_CHECKING
 from pystatic.util import uri2list, absolute_urilist, list2uri
 
 if TYPE_CHECKING:
-    from pystatic.typesys import (TypeModuleTemp)
+    from pystatic.typesys import TypeModuleTemp
+    from pystatic.config import PY_VERSION
 
 
 class ModuleFindRes:
@@ -36,14 +38,15 @@ class ModuleFinder:
     - Typeshed.
     """
     def __init__(self, manual_path: List[str], user_path: List[str],
-                 sitepkg: List[str], typeshed: Optional[List[str]]):
+                 sitepkg: List[str], typeshed: Optional[str],
+                 py_version: PY_VERSION):
         self.manual_path = manual_path
         self.user_path = user_path
         self.sitepkg = sitepkg
         self.typeshed = typeshed
         self.search_path = manual_path + user_path + sitepkg
         if typeshed:
-            self.search_path += typeshed
+            self.search_path += _resolve_typeshed(typeshed, py_version)
 
         # dummy namespace on the root
         dummy_ns = ModuleFindRes(ModuleFindRes.Namespace, self.search_path,
@@ -106,6 +109,36 @@ def _walk_single(suburi: str, paths: List[str]) -> Optional[ModuleFindRes]:
         return ModuleFindRes(ModuleFindRes.Namespace, ns_paths, None)
     else:
         return None
+
+
+def _resolve_typeshed(typeshed: str, pyv: PY_VERSION) -> List[str]:
+    stdlib_res = []
+    third_party_res = []
+
+    stdlib = os.path.join(typeshed, 'stdlib')
+    third_party = os.path.join(typeshed, 'third_party')
+    major_pyv_str = str(pyv[0])
+    pyv_str = str(pyv[0]) + '.' + str(pyv[1])
+
+    if os.path.isdir(stdlib):
+        specific_dir = os.path.join(stdlib, pyv_str)
+        major_dir = os.path.join(stdlib, major_pyv_str)
+        two_or_three = os.path.join(stdlib, '2and3')
+        for curdir in [specific_dir, major_dir, two_or_three]:
+            if os.path.isdir(curdir):
+                stdlib_res.append(curdir)
+
+    if os.path.isdir(third_party):
+        specific_dir = os.path.join(third_party, pyv_str)
+        major_dir = os.path.join(third_party, major_pyv_str)
+        two_or_three = os.path.join(third_party, '2and3')
+        for curdir in [specific_dir, major_dir, two_or_three]:
+            if os.path.isdir(curdir):
+                third_party_res.append(curdir)
+
+    print(stdlib_res + third_party_res)
+
+    return stdlib_res + third_party_res
 
 
 def uri_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> str:
