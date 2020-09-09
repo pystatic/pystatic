@@ -149,8 +149,8 @@ class Manager:
                 target = AnalysisTarget(uri)
                 try:
                     # self.collect_target_type(target)
-                    self.preprocess_target(target)
                     self.register(target)
+                    self.preprocess_target(target)
                 except (SyntaxError, FileNotFoundError):
                     return None
                 else:
