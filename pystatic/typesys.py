@@ -1,7 +1,8 @@
 from optparse import Option
 from typing import Optional, Dict, List, Tuple, Union
 from collections import OrderedDict
-from pystatic.util import Uri, BindException, BindError
+from pystatic.moduri import ModUri
+from pystatic.util import BindException, BindError
 
 TypeBind = Dict['TypeVar', 'TypeType']
 TypeList = List['TypeVar']
@@ -92,17 +93,15 @@ class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, binds: TypeBind):
         super().__init__(temp, binds)
 
+    def call(self) -> 'TypeIns':
+        return TypeIns(self.temp, self.binds)
+
     def getitem(self, bindlist: BindList) -> Optional['TypeType']:
         """getitem of typetype returns a new typetype with new bindings
 
         May throw BindException
         """
         return self.temp.get_type(bindlist, self.binds)
-
-
-class TypeTypeClass(TypeType):
-    def __init__(self, temp: 'TypeClassTemp', binds: TypeBind):
-        super().__init__(temp, binds)
 
 
 class TypeVar(TypeTemp):
@@ -193,7 +192,7 @@ class TypeClassTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: Uri, types: Dict[str, TypeTemp],
+    def __init__(self, uri: ModUri, types: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__(uri)
         for tpname in types.keys():
@@ -209,7 +208,7 @@ class TypeModuleTemp(TypeClassTemp):
 
 
 class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], uri: Uri, tp: Dict[str, TypeTemp],
+    def __init__(self, paths: List[str], uri: ModUri, tp: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__(uri, tp, local)
         self.paths = paths
@@ -279,12 +278,7 @@ class TypeGenericTemp(TypeTemp):
         return res
 
 
-class TypeClassIns(TypeIns):
-    def __init__(self, temp: TypeClassTemp, binds: TypeBind):
-        super().__init__(temp, binds)
-
-
-class TypeFuncIns(TypeClassIns):
+class TypeFuncIns(TypeIns):
     def __init__(self, arg, ret_type: BaseType):
         super().__init__(func_temp, {})
         self.arg = arg
@@ -294,7 +288,7 @@ class TypeFuncIns(TypeClassIns):
         return str(self.arg) + ' -> ' + str(self.ret_type)
 
 
-class EllipsisIns(TypeClassIns):
+class EllipsisIns(TypeIns):
     def __init__(self) -> None:
         super().__init__(ellipsis_temp, {})
 
@@ -318,3 +312,25 @@ ellipsis_temp = TypeClassTemp('ellipsis')
 ellipsis_type = ellipsis_temp.get_default_type()
 none_type = none_temp.get_default_type()
 any_type = any_temp.get_default_type()
+
+any_ins = any_type.call()
+
+
+class Tdefer:
+    def __init__(self, uri: ModUri, name: str) -> None:
+        self.uri = uri
+        self.name = name
+
+
+class TPointer:
+    def __init__(self, tp: Union[Tdefer, 'TypeIns']):
+        self.real_tp = tp
+
+    def get_type(self) -> 'TypeIns':
+        if isinstance(self.real_tp, Tdefer):
+            return any_ins
+        else:
+            return self.real_tp
+
+    def get_realtype(self) -> Union[Tdefer, 'TypeIns']:
+        return self.real_tp

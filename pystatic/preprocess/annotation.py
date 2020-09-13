@@ -3,7 +3,8 @@ import copy
 from typing import Optional, Dict, List
 from pystatic.typesys import (TypeType, TypeVar, ellipsis_type, none_type)
 from pystatic.env import Environment
-from pystatic.util import BindException, ParseException, BaseVisitor
+from pystatic.visitor import BaseVisitor
+from pystatic.util import BindException, ParseException
 
 
 def parse_annotation(node: ast.AST, env: Environment,

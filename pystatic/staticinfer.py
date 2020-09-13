@@ -1,33 +1,11 @@
-from typing import TYPE_CHECKING
 import ast
-from pystatic.util import val_unparse, ParseException, Reach
+from typing import TYPE_CHECKING
+from pystatic.reach import (Reach, cal_neg, is_true)
+from pystatic.visitor import val_unparse
+from pystatic.util import ParseException
 
 if TYPE_CHECKING:
     from pystatic.config import Config
-
-
-def cal_neg(res: Reach) -> Reach:
-    if res == Reach.TYPE_TRUE:
-        return Reach.TYPE_FALSE
-    elif res == Reach.TYPE_FALSE:
-        return Reach.TYPE_TRUE
-    elif res == Reach.RUNTIME_TRUE:
-        return Reach.RUNTIME_FALSE
-    elif res == Reach.RUNTIME_FALSE:
-        return Reach.RUNTIME_TRUE
-    elif res == Reach.ALWAYS_FALSE:
-        return Reach.ALWAYS_TRUE
-    elif res == Reach.ALWAYS_TRUE:
-        return Reach.ALWAYS_FALSE
-    else:
-        return Reach.UNKNOWN
-
-
-def is_true(res: Reach, runtime=False) -> bool:
-    if runtime:
-        return res in (Reach.ALWAYS_TRUE, Reach.RUNTIME_TRUE)
-    else:
-        return res in (Reach.ALWAYS_TRUE, Reach.TYPE_TRUE)
 
 
 def infer_reachability_if(test: ast.expr, config: 'Config') -> Reach:

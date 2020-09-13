@@ -2,8 +2,8 @@ import ast
 from typing import Optional, List
 
 
-class ErrInfo(object):
-    """Error information
+class Message(object):
+    """Message
 
     from_node: generate an error message for the position implied by the node
     """
@@ -31,19 +31,12 @@ class ErrInfo(object):
         return f'line {self.lineno} col {self.col_offset}: ' + self.msg
 
 
-class ErrHandler(object):
+class MessageBox(object):
     def __init__(self, module_uri: str):
         self.filename = module_uri
-        self.err: List[ErrInfo] = []
+        self.warn: List[Message] = []
+        self.error: List[Message] = []
+        self.info: List[Message] = []
 
     def add_err(self, node: ast.AST, msg: str):
-        new_err = ErrInfo.from_node(node, msg)
-        self.err.append(new_err)
-
-    def __iter__(self):
-        self.err.sort()
-        return iter([self.filename + ': ' + str(err) for err in self.err])
-
-    def __str__(self):
-        self.err.sort()
-        return '\n'.join([self.filename + ': ' + str(e) for e in self.err])
+        self.error.append(Message.from_node(node, msg))
