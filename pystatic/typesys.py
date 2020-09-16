@@ -408,11 +408,5 @@ any_type = any_temp.get_default_type()
 any_ins = any_type.call()
 ellipsis_ins = ellipsis_type.call()
 
-
-# binding
-def bind(tp_type: TypeType, bindlist) -> TypeType:
-    pass
-
-
 # dummy, used for test
 dummy_temp = TypeDummyTemp()

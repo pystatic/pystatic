@@ -1,10 +1,29 @@
 import ast
-from typing import List, Optional, Tuple, Union
-from pystatic.symtable import DeferredBindList, DeferredElement, Entry, Deferred
+from typing import List, Optional, Union
+from pystatic.symtable import (DeferredBindList, DeferredElement, Deferred,
+                               EntryType)
 from pystatic.visitor import BaseVisitor
 from pystatic.env import Environment
 from pystatic.message import MessageBox
-from pystatic.typesys import bind, TypeIns, ellipsis_type, TypeType
+from pystatic.typesys import TypeIns, ellipsis_type, TypeType
+
+
+def parse_annotation(node: ast.AST, env: Environment,
+                     mbox: MessageBox) -> Optional[EntryType]:
+    return AnnotationVisitor(env, mbox).accept(node)
+
+
+def parse_comment_annotation(comment: str, env: Environment,
+                             mbox: MessageBox) -> Optional[EntryType]:
+    try:
+        treenode = ast.parse(comment, mode='eval')
+        if hasattr(treenode, 'body'):
+            return AnnotationVisitor(env, mbox).accept(
+                treenode.body)  # type: ignore
+        else:
+            return None
+    except SyntaxError:
+        return None
 
 
 class NameNotFound(Exception):
@@ -32,7 +51,7 @@ class AnnotationVisitor(BaseVisitor):
         self.mbox.add_err(node, 'invalid annotation syntax')
         return None
 
-    def accept(self, node) -> Optional[Entry]:
+    def accept(self, node) -> Optional[EntryType]:
         try:
             res = self.visit(node)
             if isinstance(res, TypeIns):
@@ -41,7 +60,7 @@ class AnnotationVisitor(BaseVisitor):
                 return self.invalid_syntax(node)
         except NameNotFound:
             try:
-                return None
+                return DeferVisitor(self.mbox).accept(node)
             except InvalidAnnSyntax:
                 return self.invalid_syntax(node)
         except InvalidAnnSyntax as e:
@@ -62,8 +81,10 @@ class AnnotationVisitor(BaseVisitor):
     def visit_Name(self, node: ast.Name) -> TypeType:
         res = self.env.symtable.lookup_local(node.id)
         if res:
-            assert isinstance(res, TypeType)  # sometimes may fail
-            return res
+            if isinstance(res, TypeType):  # sometimes may fail
+                return res
+            else:
+                raise NameNotFound
         else:
             raise NameNotFound
 

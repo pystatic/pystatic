@@ -1,6 +1,7 @@
+import ast
 import enum
-from typing import (Callable, Dict, Optional, Union, List)
-from pystatic.typesys import TypeIns, any_ins, bind
+from typing import (Dict, Optional, Union, List)
+from pystatic.typesys import TypeIns, any_ins
 
 
 class Tabletype(enum.Enum):
@@ -46,6 +47,8 @@ class DeferredElement:
 
 
 class Deferred:
+    name = 'Deferred'  # make EntryType has attribute: name
+
     def __init__(self) -> None:
         self.elements: List[DeferredElement] = []
 
@@ -57,7 +60,22 @@ class Deferred:
         return self.elements[index]
 
 
-Entry = Union[TypeIns, Deferred]
+EntryType = Union[TypeIns, Deferred]
+
+
+class Entry:
+    def __init__(self, defnode: ast.AST, tp: EntryType):
+        self.defnode = defnode
+        self.tp = tp
+
+    def get_type(self) -> TypeIns:
+        if isinstance(self.tp, Deferred):
+            return any_ins
+        else:
+            return self.tp
+
+    def get_real_type(self) -> EntryType:
+        return self.tp
 
 
 class SymTable:
