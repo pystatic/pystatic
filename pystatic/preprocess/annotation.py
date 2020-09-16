@@ -4,7 +4,7 @@ from pystatic.symtable import DeferredBindList, DeferredElement, Entry, Deferred
 from pystatic.visitor import BaseVisitor
 from pystatic.env import Environment
 from pystatic.message import MessageBox
-from pystatic.typesys import bind, TypeIns, ellipsis_ins
+from pystatic.typesys import bind, TypeIns, ellipsis_type, TypeType
 
 
 class NameNotFound(Exception):
@@ -23,7 +23,7 @@ class AnnotationVisitor(BaseVisitor):
     def visit(self, node, *args, **kwargs):
         if self.whether_visit(node):
             func = self.get_visit_func(node)
-            if func is self.generic_visit:
+            if func == self.generic_visit:
                 raise InvalidAnnSyntax
             else:
                 return func(node, *args, **kwargs)
@@ -47,26 +47,50 @@ class AnnotationVisitor(BaseVisitor):
         except InvalidAnnSyntax as e:
             return self.invalid_syntax(node)
 
-    def visit_Ellipsis(self, node: ast.Ellipsis) -> TypeIns:
-        return ellipsis_ins
+    def visit_Attribute(self, node: ast.Attribute) -> TypeType:
+        # the assertion in this method may be too strong.
+        # TODO: relax this and throw proper exception after detecting a failure
+        left_type = self.visit(node.value)
+        assert isinstance(left_type, TypeType)
+        res_type = left_type.getattribute(node.attr)
+        assert isinstance(res_type, TypeType)
+        return res_type
 
-    def visit_Name(self, node: ast.Name) -> TypeIns:
+    def visit_Ellipsis(self, node: ast.Ellipsis) -> TypeType:
+        return ellipsis_type
+
+    def visit_Name(self, node: ast.Name) -> TypeType:
         res = self.env.symtable.lookup_local(node.id)
         if res:
+            assert isinstance(res, TypeType)  # sometimes may fail
             return res
         else:
             raise NameNotFound
 
-    def visit_Constant(self, node: ast.Constant) -> TypeIns:
+    def visit_Constant(self, node: ast.Constant) -> TypeType:
         if node.value is Ellipsis:
-            return ellipsis_ins
+            return ellipsis_type
         else:
             raise NameNotFound
 
-    def visit_Subscript(self, node: ast.Subscript):
-        pass
+    def visit_Subscript(self, node: ast.Subscript) -> TypeType:
+        value = self.visit(node.value)
+        assert isinstance(value, TypeType)
+        if isinstance(node.slice, (ast.Tuple, ast.Index)):
+            if isinstance(node.slice, ast.Tuple):
+                slc = self.visit(node.slice)
+            else:
+                # ast.Index
+                slc = self.visit(node.slice.value)
+            if isinstance(slc, list):
+                return value.getitem(slc)[0]  # TODO: add check here
+            assert isinstance(slc, TypeType)
+            return value.getitem([slc])[0]  # TODO: add check here
+        else:
+            assert 0, "Not implemented yet"
+            raise InvalidAnnSyntax
 
-    def visit_Tuple(self, node: ast.Tuple) -> List[TypeIns]:
+    def visit_Tuple(self, node: ast.Tuple) -> List[TypeType]:
         items = []
         for subnode in node.elts:
             res = self.visit(subnode)
@@ -74,13 +98,9 @@ class AnnotationVisitor(BaseVisitor):
             items.append(res)
         return items
 
-    def visit_List(self, node: ast.List) -> List[TypeIns]:
-        items = []
-        for subnode in node.elts:
-            res = self.visit(subnode)
-            assert isinstance(res, TypeIns) or isinstance(res, list)
-            items.append(res)
-        return items
+    def visit_List(self, node: ast.List) -> List[TypeType]:
+        # ast.List and ast.Tuple has similar structure
+        return self.visit_Tuple(node)  # type: ignore
 
 
 class DeferVisitor(BaseVisitor):
