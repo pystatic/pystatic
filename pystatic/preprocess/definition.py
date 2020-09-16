@@ -2,7 +2,7 @@ import ast
 from typing import Dict, Tuple
 from collections import OrderedDict
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import any_ins, TypeIns
+from pystatic.typesys import any_ins, TypeIns, TPointed
 from pystatic.env import Environment
 from pystatic.message import MessageBox
 from pystatic.preprocess.annotation import (parse_comment_annotation,
@@ -16,7 +16,7 @@ class DefVisitor(BaseVisitor):
         self.env = env
         self.mbox = mbox
 
-    def deal_vardict(self, vardict: Dict[str, Tuple[ast.AST, TypeIns]]):
+    def deal_vardict(self, vardict: Dict[str, Tuple[ast.AST, TPointed]]):
         symtable = self.env.symtable
         for key, val in vardict.items():
             entry = symtable.get_local_entry(key)
@@ -43,8 +43,9 @@ class DefVisitor(BaseVisitor):
         pass
 
 
-def _def_visitAssign(env: Environment, node: ast.Assign,
-                     mbox: 'MessageBox') -> Dict[str, Tuple[ast.AST, TypeIns]]:
+def _def_visitAssign(
+        env: Environment, node: ast.Assign,
+        mbox: 'MessageBox') -> Dict[str, Tuple[ast.AST, TPointed]]:
     """Get the variables defined in an ast.Assign node"""
     vardict = OrderedDict()
     if try_special_type(node, vardict, env, mbox):
@@ -60,7 +61,7 @@ def _def_visitAssign(env: Environment, node: ast.Assign,
 
 def _def_visitAnnAssign(
         env: Environment, node: ast.AnnAssign,
-        mbox: 'MessageBox') -> Dict[str, Tuple[ast.AST, TypeIns]]:
+        mbox: 'MessageBox') -> Dict[str, Tuple[ast.AST, TPointed]]:
     """Get the variables defined in an ast.AnnAssign node"""
     vardict = OrderedDict()
     if try_special_type(node, vardict, env, mbox):

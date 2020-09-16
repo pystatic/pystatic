@@ -314,23 +314,9 @@ none_type = none_temp.get_default_type()
 any_type = any_temp.get_default_type()
 
 any_ins = any_type.call()
+ellipsis_ins = ellipsis_type.call()
 
 
-class Tdefer:
-    def __init__(self, uri: ModUri, name: str) -> None:
-        self.uri = uri
-        self.name = name
-
-
-class TPointer:
-    def __init__(self, tp: Union[Tdefer, 'TypeIns']):
-        self.real_tp = tp
-
-    def get_type(self) -> 'TypeIns':
-        if isinstance(self.real_tp, Tdefer):
-            return any_ins
-        else:
-            return self.real_tp
-
-    def get_realtype(self) -> Union[Tdefer, 'TypeIns']:
-        return self.real_tp
+# helper functions
+def bind(tp_type: TypeType, bindlist: BindList) -> TypeType:
+    pass

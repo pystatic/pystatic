@@ -10,6 +10,7 @@ from pystatic.util import ParseException
 
 if TYPE_CHECKING:
     from pystatic.env import Environment
+    from pystatic.typesys import TPointed
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class STypeKind(enum.Enum):
 
 
 def try_special_type(node: Union[ast.Assign, ast.AnnAssign],
-                     vardict: Dict[str, Tuple[ast.AST, TypeIns]],
+                     vardict: Dict[str, Tuple[ast.AST, TPointed]],
                      env: 'Environment', mbox: 'MessageBox') -> bool:
     s_type = special_type_kind(node)
     if not s_type:
@@ -48,7 +49,7 @@ def special_type_kind(
 
 def analyse_special_type(kind: STypeKind, node: Union[ast.Assign,
                                                       ast.AnnAssign],
-                         vardict: Dict[str, Tuple[ast.AST, TypeIns]],
+                         vardict: Dict[str, Tuple[ast.AST, TPointed]],
                          env: 'Environment', mbox: 'MessageBox'):
     if kind == STypeKind.TypeVar:
         analyse_typevar(node, vardict, env, mbox)
@@ -58,7 +59,7 @@ def analyse_special_type(kind: STypeKind, node: Union[ast.Assign,
 
 def analyse_typevar(node: Union[ast.Assign, ast.AnnAssign],
                     vardict: Dict[str, Tuple[ast.AST,
-                                             TypeIns]], env: 'Environment',
+                                             TPointed]], env: 'Environment',
                     mbox: 'MessageBox') -> Optional[TypeVar]:
     assert isinstance(node.value, ast.Call)
     try:

@@ -1,199 +1,207 @@
 import ast
-import copy
-from typing import Optional, Dict, List
-from pystatic.typesys import (TypeType, TypeVar, ellipsis_type, none_type)
-from pystatic.env import Environment
+from typing import List, Optional, Tuple, Union
+from pystatic.symtable import DeferredBindList, DeferredElement, Entry, Deferred
 from pystatic.visitor import BaseVisitor
-from pystatic.util import BindException, ParseException
+from pystatic.env import Environment
+from pystatic.message import MessageBox
+from pystatic.typesys import bind, TypeIns, ellipsis_ins
 
 
-def parse_annotation(node: ast.AST, env: Environment,
-                     def_check: bool) -> Optional[TypeType]:
-    """Get the type according to the annotation
+class NameNotFound(Exception):
+    pass
 
-    If def_check is True, then it will make sure that the annotation not
-    surrounded by quotes must be defined earlier.
-    """
-    try:
-        return AnnotationEval(env, def_check, False, None).accept(node)
-    except (SyntaxError, ParseException):
+
+class InvalidAnnSyntax(Exception):
+    pass
+
+
+class AnnotationVisitor(BaseVisitor):
+    def __init__(self, env: Environment, mbox: MessageBox) -> None:
+        self.env = env
+        self.mbox = mbox
+
+    def visit(self, node, *args, **kwargs):
+        if self.whether_visit(node):
+            func = self.get_visit_func(node)
+            if func is self.generic_visit:
+                raise InvalidAnnSyntax
+            else:
+                return func(node, *args, **kwargs)
+
+    def invalid_syntax(self, node: ast.AST) -> None:
+        self.mbox.add_err(node, 'invalid annotation syntax')
         return None
 
-
-def parse_comment_annotation(node: ast.AST,
-                             env: Environment) -> Optional[TypeType]:
-    """Get the type according to the type comment"""
-    comment = node.type_comment if node.type_comment else None
-    if not comment:
-        return None
-    try:
-        str_node = ast.parse(
-            comment,
-            mode='eval')  # for annotations that's str we first parse it
-    except SyntaxError:
-        return None
-    else:
-        if isinstance(str_node, ast.Expression):
+    def accept(self, node) -> Optional[Entry]:
+        try:
+            res = self.visit(node)
+            if isinstance(res, TypeIns):
+                return res
+            else:
+                return self.invalid_syntax(node)
+        except NameNotFound:
             try:
-                return AnnotationEval(env, False, True, node).accept(str_node)
-            except (SyntaxError, ParseException):
                 return None
+            except InvalidAnnSyntax:
+                return self.invalid_syntax(node)
+        except InvalidAnnSyntax as e:
+            return self.invalid_syntax(node)
+
+    def visit_Ellipsis(self, node: ast.Ellipsis) -> TypeIns:
+        return ellipsis_ins
+
+    def visit_Name(self, node: ast.Name) -> TypeIns:
+        res = self.env.symtable.lookup_local(node.id)
+        if res:
+            return res
         else:
-            # TODO: add error?
-            return None
+            raise NameNotFound
 
-
-def get_typevar_from_ann(node: ast.AST, env: Environment,
-                         collect: Dict[str, TypeVar]):
-    TypeVarCollector(env, collect).accept(node)
-
-
-class TypeVarCollector(BaseVisitor):
-    def __init__(self, env: 'Environment', collect: Dict[str, TypeVar]):
-        super().__init__()
-        self.env = env
-        self.collect = collect
-
-    def visit_Name(self, node: ast.Name):
-        tp = self.env.lookup_type(node.id)
-        if isinstance(tp, TypeVar) and tp.name not in self.collect:
-            self.collect[tp.name] = copy.deepcopy(tp)
-
-
-# TODO: should replace this with EvalType(which should be more general)
-class AnnotationEval(BaseVisitor):
-    def __init__(self, env: 'Environment', def_check: bool, is_cons: bool,
-                 cons_node: Optional[ast.AST]):
-        super().__init__()
-        self.env = env
-        self.def_check = def_check
-        self.is_cons = is_cons  # is this tree is parsed from a string annotation
-        self.cons_node = cons_node  # the original node
-
-        if self.is_cons:
-            assert self.cons_node
-            assert not self.def_check
-
-    def get_realnode(self, node: ast.AST) -> ast.AST:
-        """Get the right node to report errors.
-
-        If current node is parsed as a string annotation, then return the original
-        node, otherwise return the current node
-        """
-        if self.is_cons:
-            assert self.cons_node
-            return self.cons_node
-        else:
-            return node
-
-    def visit_Attribute(self, node: ast.Attribute) -> Optional[TypeType]:
-        left_type = self.visit(node.value)
-        real_node = self.get_realnode(node)
-        if left_type:
-            assert isinstance(left_type, TypeType)
-            cur_type = left_type.getattr(node.attr)
-            if not isinstance(cur_type, TypeType):
-                # TODO: reimplement this error information, B.C should show
-                # B.C rather than C
-                self.env.add_err(real_node, f'{node.attr} is not a type')
-                return None
-            return cur_type
-        return None
-
-    def visit_Constant(self, node: ast.Constant) -> Optional[TypeType]:
+    def visit_Constant(self, node: ast.Constant) -> TypeIns:
         if node.value is Ellipsis:
-            return ellipsis_type
-        elif node.value is None:
-            return none_type
+            return ellipsis_ins
         else:
-            try:
-                tree_node = ast.parse(node.value, mode='eval')
-                return AnnotationEval(self.env, False, True,
-                                      node).accept(tree_node)
-            except SyntaxError:
-                real_node = self.get_realnode(node)
-                assert real_node
-                raise ParseException(real_node, f'invalid syntax')
+            raise NameNotFound
 
-    def visit_Name(self, node: ast.Name) -> Optional[TypeType]:
-        real_node = self.get_realnode(node)
+    def visit_Subscript(self, node: ast.Subscript):
+        pass
 
-        tp_temp = self.env.lookup_type(node.id)
-        if not tp_temp:
-            self.env.add_err(real_node, f'{node.id} is not a type')
+    def visit_Tuple(self, node: ast.Tuple) -> List[TypeIns]:
+        items = []
+        for subnode in node.elts:
+            res = self.visit(subnode)
+            assert isinstance(res, TypeIns) or isinstance(res, list)
+            items.append(res)
+        return items
+
+    def visit_List(self, node: ast.List) -> List[TypeIns]:
+        items = []
+        for subnode in node.elts:
+            res = self.visit(subnode)
+            assert isinstance(res, TypeIns) or isinstance(res, list)
+            items.append(res)
+        return items
+
+
+class DeferVisitor(BaseVisitor):
+    def __init__(self, mbox: MessageBox) -> None:
+        self.mbox = mbox
+
+    def str_to_dfele(self, name: str) -> DeferredElement:
+        return DeferredElement(name, DeferredBindList())
+
+    def ele_to_defer(self, element: DeferredElement) -> Deferred:
+        defer = Deferred()
+        defer.add_element(element)
+        return defer
+
+    def visit(self, node, *args, **kwargs):
+        if self.whether_visit(node):
+            func = self.get_visit_func(node)
+            if func == self.generic_visit:
+                raise InvalidAnnSyntax
+            else:
+                res = func(node, *args, **kwargs)
+                return res
+
+    def accept(self, node) -> Optional[Deferred]:
+        try:
+            res = self.visit(node)
+            if isinstance(res, DeferredElement):
+                return self.ele_to_defer(res)
+            elif isinstance(res, Deferred):
+                return res
+            else:
+                self.mbox.add_err(node, 'invalid annotation syntax')
+                return None
+        except InvalidAnnSyntax as e:
+            self.mbox.add_err(node, 'invalid annotation syntax')
             return None
+
+    def visit_Attribute(self, node: ast.Attribute) -> Deferred:
+        left_res = self.visit(node.value)
+        if isinstance(node.attr, str):
+            attr_ele = self.str_to_dfele(node.attr)
         else:
-            tp_type = tp_temp.get_default_type()
+            attr_ele = self.visit(node.attr)
 
-        if self.def_check:
-            assert not self.is_cons
-            if not self.env.lookup_var(tp_type.basename):
-                self.env.add_err(real_node, f'{node.id} undefined')
-        return tp_type
+        assert isinstance(left_res, (Deferred, DeferredElement))
+        assert isinstance(attr_ele, DeferredElement)
 
-    def visit_Subscript(self, node: ast.Subscript) -> Optional[TypeType]:
-        value_tp = self.visit(node.value)
-        if isinstance(value_tp, TypeType) and isinstance(
-                node.slice, ast.Index):
-            script_tp = self.visit(node.slice)
-            if script_tp:
-                assert isinstance(script_tp, tuple) or isinstance(
-                    script_tp, TypeType) or isinstance(script_tp, list)
-
-                bindlist: List[TypeType]
-                if isinstance(script_tp, TypeType):
-                    bindlist = [script_tp]
-                else:
-                    bindlist = list(script_tp)
-
-                # give additional hints to type checker
-                assert isinstance(value_tp, TypeType)
-                try:
-                    return value_tp.getitem(bindlist)
-                except BindException as e:
-                    # when binding fails, then bind all params to Any
-
-                    # give additional hints to type checker
-                    if isinstance(node.slice.value, ast.Tuple):
-                        slot_list = node.slice.value.elts
-                    elif isinstance(node.slice.value, ast.List):
-                        slot_list = node.slice.value.elts
-                    else:
-                        slot_list = [node.slice.value]
-
-                    if e.errors:
-                        for pos, msg in e.errors:
-                            if pos >= len(slot_list):
-                                break
-                            self.env.add_err(slot_list[pos], msg
-                                             or 'bind error')
-
-                        return value_tp.getitem([])
-                    else:
-                        self.env.add_err(node, e.msg or 'bind error')
-                        return value_tp.getitem([])
+        if isinstance(left_res, DeferredElement):
+            defer = self.ele_to_defer(left_res)
+            defer.add_element(attr_ele)
+            return defer
         else:
-            assert 0, "not implemented yet"
-        return None
+            left_res.add_element(attr_ele)
+            return left_res
 
-    def visit_Tuple(self, node: ast.Tuple):
-        tp_list = []
+    def visit_Ellipsis(self, node: ast.Ellipsis) -> DeferredElement:
+        return self.str_to_dfele('...')
+
+    def visit_Name(self, node: ast.Name) -> DeferredElement:
+        return self.str_to_dfele(node.id)
+
+    def visit_Constant(self, node: ast.Constant) -> DeferredElement:
+        if node.value is Ellipsis:
+            return self.str_to_dfele('...')
+        elif isinstance(
+                node.value,
+                str,
+        ):
+            return self.str_to_dfele(node.value)
+        else:
+            raise InvalidAnnSyntax
+
+    def visit_Subscript(
+            self, node: ast.Subscript) -> Union[Deferred, DeferredElement]:
+        value = self.visit(node.value)
+        assert isinstance(value, (Deferred, DeferredElement))
+        if isinstance(value, Deferred):
+            to_bind = value.get(-1)
+        else:
+            # DeferredElement
+            to_bind = value
+        assert isinstance(to_bind, DeferredElement)  # NOTE: this may be fail
+        if to_bind.get_bind_cnt() != 0:
+            raise InvalidAnnSyntax
+        if isinstance(node.slice, (ast.Tuple, ast.Index)):
+            if isinstance(node.slice, ast.Tuple):
+                slc = self.visit(node.slice)
+            else:
+                # ast.Index
+                slc = self.visit(node.slice.value)
+            bindlist = DeferredBindList()
+            if isinstance(slc, list):
+                for defer in slc:
+                    bindlist.add_binded(defer)
+            else:
+                assert isinstance(slc, (Deferred, DeferredElement))
+                bindlist.add_binded(slc)
+            to_bind.bindlist = bindlist
+            return value
+        else:
+            assert 0, "Not implemented yet"
+            raise InvalidAnnSyntax
+
+    def visit_Tuple(self, node: ast.Tuple) -> List[Deferred]:
+        items: List[Deferred] = []
         for subnode in node.elts:
             res = self.visit(subnode)
-            if res:
-                tp_list.append(res)
-        return tuple(tp_list)
+            if isinstance(res, str):
+                defer = self.ele_to_defer(self.str_to_dfele(res))
+                items.append(defer)
+            elif isinstance(res, DeferredElement):
+                items.append(self.ele_to_defer(res))
+            elif isinstance(res, Deferred):
+                items.append(res)
+            elif isinstance(res, list):
+                items.append(res)
+            else:
+                assert 0, "should not reach here"
+                raise InvalidAnnSyntax
+        return items
 
-    def visit_List(self, node: ast.List):
-        tp_list = []
-        for subnode in node.elts:
-            res = self.visit(subnode)
-            if res:
-                tp_list.append(res)
-        return tp_list
-
-    def visit_Index(self, node: ast.Index):
-        return self.visit(node.value)
-
-    def accept(self, node: ast.AST) -> Optional[TypeType]:
-        return self.visit(node)
+    def visit_List(self, node: ast.List) -> List[Deferred]:
+        # ast.List and ast.Tuple has similar structure
+        return self.visit_Tuple(node)  # type: ignore

@@ -6,15 +6,21 @@ from pystatic.util import ParseException
 
 # Unparse part
 class BaseVisitor(object):
-    def __init__(self) -> None:
-        # node with reachability in reach_block will not be visited
-        self.reach_block: tuple = (Reach.NEVER, Reach.CLS_REDEF)
+    def whether_visit(self, node):
+        if getattr(node, 'reach',
+                   Reach.UNKNOWN) not in (Reach.NEVER, Reach.CLS_REDEF):
+            return True
+        return False
+
+    def get_visit_func(self, node):
+        method = 'visit_' + node.__class__.__name__
+        next_visitor = getattr(self, method, self.generic_visit)
+        return next_visitor
 
     def visit(self, node, *args, **kwargs):
-        if getattr(node, 'reach', Reach.UNKNOWN) not in self.reach_block:
-            method = 'visit_' + node.__class__.__name__
-            next_visitor = getattr(self, method, self.generic_visit)
-            return next_visitor(node, *args, **kwargs)
+        if self.whether_visit(node):
+            visit_func = self.get_visit_func(node)
+            return visit_func(node, *args, **kwargs)
 
     def generic_visit(self, node, *args, **kwargs):
         rt = None
