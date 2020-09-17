@@ -1,85 +1,13 @@
 import ast
 import enum
-from typing import (Dict, Optional, Union, List)
-from pystatic.typesys import TypeIns, any_ins
+from typing import (Dict, Optional, Union, List, Set)
+from pystatic.typesys import TypeIns, any_ins, TypeClassTemp, Entry
 
 
 class Tabletype(enum.Enum):
     GLOB = 1
     CLASS = 2
     FUNC = 3
-
-
-DeferBindEle = Union['Deferred', List['Deferred']]
-
-
-class DeferredBindList:
-    def __init__(self) -> None:
-        self.binding: List[DeferBindEle] = []
-
-    def add_binded(self, binded: Union['DeferredElement',
-                                       DeferBindEle]) -> None:
-        if isinstance(binded, DeferredElement):
-            defer = Deferred()
-            defer.add_element(binded)
-            self.binding.append(defer)
-            return
-        assert isinstance(binded, (Deferred, list))
-        self.binding.append(binded)
-
-    def get_bind(self, index: int) -> Union['Deferred', List['Deferred']]:
-        return self.binding[index]
-
-    def get_bind_cnt(self) -> int:
-        return len(self.binding)
-
-
-class DeferredElement:
-    def __init__(self, name: str, bindlist: 'DeferredBindList'):
-        self.name = name
-        self.bindlist = bindlist
-
-    def get_bind(self, index: int) -> DeferBindEle:
-        return self.bindlist.get_bind(index)
-
-    def get_bind_cnt(self) -> int:
-        return self.bindlist.get_bind_cnt()
-
-
-class Deferred:
-    name = 'Deferred'  # make EntryType has attribute: name
-
-    def __init__(self) -> None:
-        self.elements: List[DeferredElement] = []
-
-    def add_element(self, item: DeferredElement):
-        assert isinstance(item, DeferredElement)
-        self.elements.append(item)
-
-    def get(self, index: int) -> DeferredElement:
-        return self.elements[index]
-
-
-EntryType = Union[TypeIns, Deferred]
-
-
-class Entry:
-    def __init__(self, tp: EntryType, defnode: Optional[ast.AST] = None):
-        # TODO: turn defnode to non-optional
-        self.tp = tp
-        self.defnode = defnode
-
-    def get_type(self) -> TypeIns:
-        if isinstance(self.tp, Deferred):
-            return any_ins
-        else:
-            return self.tp
-
-    def get_real_type(self) -> EntryType:
-        return self.tp
-
-    def set_type(self, entry_tp: EntryType):
-        self.tp = entry_tp
 
 
 class SymTable:
@@ -91,9 +19,16 @@ class SymTable:
         self.glob = glob
         self.builtins = builtins
 
+        self.anonymous_entry: Set[Entry] = set()
+
         self.table_type = table_type
 
-        self.defer = set()
+        self.subtables = set()
+
+        self.attach: Optional[TypeClassTemp] = None
+
+    def set_attach(self, tp_temp: 'TypeClassTemp'):
+        self.attach = tp_temp
 
     def _legb_lookup(self, name: str, find):
         curtable = self
@@ -135,3 +70,13 @@ class SymTable:
 
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
+        if self.attach and self.table_type == Tabletype.CLASS:
+            self.attach.add_clsvar(name, entry)
+
+    def add_anon_entry(self, entry: 'Entry'):
+        """Add anonymous entry(mainly used for remove defer)"""
+        self.anonymous_entry.add(entry)
+
+    def add_subtable(self, symtable: 'SymTable'):
+        assert symtable.table_type != Tabletype.GLOB
+        self.subtables.add(symtable)

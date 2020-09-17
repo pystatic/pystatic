@@ -1,11 +1,10 @@
 import ast
 from typing import List, Optional, Union
-from pystatic.symtable import (DeferredBindList, DeferredElement, Deferred,
-                               EntryType)
 from pystatic.visitor import BaseVisitor
 from pystatic.env import Environment
 from pystatic.message import MessageBox
-from pystatic.typesys import TypeIns, ellipsis_type, TypeType
+from pystatic.typesys import (DeferredBindList, DeferredElement, Deferred,
+                              EntryType, TypeIns, ellipsis_type, TypeType)
 
 
 def parse_annotation(node: ast.AST, env: Environment,
@@ -54,10 +53,8 @@ class AnnotationVisitor(BaseVisitor):
     def accept(self, node) -> Optional[EntryType]:
         try:
             res = self.visit(node)
-            if isinstance(res, TypeIns):
-                return res
-            else:
-                return self.invalid_syntax(node)
+            assert isinstance(res, TypeType)
+            return res
         except NameNotFound:
             try:
                 return DeferVisitor(self.mbox).accept(node)

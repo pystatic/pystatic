@@ -1,6 +1,7 @@
 from typing import Optional, Union, Set
-from pystatic.typesys import TypeIns, TypeType
-from pystatic.symtable import Deferred, SymTable, DeferredElement, Entry
+from pystatic.typesys import (TypeIns, TypeType, Deferred, DeferredElement,
+                              Entry)
+from pystatic.symtable import SymTable
 
 
 def eval_defer(defer: Deferred, symtable: SymTable) -> Optional['TypeType']:
@@ -47,9 +48,15 @@ def remove_defer(symtable: SymTable) -> bool:
             tpins = eval_defer(res, symtable)
             if tpins:
                 progress = True
-                entry.tp = tpins
+                assert isinstance(tpins, TypeType)
+                entry.set_type(tpins.getins())
             else:
                 tmp_defer.add(entry)
         defer_entries = tmp_defer
 
-    return not defer_entries
+    ok = not defer_entries
+
+    for subsym in symtable.subtables:
+        ok = ok and remove_defer(subsym)
+
+    return ok

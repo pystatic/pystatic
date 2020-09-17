@@ -1,5 +1,6 @@
+import ast
 import copy
-from typing import Optional, Dict, List, Tuple, Union
+from typing import Optional, Dict, List, Tuple, Union, Set, TYPE_CHECKING
 from collections import OrderedDict
 from pystatic.moduri import ModUri
 
@@ -73,7 +74,7 @@ class TypeTemp(BaseType):
         return None
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
-        pass
+        assert 0, "This function should be avoided because TypeClassTemp doesn't support it"
 
     def getattr(self,
                 name: str,
@@ -137,7 +138,7 @@ class TypeIns(BaseType):
             context: Optional[TypeContext] = None) -> Optional['TypeIns']:
         context = context or {}
         context = self.shadow(context)
-        return self.temp.getattr(name, self.substitute(context), context)
+        return self.temp.getattribute(name, self.substitute(context), context)
 
     def getattr(self,
                 name: str,
@@ -157,8 +158,11 @@ class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
         super().__init__(temp, bindlist)
 
-    def call(self) -> 'TypeIns':
+    def getins(self) -> 'TypeIns':
         return TypeIns(self.temp, self.bindlist)
+
+    def call(self) -> 'TypeIns':
+        return self.getins()
 
     def getitem(self, bindlist: BindList) -> Tuple['TypeType', 'GetItemError']:
         return self.temp.get_type(bindlist)
@@ -168,12 +172,12 @@ class TypeClassTemp(TypeTemp):
     def __init__(self, clsname: str):
         super().__init__(clsname)
 
-        self.baseclass: 'OrderedDict[str, TypeType]'
+        self.baseclass: 'OrderedDict[str, Entry]'
         self.baseclass = OrderedDict()
 
-        self.method: dict = {}
-        self.cls_attr: Dict[str, TypeIns] = {}
-        self.var_attr: Dict[str, TypeIns] = {}
+        self.cls_attr: Dict[str, 'Entry'] = {}
+        self.var_attr: Dict[str, 'Entry'] = {}
+        self.method: Dict[str, 'Entry'] = {}
 
     def add_typevar(self, typevar: TypeVar):
         self.placeholders.append(typevar)
@@ -208,56 +212,57 @@ class TypeClassTemp(TypeTemp):
 
             return binds, binderr
 
-    def add_base(self, base_type: TypeType):
-        self.baseclass[base_type.name] = base_type
+    def add_base(self, name: str, entry: 'Entry'):
+        self.baseclass[name] = entry
 
-    def add_method(self, name: str, method_type):
+    def add_method(self, name: str, method_type: 'Entry'):
         self.method[name] = method_type
 
-    def add_var_attr(self, name: str, attr_type: TypeIns):
-        self.var_attr[name] = attr_type
+    def add_var(self, name: str, entry: 'Entry'):
+        self.var_attr[name] = entry
 
-    def add_cls_attr(self, name: str, attr_type: TypeIns):
-        self.cls_attr[name] = attr_type
+    def add_clsvar(self, name: str, entry: 'Entry'):
+        self.cls_attr[name] = entry
 
     def get_local_attr(
             self,
             name: str,
             binds: Optional[TypeContext] = None) -> Optional['TypeIns']:
         if name in self.var_attr:
-            return self.var_attr[name]
+            return self.var_attr[name].get_type()
         elif name in self.cls_attr:
-            return self.cls_attr[name]
+            return self.cls_attr[name].get_type()
         return None
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
-        """Same as add_cls_attr"""
-        self.add_cls_attr(name, attr_type)
+        assert 0, "This function should not be called, use add_var or add_clsvar instead"
+        self.add_clsvar(name, Entry(attr_type))
 
-    def getattr(self,
-                name: str,
-                binds: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        local_res = self.get_local_attr(name, binds)
-        if local_res:
-            return local_res
-        else:
-            for basecls in self.baseclass.values():
-                res = basecls.getattr(name, binds)
-                if res:
-                    return res
-            return None
+    def getattribute(self, name: str, bindlist: BindList,
+                     context: Optional[TypeContext]) -> Optional['TypeIns']:
+        # FIXME: current implementation doesn't cope bindlist, context and baseclasses
+        res = self.get_local_attr(name)
+        if not res:
+            for base_entry in self.baseclass.values():
+                basecls = base_entry.get_real_type()
+                if isinstance(basecls, TypeType):
+                    res = basecls.temp.getattribute(name, bindlist, context)
+                    if res:
+                        return res
+        return res
 
 
 class TypeModuleTemp(TypeClassTemp):
     def __init__(self, uri: ModUri, types: Dict[str, TypeTemp],
                  local: Dict[str, TypeIns]):
         super().__init__(uri)
-        for tpname in types.keys():
-            tpres = types[tpname].get_default_type()
-            assert tpres
-            if tpres:
-                self.cls_attr[tpname] = tpres
-        self.cls_attr.update(local)
+        assert 0, "not implemented yet"
+        # for tpname in types.keys():
+        #     tpres = types[tpname].get_default_type()
+        #     assert tpres
+        #     if tpres:
+        #         self.cls_attr[tpname] = tpres
+        # self.cls_attr.update(local)
 
     @property
     def uri(self):
@@ -410,3 +415,82 @@ ellipsis_ins = ellipsis_type.call()
 
 # dummy, used for test
 dummy_temp = TypeDummyTemp()
+
+# defer related
+
+DeferBindEle = Union['Deferred', List['Deferred']]
+
+
+class DeferredBindList:
+    def __init__(self) -> None:
+        self.binding: List[DeferBindEle] = []
+
+    def add_binded(self, binded: Union['DeferredElement',
+                                       DeferBindEle]) -> None:
+        if isinstance(binded, DeferredElement):
+            defer = Deferred()
+            defer.add_element(binded)
+            self.binding.append(defer)
+            return
+        assert isinstance(binded, (Deferred, list))
+        self.binding.append(binded)
+
+    def get_bind(self, index: int) -> Union['Deferred', List['Deferred']]:
+        return self.binding[index]
+
+    def get_bind_cnt(self) -> int:
+        return len(self.binding)
+
+
+class DeferredElement:
+    def __init__(self, name: str, bindlist: 'DeferredBindList'):
+        self.name = name
+        self.bindlist = bindlist
+
+    def get_bind(self, index: int) -> DeferBindEle:
+        return self.bindlist.get_bind(index)
+
+    def get_bind_cnt(self) -> int:
+        return self.bindlist.get_bind_cnt()
+
+
+class Deferred:
+    def __init__(self) -> None:
+        self.elements: List[DeferredElement] = []
+
+    def add_element(self, item: DeferredElement):
+        assert isinstance(item, DeferredElement)
+        self.elements.append(item)
+
+    def get(self, index: int) -> DeferredElement:
+        return self.elements[index]
+
+
+EntryType = Union[TypeIns, Deferred]
+
+
+class Entry:
+    def __init__(self, tp: EntryType, defnode: Optional[ast.AST] = None):
+        # TODO: turn defnode to non-optional
+        self.tp = tp
+        self.defnode = defnode
+
+    def get_type(self) -> TypeIns:
+        if isinstance(self.tp, Deferred):
+            return any_ins
+        else:
+            return self.tp
+
+    def get_real_type(self) -> EntryType:
+        return self.tp
+
+    def set_type(self, entry_tp: EntryType):
+        self.tp = entry_tp
+
+
+# helper functions
+def get_entry_type_name(entry_tp: EntryType) -> str:
+    if isinstance(entry_tp, Deferred):
+        return entry_tp.get(0).name
+    else:
+        return entry_tp.name
