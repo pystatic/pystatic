@@ -3,7 +3,7 @@ from typing import Optional, List
 from pystatic.env import Environment
 from pystatic.arg import Argument, Arg
 from pystatic.preprocess.annotation import parse_annotation
-from pystatic.typesys import TypeFuncIns, any_type
+from pystatic.typesys import any_type
 
 
 def parse_arg(node: ast.arg, tp_scope: Environment):
@@ -74,8 +74,7 @@ def parse_arguments(node: ast.arguments,
         return None
 
 
-def parse_func(node: ast.FunctionDef,
-               env: Environment) -> Optional[TypeFuncIns]:
+def parse_func(node: ast.FunctionDef, env: Environment) -> Optional[TypeIns]:
     """Get a function's type according to a ast.FunctionDef node"""
     argument = parse_arguments(node.args, env)
     if not argument:

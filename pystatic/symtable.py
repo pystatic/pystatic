@@ -64,9 +64,10 @@ EntryType = Union[TypeIns, Deferred]
 
 
 class Entry:
-    def __init__(self, defnode: ast.AST, tp: EntryType):
-        self.defnode = defnode
+    def __init__(self, tp: EntryType, defnode: Optional[ast.AST] = None):
+        # TODO: turn defnode to non-optional
         self.tp = tp
+        self.defnode = defnode
 
     def get_type(self) -> TypeIns:
         if isinstance(self.tp, Deferred):
@@ -76,6 +77,9 @@ class Entry:
 
     def get_real_type(self) -> EntryType:
         return self.tp
+
+    def set_type(self, entry_tp: EntryType):
+        self.tp = entry_tp
 
 
 class SymTable:
@@ -110,12 +114,18 @@ class SymTable:
 
     def lookup_local(self, name: str) -> Optional['TypeIns']:
         res = self.local.get(name)
+        if not res:
+            return None
+        res = res.tp
         if not isinstance(res, TypeIns):  # Deferred
             return any_ins
         return res
 
     def lookup(self, name: str) -> Optional['TypeIns']:
         return self._legb_lookup(name, SymTable.lookup_local)
+
+    def getattr(self, name: str) -> Optional['TypeIns']:
+        return self.lookup(name)
 
     def lookup_local_entry(self, name: str) -> Optional['Entry']:
         return self.local.get(name)

@@ -25,6 +25,7 @@ class DefVisitor(BaseVisitor):
                 if entry.get_real_type().name == 'typing.Any':
                     symtable.add_entry(key, val)
                 else:
+                    assert val.defnode
                     self.mbox.add_err(val.defnode, f'{key} is already defined')
             else:
                 symtable.add_entry(key, val)
@@ -72,5 +73,5 @@ def _def_visitAnnAssign(env: Environment, node: ast.AnnAssign,
         ann_ins = ann_ins if ann_ins else any_ins
         if isinstance(node.target, ast.Name):
             # this assignment is also a definition
-            vardict[node.target.id] = Entry(node, ann_ins)
+            vardict[node.target.id] = Entry(ann_ins, node)
     return vardict
