@@ -23,9 +23,9 @@ def _eval_defer(defer: DeferredElement, topitem: Union[TypeIns, SymTable],
             else:
                 tmp = eval_defer(bind, symtable)
             if tmp is None:
-                bindlist.append(tmp)
-            else:
                 return None
+            else:
+                bindlist.append(tmp)
         res, _ = tpins.getitem(bindlist)  # TODO: check consistence here
         return res
     return None
@@ -38,16 +38,16 @@ def remove_defer(symtable: SymTable) -> bool:
             defer_entries.add(entry)
 
     progress = True
-    while progress:
+    while progress and defer_entries:
         progress = False
         tmp_defer = set()
         for entry in defer_entries:
             res = entry.get_real_type()
-            if isinstance(res, Deferred):
-                tpins = eval_defer(res, symtable)
-                if tpins:
-                    progress = True
-                    entry.tp = tpins
+            assert isinstance(res, Deferred)
+            tpins = eval_defer(res, symtable)
+            if tpins:
+                progress = True
+                entry.tp = tpins
             else:
                 tmp_defer.add(entry)
         defer_entries = tmp_defer

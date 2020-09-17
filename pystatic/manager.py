@@ -2,11 +2,12 @@ import os
 import ast
 import logging
 import enum
+from pystatic.symtable import SymTable
+from pystatic.message import MessageBox
 from typing import Optional, List, TextIO, Set, Dict
+from pystatic import preprocess
 from pystatic.typesys import TypeModuleTemp, TypePackageTemp
 from pystatic.config import Config
-from pystatic.preprocess.preprocess import (collect_type_def, import_type_def,
-                                            bind_type_name)
 from pystatic.modfinder import (ModuleFinder, ModuleFindRes)
 from pystatic.env import Environment
 from pystatic.moduri import ModUri, relpath2uri, uri2list
@@ -31,6 +32,8 @@ class Target:
         self.uri = uri
         self.stage = stage
 
+        self.symtable = preprocess.get_init_env(
+        ).symtable  # TODO: refactor this
         self.ast: Optional[ast.AST] = None
 
 
@@ -56,8 +59,21 @@ class Manager:
         self.get_check_targets(module_files)
         self.get_check_targets(package_files)
 
+        self.mbox = MessageBox('test')  # TODO: refactor this
+
     def start_check(self):
-        pass
+        for target in self.check_targets:
+            if target.stage <= Stage.Parse:
+                self.parse(target)
+            assert target.ast
+            preprocess.get_definition(target.ast, Environment(target.symtable),
+                                      self.mbox)
+
+        for target in self.check_targets:
+            preprocess.remove_defer(target.symtable)
+
+        for err in self.mbox.error:
+            print(err)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""
