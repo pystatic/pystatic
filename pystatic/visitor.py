@@ -157,5 +157,8 @@ class LiterUnParser(BaseVisitor):
 
 
 def liter_unparse(node: ast.AST):
-    """Tries to change the ast to the str format"""
+    """Tries to change the ast to the str format
+
+    May throw ParseException
+    """
     return LiterUnParser().accept(node)

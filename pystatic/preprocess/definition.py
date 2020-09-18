@@ -50,7 +50,8 @@ class DefVisitor(BaseVisitor):
 
             # base classes
             for base_node in node.bases:
-                entry_tp = parse_annotation(base_node, self.env, self.mbox)
+                entry_tp = parse_annotation(base_node, self.env.symtable,
+                                            self.mbox)
                 if entry_tp:
                     entry = Entry(entry_tp)
                     entry_name = get_entry_type_name(entry_tp)
@@ -76,12 +77,13 @@ def _def_visitAssign(env: Environment, node: ast.Assign,
     """Get the variables defined in an ast.Assign node"""
     # NOTE: current implementation is wrong
     vardict: Dict[str, Entry] = OrderedDict()
-    if try_special_type(node, vardict, env, mbox):
+    if try_special_type(node, vardict, env.symtable, mbox):
         return vardict
     else:
         comment = node.type_comment
         if comment:
-            comment_type = parse_comment_annotation(comment, env, mbox)
+            comment_type = parse_comment_annotation(comment, env.symtable,
+                                                    mbox)
             if isinstance(comment_type, TypeIns):
                 assert isinstance(comment_type, TypeType)
                 comment_ins = comment_type.getins()
@@ -102,10 +104,10 @@ def _def_visitAnnAssign(env: Environment, node: ast.AnnAssign,
     """Get the variables defined in an ast.AnnAssign node"""
     # NOTE: current implementation may be wrong
     vardict = OrderedDict()
-    if try_special_type(node, vardict, env, mbox):
+    if try_special_type(node, vardict, env.symtable, mbox):
         return vardict
     else:
-        ann_type = parse_annotation(node.annotation, env, mbox)
+        ann_type = parse_annotation(node.annotation, env.symtable, mbox)
         if isinstance(ann_type, TypeIns):
             assert isinstance(ann_type, TypeType)
             ann_ins = ann_type.getins()

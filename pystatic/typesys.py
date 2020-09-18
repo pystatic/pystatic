@@ -87,7 +87,7 @@ class TypeVar(TypeTemp):
     def __init__(self,
                  name: str,
                  *args: 'TypeIns',
-                 bound: Optional[BaseType] = None,
+                 bound: Optional['Entry'] = None,
                  covariant=False,
                  contravariant=False):
         super().__init__(name)
@@ -101,7 +101,7 @@ class TypeVar(TypeTemp):
         else:
             self.invariant = True
         self.contravariant = contravariant
-        self.constrains: List[TypeIns] = list(*args)
+        self.constrains: List['Entry'] = list(*args)
 
 
 class TypeIns(BaseType):

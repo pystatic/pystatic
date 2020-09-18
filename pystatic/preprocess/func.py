@@ -10,7 +10,7 @@ def parse_arg(node: ast.arg, tp_scope: Environment):
     """Generate an Arg instance according to an ast.arg node"""
     new_arg = Arg(node.arg)
     if node.annotation:
-        ann = parse_annotation(node.annotation, tp_scope, False)
+        ann = parse_annotation(node.annotation, tp_scope.symtable, False)
         if not ann:
             return None
         else:

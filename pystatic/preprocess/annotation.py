@@ -1,4 +1,5 @@
 import ast
+from pystatic.symtable import SymTable
 from typing import List, Optional, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.env import Environment
@@ -7,17 +8,17 @@ from pystatic.typesys import (DeferredBindList, DeferredElement, Deferred,
                               EntryType, TypeIns, ellipsis_type, TypeType)
 
 
-def parse_annotation(node: ast.AST, env: Environment,
+def parse_annotation(node: ast.AST, symtable: SymTable,
                      mbox: MessageBox) -> Optional[EntryType]:
-    return AnnotationVisitor(env, mbox).accept(node)
+    return AnnotationVisitor(symtable, mbox).accept(node)
 
 
-def parse_comment_annotation(comment: str, env: Environment,
+def parse_comment_annotation(comment: str, symtable: SymTable,
                              mbox: MessageBox) -> Optional[EntryType]:
     try:
         treenode = ast.parse(comment, mode='eval')
         if hasattr(treenode, 'body'):
-            return AnnotationVisitor(env, mbox).accept(
+            return AnnotationVisitor(symtable, mbox).accept(
                 treenode.body)  # type: ignore
         else:
             return None
@@ -34,8 +35,8 @@ class InvalidAnnSyntax(Exception):
 
 
 class AnnotationVisitor(BaseVisitor):
-    def __init__(self, env: Environment, mbox: MessageBox) -> None:
-        self.env = env
+    def __init__(self, symtable: SymTable, mbox: MessageBox) -> None:
+        self.symtable = symtable
         self.mbox = mbox
 
     def visit(self, node, *args, **kwargs):
@@ -76,7 +77,7 @@ class AnnotationVisitor(BaseVisitor):
         return ellipsis_type
 
     def visit_Name(self, node: ast.Name) -> TypeType:
-        res = self.env.symtable.lookup_local(node.id)
+        res = self.symtable.lookup_local(node.id)
         if res:
             if isinstance(res, TypeType):  # sometimes may fail
                 return res

@@ -37,6 +37,9 @@ def remove_defer(symtable: SymTable) -> bool:
     for entry in symtable.local.values():
         if isinstance(entry.get_real_type(), Deferred):
             defer_entries.add(entry)
+    for entry in symtable.anonymous_entry:
+        if isinstance(entry.get_real_type(), Deferred):
+            defer_entries.add(entry)
 
     progress = True
     while progress and defer_entries:
