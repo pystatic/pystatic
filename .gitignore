@@ -128,9 +128,9 @@ include
 *-workspace
 .VSCodeCounter
 
-# test
-tmp_test
-test.py
+# pytest
+tests
+pytest.ini
 
 # script
 script

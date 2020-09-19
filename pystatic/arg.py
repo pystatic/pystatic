@@ -1,11 +1,11 @@
-from pystatic.typesys import BaseType, TypeAny, any_type
+from pystatic.typesys import BaseType, TypeAnyTemp, any_temp
 from typing import Optional, List
 
 
 class Arg(object):
     def __init__(self,
                  name,
-                 ann: BaseType = any_type,
+                 ann: BaseType = any_temp,
                  default=None,
                  valid=False):
         """
@@ -18,7 +18,7 @@ class Arg(object):
 
     def __str__(self):
         result = self.name
-        if not isinstance(self.ann, TypeAny):
+        if not isinstance(self.ann, TypeAnyTemp):
             result += ': ' + str(self.ann)
         if self.valid:
             result += ' = ...'

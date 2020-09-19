@@ -1,10 +1,16 @@
 import ast
 import enum
-from typing import Optional, Final, List
+from typing import Optional, Final, List, TYPE_CHECKING, Tuple
 
+if TYPE_CHECKING:
+    from pystatic.env import Environment
+    from pystatic.typesys import TypeIns
 
 # Uri part
-def count_uri_head_dots(uri: str) -> int:
+Uri = str
+
+
+def count_uri_head_dots(uri: Uri) -> int:
     """find out how many dots at the begining of a uri"""
     i = 0
     while len(uri) > i and uri[i] == '.':
@@ -12,15 +18,27 @@ def count_uri_head_dots(uri: str) -> int:
     return i
 
 
-def uri2list(uri: str) -> List[str]:
+def uri2list(uri: Uri) -> List[str]:
     return [item for item in uri.split('.') if item != '']
 
 
-def list2uri(urilist: List[str]) -> str:
+def list2uri(urilist: List[str]) -> Uri:
     return '.'.join(urilist)
 
 
-def absolute_urilist(uri: str, cur_uri: str) -> List[str]:
+def uri_parent(uri: Uri) -> Uri:
+    """Return the parent uri(a.b.c -> a.b, a -> ''), uri should be absolute"""
+    return '.'.join(uri2list(uri)[:-1])
+
+
+def uri_last(uri: Uri) -> str:
+    """Return the last(a.b.c -> c, a -> a)"""
+    if not uri:
+        return ''
+    return uri2list(uri)[-1]
+
+
+def absolute_urilist(uri: Uri, cur_uri: Uri) -> List[str]:
     i = count_uri_head_dots(uri)
     if i == 0:  # the uri itself is an absolute uri
         return uri2list(uri)
@@ -72,7 +90,8 @@ class BaseVisitor(object):
         return self.visit(node)
 
 
-class UnParser(BaseVisitor):
+class ValueUnParser(BaseVisitor):
+    """Try to convert an ast to a python value"""
     def __init__(self, context: Optional[dict]) -> None:
         super().__init__()
         self.context = context
@@ -81,7 +100,7 @@ class UnParser(BaseVisitor):
         method = 'visit_' + node.__class__.__name__
         next_visitor = getattr(self, method, None)
         if not next_visitor:
-            raise UnParseException()
+            raise ParseException(node, '')
         return next_visitor(node, *args, **kwargs)
 
     def visit_Tuple(self, node: ast.Tuple):
@@ -93,30 +112,134 @@ class UnParser(BaseVisitor):
     def visit_Name(self, node: ast.Name):
         if self.context and node.id in self.context:
             return self.context[node.id]
-        raise UnParseException()
+        else:
+            raise ParseException(node, f'{node.id} not found')
+
+    def visit_Constant(self, node: ast.Constant):
+        return node.value
+
+
+def val_unparse(node: ast.AST, context: Optional[dict] = None):
+    """Tries to unparse node to exact values.
+
+    Look up context when meeting variable names
+    """
+    return ValueUnParser(context).accept(node)
+
+
+class LiterUnParser(BaseVisitor):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def visit(self, node: ast.AST, *args, **kwargs):
+        method = 'visit_' + node.__class__.__name__
+        next_visitor = getattr(self, method, None)
+        if not next_visitor:
+            raise ParseException(node, f'{method} not implemented')
+        return next_visitor(node, *args, **kwargs)
+
+    def visit_Name(self, node: ast.Name):
+        return node.id
+
+    def visit_Ellipsis(self, node: ast.Ellipsis):
+        return '...'
 
     def visit_Constant(self, node: ast.Constant):
         try:
-            return int(node.value)
+            if node.value is Ellipsis:
+                return '...'
+            else:
+                return str(node.value)
         except ValueError:
-            return node.value
+            raise ParseException(node, "can't convert to str")
+
+    def visit_Tuple(self, node: ast.Tuple):
+        items = []
+        for subnode in node.elts:
+            items.append(self.visit(subnode))
+        return '(' + ','.join(items) + ')'
+
+    def visit_List(self, node: ast.List):
+        items = []
+        for subnode in node.elts:
+            items.append(self.visit(subnode))
+        return '[' + ','.join(items) + ']'
+
+    def visit_Attribute(self, node: ast.Attribute):
+        value = self.visit(node.value)
+        return value + '.' + node.attr
+
+    def visit_Subscript(self, node: ast.Subscript):
+        value = self.visit(node.value)
+        if isinstance(node.slice, ast.Tuple):
+            slc = self.visit(node.slice)
+            assert (slc[0] == '(')
+            assert (slc[-1] == ')')
+            slc[0] = '['
+            slc[-1] = ']'
+        else:
+            slc = '[' + self.visit(node.slice) + ']'
+        return value + slc
+
+    def visit_Slice(self, node: ast.Slice):
+        lower = ''
+        upper = ''
+        step = ''
+        if node.lower:
+            lower = self.visit(node.lower)
+        if node.upper:
+            upper = self.visit(node.upper)
+        if node.step:
+            step = self.visit(node.step)
+        return ':'.join([lower, upper, step])
+
+    def visit_Index(self, node: ast.Index):
+        # ast.Index is deprecated since python3.9
+        if isinstance(node.value, ast.Tuple):
+            res = self.visit(node.value)
+            assert res[0] == '(' and res[-1] == ')'
+            return res[1:-1]
+        else:
+            return self.visit(node.value)
+
+    def visit_ExtSlice(self, node: ast.ExtSlice):
+        items = []
+        for subnode in node.dims:
+            items.append(self.visit(subnode))
+        return ','.join(items)
 
 
-def unparse(node: ast.AST, context: Optional[dict] = None):
-    return UnParser(context).accept(node)
+def liter_unparse(node: ast.AST):
+    """Tries to change the ast to the str format"""
+    return LiterUnParser().accept(node)
 
 
+# exception part
 class ParseException(Exception):
+    """ParseException is used when working on the ast tree however the tree
+    doesn't match the structure and the process failed.
+
+    Node points to the position where the process failed.
+    Msg is used to describe why it failed(it can be omitted by set it to '').
+    """
     def __init__(self, node: ast.AST, msg: str):
         super().__init__(msg)
-        self.msg = msg
-        self.node = node
-
-
-class UnParseException(Exception):
-    """Exceptions used in unparse"""
-    def __init__(self,
-                 node: Optional[ast.AST] = None,
-                 msg: Optional[str] = None):
         self.node = node
         self.msg = msg
+
+
+BindError = List[Tuple[int, str]]
+
+
+class BindException(Exception):
+    """BindException is used when some error happens trying to bind types to
+    typevars.
+
+    Each element of index tells the position(start from 0) of the wrong binding
+    and the error information.
+
+    If index is empty([]), then the error information is stored in msg.
+    """
+    def __init__(self, errors: List[Tuple[int, str]], msg: str) -> None:
+        self.msg = msg
+        self.errors = errors

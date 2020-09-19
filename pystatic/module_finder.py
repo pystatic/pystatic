@@ -1,30 +1,29 @@
 import os
-from typing import List, Dict, Optional, Union, TYPE_CHECKING, Tuple
-from pystatic.typesys import (TypeModuleTemp, TypePackageTemp, TypeClassTemp,
-                              TypeTemp)
-from pystatic.util import uri2list, absolute_urilist, list2uri, count_uri_head_dots
+from typing import List, Dict, Optional, Union, TYPE_CHECKING
+from pystatic.util import uri2list, absolute_urilist, list2uri
 
 if TYPE_CHECKING:
-    from pystatic.manager import Manager
-
-ImpItem = Union[TypeModuleTemp, TypePackageTemp]
+    from pystatic.typesys import (TypeModuleTemp)
 
 
-# Uri forms a hierarchy structure just like filename.
-# Tree's leafnodes represent modules, inner-node represent packages.
-class _Node:
-    def __init__(self, content: 'ImpItem'):
-        self.child: Dict[str, '_Node'] = {}
-        self.content = content
+class ModuleFindRes:
+    Module = 1
+    Package = 2
+    Namespace = 3
 
-    def march(self, name: str) -> Optional['_Node']:
-        """Go down the tree"""
-        return self.child.get(name)
+    def __init__(self, res_type: int, paths: List[str],
+                 target_file: Optional[str]) -> None:
+        self.res_type = res_type
+        # For package to set correct paths attribute
+        self.paths = paths
+        # File to analyse, if result is a namespace package, target_file is None
+        self.target_file = target_file
 
 
-def urilist_from_impitem(uri: str, cur_impitem: 'ImpItem') -> List[str]:
-    package = uri2list(cur_impitem.uri)[:-1]  # the package that cur_module in
-    return absolute_urilist(uri, list2uri(package))
+class Node:
+    def __init__(self, res: ModuleFindRes):
+        self.res: ModuleFindRes = res
+        self.child: Dict[str, Node] = {}
 
 
 class ModuleFinder:
@@ -37,108 +36,82 @@ class ModuleFinder:
     - Typeshed.
     """
     def __init__(self, manual_path: List[str], user_path: List[str],
-                 sitepkg: List[str], typeshed: Optional[List[str]],
-                 manager: 'Manager'):
-        search_path = manual_path + user_path + sitepkg
+                 sitepkg: List[str], typeshed: Optional[List[str]]):
+        self.manual_path = manual_path
+        self.user_path = user_path
+        self.sitepkg = sitepkg
+        self.typeshed = typeshed
+        self.search_path = manual_path + user_path + sitepkg
         if typeshed:
-            search_path += typeshed
+            self.search_path += typeshed
 
-        rt_pkg = TypePackageTemp(search_path, '', manager)
-        self.manager = manager
-        self.root = _Node(rt_pkg)
+        # dummy namespace on the root
+        dummy_ns = ModuleFindRes(ModuleFindRes.Namespace, self.search_path,
+                                 None)
+        self.root = Node(dummy_ns)
 
-    def find_by_paths(self, paths: List[str], uri: List[str], start: int,
-                      end: int) -> Optional[ImpItem]:
-        def gen_impItem(paths: List[str]):
-            isdir = False
-            for path in paths:
-                if not os.path.exists(path):
-                    return None
-                if os.path.isdir(path):
-                    isdir = True
-                elif isdir:
-                    return None
-
-            if isdir:  # package
-                return TypePackageTemp(paths, '.'.join(uri[:end]),
-                                       self.manager)
-            else:
-                assert len(paths) == 1  # module
-                return self.manager.semanal_module(paths[0],
-                                                   '.'.join(uri[:end]))
-
-        paths = self._search_type_file(uri[start:end], paths, 0)
-        if paths:
-            return gen_impItem(paths)
-        else:
+    def find(self, uri: str) -> Optional[ModuleFindRes]:
+        urilist = uri2list(uri)
+        if not urilist:
             return None
 
-    def search_imp(self, uris: List[str]) -> Tuple['ImpItem', int]:
-        curnode = self.root
-        for i, sub_uri in enumerate(uris):
-            nextnode = curnode.march(sub_uri)
-            if not nextnode:
-                if isinstance(curnode.content, TypeModuleTemp):
-                    return curnode.content, i
-                else:
-                    res = self.find_by_paths(curnode.content.path, uris, i,
-                                             i + 1)
-                    if res is None:
-                        return curnode.content, i
-                    else:
-                        curnode.child[sub_uri] = _Node(res)
-                        curnode = curnode.child[sub_uri]
+        cur_node = self.root
+        i = 0
+        while i < len(urilist) and urilist[i] in cur_node.child:
+            cur_node = cur_node.child[urilist[i]]
+            i += 1
+
+        cur_res = cur_node.res
+        for suburi in urilist[i:]:
+            if cur_res.res_type == ModuleFindRes.Module:
+                return None
+            walk_res = _walk_single(suburi, cur_res.paths)
+            if not walk_res:
+                return None
+            cur_res = walk_res
+
+        return cur_res
+
+    def relative_find(self, uri: str,
+                      module: 'TypeModuleTemp') -> Optional[ModuleFindRes]:
+        abs_uri = urilist_from_impitem(uri, module)
+        return self.find(list2uri(abs_uri))
+
+
+def _walk_single(suburi: str, paths: List[str]) -> Optional[ModuleFindRes]:
+    assert paths
+    ns_paths = []
+    target = None
+    target_file = None
+    for path in paths:
+        sub_target = os.path.normpath(os.path.join(path, suburi))
+        pyi_file = sub_target + '.pyi'
+        py_file = sub_target + '.py'
+        if os.path.isfile(pyi_file):
+            return ModuleFindRes(ModuleFindRes.Module, [pyi_file], pyi_file)
+        if os.path.isfile(py_file):
+            return ModuleFindRes(ModuleFindRes.Module, [py_file], py_file)
+
+        if os.path.isdir(sub_target):
+            init_file = os.path.join(sub_target, '__init__.py')
+            if os.path.isfile(init_file):
+                target = sub_target
+                target_file = init_file
             else:
-                curnode = nextnode
-        return curnode.content, len(uris)
+                ns_paths.append(sub_target)
+    if target:
+        assert target_file
+        return ModuleFindRes(ModuleFindRes.Package, [target], target_file)
+    elif ns_paths:
+        return ModuleFindRes(ModuleFindRes.Namespace, ns_paths, None)
+    else:
+        return None
 
-    def find(self, uri: str, cur_item: 'ImpItem') -> Optional[TypeTemp]:
-        to_imp_uris = urilist_from_impitem(uri, cur_item)
-        return self._find(to_imp_uris)
 
-    def _search_type_file(self, uri: List[str], paths: List[str],
-                          start) -> List[str]:
-        len_uri = len(uri)
-        for i in range(start, len_uri):
-            if not paths:
-                return []
-            ns_paths = []  # namespace packages
-            target = None
-            for path in paths:
-                sub_target = os.path.normpath(os.path.join(path, uri[i]))
+def uri_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> str:
+    return list2uri(urilist_from_impitem(uri, curmodule))
 
-                if i == len_uri - 1:
-                    pyi_file = sub_target + '.pyi'
-                    py_file = sub_target + '.py'
-                    if os.path.isfile(pyi_file):
-                        return [pyi_file]
-                    if os.path.isfile(py_file):
-                        return [py_file]
 
-                if os.path.isdir(sub_target):
-                    init_file = os.path.join(sub_target, '__init__.py')
-                    if os.path.isfile(init_file):
-                        target = sub_target
-                    else:
-                        ns_paths.append(sub_target)
-
-            if target:
-                paths = [target]
-            else:
-                paths = ns_paths
-        return paths
-
-    def _find(self, uris: List[str]) -> Optional[TypeTemp]:
-        res: Optional[TypeTemp]
-        res, i = self.search_imp(uris)
-        if i == 0:
-            return None
-        elif i != len(uris) and isinstance(res, TypePackageTemp):
-            return None
-        else:
-            for sub_name in uris[i:]:
-                if isinstance(res, TypeClassTemp):
-                    res = res.get_type(sub_name)
-                else:
-                    return None
-            return res
+def urilist_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> List[str]:
+    package = uri2list(curmodule.uri)[:-1]  # the package that cur_module in
+    return absolute_urilist(uri, list2uri(package))

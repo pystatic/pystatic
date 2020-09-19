@@ -1,7 +1,6 @@
 import argparse
-import os
 import sys
-from typing import Text, TextIO, List
+from typing import TextIO
 from pystatic.manager import Manager
 
 
@@ -29,7 +28,7 @@ def cmdline(stdout: TextIO, stderr: TextIO):
     if not cmd_res.package:
         cmd_res.package = []
     manager = Manager(cmd_res, cmd_res.module, cmd_res.package, stdout, stderr)
-    manager.check()
+    manager.start_check()
 
 
 if __name__ == '__main__':
