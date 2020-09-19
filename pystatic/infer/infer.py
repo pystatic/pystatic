@@ -4,10 +4,12 @@ from typing import Optional
 from pystatic.typesys import *
 from pystatic.typesys import TypeModuleTemp
 from pystatic.env import Environment
-from pystatic.op_map import *
-from pystatic.type_table import VarTree
+from pystatic.arg import Argument
+from pystatic.infer.op_map import *
+from pystatic.infer.type_table import VarTree
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class BaseVisitor(object):
@@ -18,6 +20,8 @@ class BaseVisitor(object):
         return visitor(node)
 
     def generic_visit(self, node):
+        if node is None:
+            return
         """Called if no explicit visitor function exists for a node."""
         for field, value in ast.iter_fields(node):
             if isinstance(value, list):
@@ -33,6 +37,8 @@ class TypeChecker:
         pass
 
     def check(self, tp1: TypeIns, tp2: TypeIns) -> bool:
+        if tp1.__str__() == "Any":
+            return True
         return tp1.__str__() == tp2.__str__()
 
 
@@ -43,6 +49,7 @@ class ValueParser(BaseVisitor):
         self.module = module
         self.env = env
         self.var_tree = var_tree
+        self.checker = TypeChecker()
 
     def accept(self) -> Optional[TypeIns]:
         return self.visit(self.node)
@@ -50,7 +57,7 @@ class ValueParser(BaseVisitor):
     def visit_Name(self, node):
         tp = self.var_tree.lookup_var(node.id)
         if tp is None:
-            self.env.add_err(node, f"Variable '{node.id}' undefined!")
+            self.env.add_err(node, f"unresolved reference '{node.id}'")
         return tp
 
     def visit_Attribute(self, node):
@@ -86,11 +93,38 @@ class ValueParser(BaseVisitor):
         # TODO
         pass
 
+    def check_argument_in_call(self, node: ast.Call, argument: Argument):
+        arg_list = argument.args
+        param_length = len(node.args)
+        arg_length = len(arg_list)
+        if param_length > arg_length:
+            self.env.add_err(node.args[arg_length], f"unexpected argument")
+            self.env.add_err(node, f"too more argument for '{node.func.id}'")
+            node.args = node.args[:arg_length]
+        elif param_length < arg_length:
+            self.env.add_err(node, f"too few argument for '{node.func.id}'")
+            arg_list = arg_list[:param_length]
+
+        for param, arg in zip(node.args, arg_list):
+            param_tp = self.visit(param)
+            arg_tp = arg.ann
+            res = self.checker.check(arg_tp, param_tp)
+            if not res:
+                self.env.add_err(param, f"expected type \'{arg_tp}\', got \'{param_tp}\' instead")
+
     def visit_Call(self, node: ast.Call):
-        tp = self.var_tree.lookup_cls(node.func.id)
+        # TODO: the action call need a method
+        name = node.func.id
+        tp = self.var_tree.lookup_cls(name)
         if tp is None:
-            self.env.add_err(node, f"class '{node.func.id}' undefined")
-        return tp
+            tp = self.var_tree.lookup_func(name)
+        else:
+            return tp
+        if tp is None:
+            self.env.add_err(node, f"unresolved reference '{name}'")
+        else:
+            self.check_argument_in_call(node, tp.arg)
+            return tp.ret_type
 
 
 class InferVisitor(BaseVisitor):
@@ -116,7 +150,7 @@ class InferVisitor(BaseVisitor):
                 tp = self.var_tree.lookup_var(target.id)
                 if tp is None:  # var appear first time
                     tp = self.cur_module.getattr(target.id)
-                    if tp.__str__() == "Any":  # var with annotation
+                    if tp.__str__() == "Any":  # var with no annotation
                         self.var_tree.add_var(target.id, rtype)
                     else:
                         self.var_tree.add_var(target.id, tp)
@@ -144,15 +178,19 @@ class InferVisitor(BaseVisitor):
         class_type = self.cur_module.getattr(node.name)
         self.var_tree.add_cls(node.name, class_type)
 
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        func_type = self.cur_module.getattr(node.name)
+        self.var_tree.add_func(node.name, func_type)
+
 
 class InferStarter:
     def __init__(self, sources):
         self.sources = sources
 
     def start_infer(self):
-        for target in self.sources:
-            logger.info(f'Type infer in module \'{target.uri}\'')
-            mod_uri = target.uri.replace('.', '/')
+        for uri, target in self.sources.items():
+            logger.info(f'Type infer in module \'{uri}\'')
+            mod_uri = uri.replace('.', '/')
             mod_uri += ".py"
             try:
                 with open(mod_uri) as f:

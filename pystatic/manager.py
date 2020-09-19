@@ -11,9 +11,10 @@ from pystatic.preprocess.preprocess import (collect_type_def, import_type_def,
 from pystatic.module_finder import (ModuleFinder, ModuleFindRes)
 from pystatic.env import Environment
 from pystatic.util import Uri
+from pystatic.infer.infer import InferStarter
 
 logger = logging.getLogger(__name__)
-
+logging.basicConfig(level=logging.DEBUG)
 
 class ReadNsAst(Exception):
     """Try to read a namespace package's ast(which has no __init__.py)"""
@@ -92,6 +93,9 @@ class Manager:
         for target in self.check_targets:
             self.preprocess_target(target)
 
+        inferior = InferStarter(self.targets)
+        inferior.start_infer()
+
         # for debug purpose, will be removed in the future
         for target in self.targets.values():
             for err in target.env.err:
@@ -139,7 +143,7 @@ class Manager:
 
         # cached result
         if uri in self.targets and self.targets[
-                uri].stage >= AnalysisStage.Collected:
+            uri].stage >= AnalysisStage.Collected:
             return self.targets[uri].module
 
         find_res = self.finder.find(uri)
