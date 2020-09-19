@@ -10,6 +10,7 @@ from pystatic.preprocess.preprocess import (collect_type_def, import_type_def,
                                             generate_type_binding)
 from pystatic.error import ErrHandler
 from pystatic.module_finder import ModuleFinder
+from pystatic.infer.infer import InferStarter
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,9 @@ class Manager:
         for target in self.targets:
             logging.info(f'Check {target.uri} {target.src}')
             self.semanal_module(target.src, target.uri)
+
+        inferior=InferStarter(self.targets)
+
 
     def generate_targets(self, srcfiles: List[str], mode: AnalysisMode):
         """Generate AnalysisTarget according to the srcfiles
