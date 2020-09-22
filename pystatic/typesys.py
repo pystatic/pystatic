@@ -74,6 +74,9 @@ class TypeIns(BaseType):
         outer_binds = outer_binds or {}
         return {**outer_binds, **self.binds}
 
+    def setattr(self, name: str, attr: 'TypeIns'):
+        self.temp.setattr(name, attr)
+
     def getattr(self,
                 name: str,
                 outer_binds: Optional[TypeBind] = None) -> Optional['TypeIns']:
