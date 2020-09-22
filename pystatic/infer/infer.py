@@ -30,7 +30,7 @@ class InferVisitor(BaseVisitor):
         self.checker.check(ltype, rtype, node)
 
     def visit_Assign(self, node: ast.Assign):
-        rtype: Optional[TypeIns] = RValueParser(node.value, self.env, self.var_tree).accept()
+        rtype: Optional[TypeIns] = RValueParser(self.env, self.var_tree).accept(node.value)
         if rtype is None:  # some wrong with rvalue
             return
         for target in node.targets:
@@ -51,7 +51,7 @@ class InferVisitor(BaseVisitor):
             return tp
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        rtype: Optional[TypeIns] = RValueParser(node.value, self.env, self.var_tree).accept()
+        rtype: Optional[TypeIns] = RValueParser(self.env, self.var_tree).accept(node.value)
         if rtype is None:
             return
         target = node.target
@@ -77,47 +77,99 @@ class InferVisitor(BaseVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         func_type = self.var_tree.lookup_attr(node.name)
+        self.var_tree.add_func(node.name, func_type)
+        self.var_tree.enter_func(node.name)
+
         self.infer_ret_value_of_func(node, func_type)
         self.var_tree.add_func(node.name, func_type)
 
-    def infer_ret_value_of_func(self, node, func_type):
-        rtype = FunctionDefVisitor(self.env, self.var_tree).accept(node)
+        self.var_tree.leave_func()
 
+    def infer_ret_value_of_func(self, node, func_type):
+        rtype = FunctionDefVisitor(self.env, self.var_tree, func_type.ret_type).accept(node)
         if func_type.ret_type.__str__() == "Any":
-            pass
+            func_type.ret_type = rtype
 
 
 class FunctionDefVisitor(BaseVisitor):
-    def __init__(self, env, var_tree):
+    def __init__(self, env, var_tree, annotation):
         self.env = env
         self.var_tree = var_tree
+        self.annotation = annotation
         self.type_list = []
+        self.checker = TypeChecker(self.env)
 
     def accept(self, node):
         assert isinstance(node, ast.FunctionDef)
         self.visit(node)
-
+        if len(self.type_list) == 0:
+            return any_type
+        elif len(self.type_list) == 1:
+            return self.type_list[0]
+        else:
+            raise Exception(f"todo")
 
     def visit_Return(self, node: ast.Return):
-        tp = RValueParser(node.value, self.env, self.var_tree)
+        tp = RValueParser(self.env, self.var_tree).accept(node.value)
+        self.checker.check(self.annotation, tp, node.value)
         if tp not in self.type_list:
             self.type_list.append(tp)
 
-    class InferStarter:
-        def __init__(self, sources):
-            self.sources = sources
 
-        def start_infer(self):
-            for uri, target in self.sources.items():
-                logger.info(f'Type infer in module \'{uri}\'')
-                mod_uri = uri.replace('.', '/')
-                mod_uri += ".py"
-                try:
-                    with open(mod_uri) as f:
-                        data = f.read()
-                except FileNotFoundError:
-                    logger.error(f'file \'{mod_uri}\' not found')
-                    continue
-                node = ast.parse(data)
-                infer_visitor = InferVisitor(node, target.module, target.env)
-                infer_visitor.infer()
+class InferStarter:
+    def __init__(self, sources):
+        self.sources = sources
+
+    def start_infer(self):
+        for uri, target in self.sources.items():
+            logger.info(f'Type infer in module \'{uri}\'')
+            mod_uri = uri.replace('.', '/')
+            mod_uri += ".py"
+            try:
+                with open(mod_uri) as f:
+                    data = f.read()
+            except FileNotFoundError:
+                logger.error(f'file \'{mod_uri}\' not found')
+                continue
+            node = ast.parse(data)
+            infer_visitor = InferVisitor(node, target.module, target.env)
+            infer_visitor.infer()
+            # DisplayVar(target.env, node).accept()
+
+class DisplayVar(BaseVisitor):
+    def __init__(self, env: Environment, ast_rt: ast.AST):
+        self.env = env
+        self.ast_rt = ast_rt
+        self.curscope = self.env.module
+        self.tab = 0
+
+    def accept(self):
+        print(" "*self.tab, self.curscope.name)
+        self.tab += 4
+        print(" "*self.tab, "attribute in this scope")
+        for var in self.curscope.cls_attr.keys():
+            print(" "*self.tab, var, self.curscope.cls_attr[var])
+        self.visit(self.ast_rt)
+        self.tab -= 4
+
+    def visit_ClassDef(self, node: ast.ClassDef):
+        self.displayscopeattribute('class', node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        self.displayscopeattribute('function', node)
+
+    def displayscopeattribute(self, whichtype, node):
+        curscopetmp = self.curscope
+        self.curscope = self.curscope.getattr(node.name)
+        print(" "*self.tab, "below is {} scope".format(whichtype))
+        if isinstance(node, ast.ClassDef):
+            print(" "*self.tab, self.curscope.name)
+        else:
+            print(" "*self.tab, node.name, self.curscope)
+        self.tab += 4
+        for var in self.curscope.temp.cls_attr.keys():
+            print(" "*self.tab, var, self.curscope.temp.cls_attr[var])
+        for bodynode in node.body:
+            self.visit(self.ast_rt)
+        self.tab -= 4
+        self.curscope = curscopetmp

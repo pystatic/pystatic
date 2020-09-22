@@ -8,17 +8,16 @@ from pystatic.infer.checker import TypeChecker
 
 
 class ValueParser(BaseVisitor):
-    def __init__(self, node, env: Environment,
+    def __init__(self, env: Environment,
                  var_tree: VarTree):
-        self.node = node
         self.env = env
         self.var_tree = var_tree
         self.checker = TypeChecker(self.env)
 
 
 class LValueParser(ValueParser):
-    def __init__(self, node, env: Environment, var_tree: VarTree, rtype):
-        super().__init__(node, env, var_tree)
+    def __init__(self, env: Environment, var_tree: VarTree, rtype):
+        super().__init__(env, var_tree)
         self.single_name_node = False
         self.rtype = rtype
 
@@ -27,20 +26,22 @@ class LValueParser(ValueParser):
             self.single_name_node = True
         return self.visit(node)
 
-    def visit_Name(self, node: ast.Name):
-        self.var_tree.move_to_symbol(node.id)
-
 
 class RValueParser(ValueParser):
-    def __init__(self, node, env: Environment, var_tree: VarTree):
-        super().__init__(node, env, var_tree)
+    def __init__(self, env: Environment, var_tree: VarTree):
+        super().__init__(env, var_tree)
 
-    def accept(self) -> Optional[TypeIns]:
-        return self.visit(self.node)
+    def accept(self, node) -> Optional[TypeIns]:
+        return self.visit(node)
 
     def visit_Name(self, node):
+        if node.id == "self":
+            tp = self.var_tree.upper_class()
+            if tp is not None:
+                return tp
         tp = self.var_tree.lookup_attr(node.id)
-        if tp is None:
+
+        if not tp:
             self.env.add_err(node, f"unresolved reference '{node.id}'")
         return tp
 
@@ -71,7 +72,6 @@ class RValueParser(ValueParser):
     def visit_Subscirbe(self, node: ast.Subscript):
         # TODO
         pass
-        # out_list=self.visit(node.value)
 
     def visit_Constant(self, node: ast.Constant):
         # TODO

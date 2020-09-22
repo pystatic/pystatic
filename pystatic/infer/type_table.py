@@ -3,7 +3,7 @@ from enum import Enum
 from pystatic.typesys import *
 
 
-class SymbolType(Enum):
+class ScopeType(Enum):
     GLOBAL_TYPE = 0
     LOCAL_TYPE = 1
     NON_LOCAL_TYPE = 2
@@ -11,19 +11,18 @@ class SymbolType(Enum):
     VAR_TYPE = 4
 
 
-class Symbol:
-    def __init__(self, name: str, tp: TypeIns, parent: "Symbol",
-                 symbol_type: SymbolType):
+class Scope:
+    def __init__(self, name: str, tp: TypeIns, parent: "Scope",
+                 scope_type: ScopeType):
         self.name = name
         self.tp = tp
-        self.symbol_type = symbol_type
+        self.scope_type = scope_type
         self.parent = parent
 
-        self.discovered = True
-        self.attr: Dict[str, Symbol] = {}
+        self.attr: Dict[str, Scope] = {}
 
-    def add_attr(self, name: str, symbol: "Symbol"):
-        self.attr[name] = symbol
+    def add_attr(self, name: str, scope: "Scope"):
+        self.attr[name] = scope
 
     def get_attr(self, name: str):
         return self.tp.getattr(name)
@@ -32,17 +31,17 @@ class Symbol:
         self.tp.setattr(name, tp)
 
     def get_cls(self, name):
-        symbol = self.attr.get(name)
-        assert symbol is not None
-        assert symbol.symbol_type == SymbolType.CLASS_TYPE
-        return symbol
+        scope = self.attr.get(name)
+        assert scope is not None
+        assert scope.scope_type == ScopeType.CLASS_TYPE
+        return scope
 
     def get_func(self, name):
-        symbol = self.attr.get(name)
-        assert symbol is not None
-        assert symbol.symbol_type == SymbolType.LOCAL_TYPE or \
-               symbol.symbol_type == SymbolType.NON_LOCAL_TYPE
-        return symbol
+        scope = self.attr.get(name)
+        assert scope is not None
+        assert scope.scope_type == ScopeType.LOCAL_TYPE or \
+               scope.scope_type == ScopeType.NON_LOCAL_TYPE
+        return scope
 
     def is_defined(self, name) -> bool:
         return name in self.attr
@@ -50,40 +49,59 @@ class Symbol:
 
 class VarTree:
     def __init__(self, module: TypeModuleTemp):
-        self.root = Symbol(module.name, module, None, SymbolType.GLOBAL_TYPE)
-        self.cur_symbol: Symbol = self.root
+        self.root = Scope(module.name, module, None, ScopeType.GLOBAL_TYPE)
+        self.cur_scope: Scope = self.root
         self.in_func = False
 
+    @property
+    def upper_class(self):
+        tmp_scope = self.cur_scope
+        while tmp_scope:
+            if tmp_scope.scope_type == ScopeType.CLASS_TYPE:
+                return tmp_scope.tp
+            tmp_scope = tmp_scope.parent
+        return None
+
     def add_cls(self, name, tp):
-        symbol = Symbol(name, tp, self.cur_symbol, SymbolType.CLASS_TYPE)
-        self.cur_symbol.add_attr(name, symbol)
+        scope = Scope(name, tp, self.cur_scope, ScopeType.CLASS_TYPE)
+        self.cur_scope.add_attr(name, scope)
 
     def add_var(self, name, tp):
-        symbol = Symbol(name, tp, self.cur_symbol, SymbolType.VAR_TYPE)
-        self.cur_symbol.add_attr(name, symbol)
-        self.cur_symbol.set_attr(name, tp)
+        scope = Scope(name, tp, self.cur_scope, ScopeType.VAR_TYPE)
+        self.cur_scope.add_attr(name, scope)
+        self.cur_scope.set_attr(name, tp)
 
     def add_func(self, name, tp):
         if self.in_func:
-            symbol = Symbol(name, tp, self.cur_symbol, SymbolType.NON_LOCAL_TYPE)
+            scope = Scope(name, tp, self.cur_scope, ScopeType.NON_LOCAL_TYPE)
         else:
-            symbol = Symbol(name, tp, self.cur_symbol, SymbolType.LOCAL_TYPE)
-        self.cur_symbol.add_attr(name, symbol)
+            scope = Scope(name, tp, self.cur_scope, ScopeType.LOCAL_TYPE)
+        self.cur_scope.add_attr(name, scope)
 
     def enter_cls(self, name):
-        self.cur_symbol = self.cur_symbol.get_cls(name)
+        self.cur_scope = self.cur_scope.get_cls(name)
 
     def leave_cls(self):
-        self.cur_symbol = self.cur_symbol.parent
+        self.cur_scope = self.cur_scope.parent
 
     def enter_func(self, name):
-        self.cur_symbol = self.cur_symbol.get_func(name)
+        self.cur_scope = self.cur_scope.get_func(name)
 
     def leave_func(self):
         self.leave_cls()
 
     def lookup_attr(self, name):
-        return self.cur_symbol.get_attr(name)
+        tp = self.cur_scope.get_attr(name)
+        if tp:
+            return tp
+        tmp_scope = self.cur_scope.parent
+        while tmp_scope:
+            if tmp_scope.scope_type == ScopeType.LOCAL_TYPE\
+                    or tmp_scope.scope_type == ScopeType.GLOBAL_TYPE:
+                tp = tmp_scope.get_attr(name)
+                if tp:
+                    return tp
+            tmp_scope = tmp_scope.parent
 
     def is_defined(self, name):
-        return self.cur_symbol.is_defined(name)
+        return self.cur_scope.is_defined(name)
