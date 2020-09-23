@@ -92,7 +92,7 @@ class Manager:
             for target in targets:
                 self.pre_queue.append(target)
 
-        to_check = []
+        to_check: List[Target] = []
         while len(self.pre_queue) > 0:
             current = self.pre_queue[0]
             self.pre_queue.popleft()
@@ -108,7 +108,9 @@ class Manager:
             preprocess.resolve_import_type(target.symtable, self)
 
         preprocess.resolve_cls_def(to_check)
-        # preprocess.resolve_typeins(to_check)
+
+        for target in to_check:
+            preprocess.resolve_typeins(target.symtable)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""

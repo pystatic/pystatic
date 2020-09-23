@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SpecialTypeKind(enum.Enum):
-    """Special types
+class STPKind(enum.Enum):
+    """SpecialType kind
 
     TypeVar, TypeAlias...
     """
@@ -24,34 +24,39 @@ class SpecialTypeKind(enum.Enum):
     TypeAlias = 2
 
 
-def try_special_type(node: Union[ast.Assign,
-                                 ast.AnnAssign], vardict: Dict[str, Entry],
-                     symtable: SymTable, mbox: 'MessageBox') -> bool:
-    s_type = get_special_type_kind(node)
+def record_stp(node: Union[ast.Assign, ast.AnnAssign], symtable: SymTable):
+    s_type = get_stp_kind(node)
     if not s_type:
         return False
     else:
-        analyse_special_type(s_type, node, vardict, symtable, mbox)
-        return True
+        if s_type == STPKind.TypeVar:
+            assert isinstance(node.value, ast.Call)
+            name = get_typevar_name(node.value)
+            # FIXME: the defnode given here is incorrect
+            entry = Entry(TypeVar(name).get_default_type(), node.value)
+            symtable.add_entry(name, entry)
+            logger.debug(f'add TypeVar {name}')
+            return True
+        else:
+            assert 0, "not implemented yet"
+            return False  # to suppress type warnings...
 
 
-def get_special_type_kind(
-        node: Union[ast.Assign, ast.AnnAssign]) -> Optional[SpecialTypeKind]:
+def get_stp_kind(node: Union[ast.Assign, ast.AnnAssign]) -> Optional[STPKind]:
     """Return the kind of assignment node, if it's a normal assignment(not TypeVar,
     TypeAlias...), then return None"""
     if isinstance(node.value, ast.Call):
         if isinstance(node.value.func, ast.Name):
             fname = node.value.func.id
             if fname == 'TypeVar':
-                return SpecialTypeKind.TypeVar
+                return STPKind.TypeVar
     return None
 
 
-def analyse_special_type(kind: SpecialTypeKind, node: Union[ast.Assign,
-                                                            ast.AnnAssign],
+def analyse_special_type(kind: STPKind, node: Union[ast.Assign, ast.AnnAssign],
                          vardict: Dict[str, Entry], symtable: SymTable,
                          mbox: 'MessageBox'):
-    if kind == SpecialTypeKind.TypeVar:
+    if kind == STPKind.TypeVar:
         analyse_typevar(node, vardict, symtable, mbox)
     else:
         assert 0, "Not implemented yet"

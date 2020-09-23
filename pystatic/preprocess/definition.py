@@ -1,21 +1,21 @@
 import ast
+import logging
 from contextlib import contextmanager
-from typing import Dict, Union, List, Tuple
+from typing import Dict, Union, List, Tuple, Optional
 from collections import OrderedDict
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeClassTemp, TypeType, TypeIns, any_ins,
                               TYPE_CHECKING)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope
-from pystatic.preprocess.annotation import (parse_annotation,
-                                            parse_comment_annotation,
-                                            InvalidAnnSyntax)
-from pystatic.preprocess.special_type import get_special_type_kind, try_special_type
+from pystatic.preprocess.special_type import record_stp
 from pystatic.preprocess.impt import split_import_stmt
-from pystatic.uri import Uri, rel2absuri, uri_parent
+from pystatic.uri import Uri
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
+
+logger = logging.getLogger(__name__)
 
 
 class TypeDefVisitor(BaseVisitor):
@@ -47,16 +47,32 @@ class TypeDefVisitor(BaseVisitor):
         self._is_class = old_is_class
         self._clstemp = old_clstemp
 
-    # def record_special_type(self, node: Union[ast.Assign, ast.AnnAssign]):
-    #     kind = get_special_type_kind(node)
-    #     if kind:
-    #         pass
+    def _is_new_def(self, node: ast.AST) -> Optional[str]:
+        """Whether the node stands for a new definition"""
+        if isinstance(node, ast.Name):
+            if self.symtable.lookup_local_entry(node.id) is None:
+                return node.id
+            else:
+                return None
+        return None
 
-    # def visit_Assign(self, node: ast.Assign):
-    #     self.record_special_type(node)
+    def visit_Assign(self, node: ast.Assign):
+        # TODO: here we haven't add redefine warning and check consistence, the
+        # def node is also incorrect
+        if not record_stp(node, self.symtable):
+            for target in node.targets:
+                name = self._is_new_def(target)
+                if name:
+                    self.symtable.add_entry(name, Entry(None, node))
+                    logger.debug(f'add variable {name}')
 
-    # def visit_AnnAssign(self, node: ast.AnnAssign):
-    #     self.record_special_type(node)
+    def visit_AnnAssign(self, node: ast.AnnAssign):
+        if not record_stp(node, self.symtable):
+            name = self._is_new_def(node.target)
+            if name:
+                self.symtable.add_entry(name, Entry(None, node,
+                                                    node.annotation))
+                logger.debug(f'add variable {name}')
 
     def visit_ClassDef(self, node: ast.ClassDef):
         clsname = node.name
@@ -93,61 +109,3 @@ class TypeDefVisitor(BaseVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         pass
-
-
-# def deal_vardict(self, vardict: Dict[str, Entry]):
-#     pass
-#     # for key, val in vardict.items():
-#     #     entry = self.symtable.lookup_local_entry(key)
-#     #     if entry:
-#     #         if get_entry_type_name(entry.get_real_type()) == 'typing.Any':
-#     #             self.symtable.add_entry(key, val)
-#     #         else:
-#     #             assert val.defnode
-#     #             self.mbox.add_err(val.defnode, f'{key} is already defined')
-#     #     else:
-#     #         self.symtable.add_entry(key, val)
-
-# def _def_visitAssign(self, node: ast.Assign) -> Dict[str, Entry]:
-#     """Get the variables defined in an ast.Assign node"""
-#     # NOTE: current implementation is wrong
-#     vardict: Dict[str, Entry] = OrderedDict()
-#     if try_special_type(node, vardict, self.symtable, self.mbox):
-#         return vardict
-#     else:
-#         comment = node.type_comment
-#         if comment:
-#             try:
-#                 comment_type = parse_comment_annotation(
-#                     comment, self.symtable)
-#                 if isinstance(comment_type, TypeIns):
-#                     assert isinstance(comment_type, TypeType)
-#                     comment_ins = comment_type.getins()
-#                 else:
-#                     comment_ins = None
-#                 for sub_node in reversed(node.targets):
-#                     if isinstance(sub_node, ast.Name):
-#                         vardict[sub_node.id] = Entry(sub_node, comment_ins)
-#             except InvalidAnnSyntax:
-#                 self.mbox.add_err(node, f'annotation syntax error')
-#         return vardict
-
-# def _def_visitAnnAssign(self, node: ast.AnnAssign) -> Dict[str, Entry]:
-#     """Get the variables defined in an ast.AnnAssign node"""
-#     # NOTE: current implementation may be wrong
-#     vardict = OrderedDict()
-#     if isinstance(node.target, ast.Name):
-#         if try_special_type(node, vardict, self.symtable, self.mbox):
-#             return vardict
-#         else:
-#             try:
-#                 ann_type = parse_annotation(node.annotation, self.symtable)
-#                 if ann_type:
-#                     assert isinstance(ann_type, TypeType)
-#                     ann_ins = ann_type.getins()
-#                 else:
-#                     ann_ins = None  # defer
-#                 vardict[node.target.id] = Entry(node, ann_ins)
-#             except InvalidAnnSyntax:
-#                 self.mbox.add_err(node, f'annotation syntax error')
-#     return vardict

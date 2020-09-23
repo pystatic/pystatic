@@ -21,9 +21,13 @@ EntryType = Optional[Union['TypeIns', ImportItem]]
 
 
 class Entry:
-    def __init__(self, tp: EntryType, defnode: Optional[ast.AST] = None):
+    def __init__(self,
+                 tp: EntryType,
+                 defnode: Optional[ast.AST] = None,
+                 tpnode: Optional[ast.AST] = None):
         self._tp = tp
         self._defnode = defnode
+        self._typenode = tpnode
 
     def set_type(self, tp: EntryType):
         self._tp = tp
@@ -36,6 +40,12 @@ class Entry:
 
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
+
+    def set_typenode(self, tpnode: ast.AST):
+        self._typenode = tpnode
+
+    def get_typenode(self) -> Optional[ast.AST]:
+        return self._typenode
 
 
 class SymTable:

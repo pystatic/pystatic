@@ -1,10 +1,8 @@
-from optparse import Option
 import sys
 import os
 import inspect
 from typing import List, Optional, Type, Tuple
 
-from pkg_resources import require
 from pystatic.sitepkg import get_sitepkg
 
 PY_VERSION = Tuple[int, int]
