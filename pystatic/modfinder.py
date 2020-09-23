@@ -1,7 +1,7 @@
 import os
 from pystatic.config import PY_VERSION
 from typing import List, Dict, Optional, TYPE_CHECKING
-from pystatic.moduri import uri2list, absolute_urilist, list2uri
+from pystatic.uri import uri2list, absolute_urilist, list2uri
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeModuleTemp

@@ -1,8 +1,9 @@
 import ast
 import copy
+from pystatic.symtable import SymTable
 from typing import Optional, Dict, List, Tuple, Union, Set, TYPE_CHECKING
 from collections import OrderedDict
-from pystatic.moduri import ModUri
+from pystatic.uri import Uri
 
 TypeContext = Dict['TypeVar', 'TypeType']
 TypeVarList = List['TypeVar']
@@ -87,7 +88,7 @@ class TypeVar(TypeTemp):
     def __init__(self,
                  name: str,
                  *args: 'TypeIns',
-                 bound: Optional['Entry'] = None,
+                 bound: Optional['TypeIns'] = None,
                  covariant=False,
                  contravariant=False):
         super().__init__(name)
@@ -101,7 +102,7 @@ class TypeVar(TypeTemp):
         else:
             self.invariant = True
         self.contravariant = contravariant
-        self.constrains: List['Entry'] = list(*args)
+        self.constrains: List['TypeIns'] = list(*args)
 
 
 class TypeIns(BaseType):
@@ -169,18 +170,42 @@ class TypeType(TypeIns):
 
 
 class TypeClassTemp(TypeTemp):
-    def __init__(self, clsname: str):
+    # FIXME: remove None of symtable and defnode
+    def __init__(self,
+                 clsname: str,
+                 symtable: 'SymTable' = None,
+                 defnode: ast.ClassDef = None):
         super().__init__(clsname)
 
-        self.baseclass: 'OrderedDict[str, Entry]'
-        self.baseclass = OrderedDict()
+        self.baseclass: 'List[TypeType]'
+        self.baseclass = []
 
-        self.cls_attr: Dict[str, 'Entry'] = {}
-        self.var_attr: Dict[str, 'Entry'] = {}
-        self.method: Dict[str, 'Entry'] = {}
+        self.var_attr: Dict[str, 'TypeIns'] = {}
+        self.method: Dict[str, 'TypeIns'] = {}
+
+        self._inner_symtable = None
+        self._in_symtable = symtable
+        self._defnode = defnode
+
+    def set_inner_symtable(self, symtable):
+        self._inner_symtable = symtable
+
+    def get_inner_symtable(self) -> 'SymTable':
+        assert self._inner_symtable
+        return self._inner_symtable
+
+    def get_def_symtable(self) -> 'SymTable':
+        return self._in_symtable
+
+    def get_defnode(self) -> ast.ClassDef:
+        return self._defnode
 
     def add_typevar(self, typevar: TypeVar):
         self.placeholders.append(typevar)
+
+    def add_base(self, basetype: 'TypeType'):
+        if basetype not in self.baseclass:
+            self.baseclass.append(basetype)
 
     def _bind_placeholders(self,
                            bindlist) -> Tuple[TypeContext, 'GetItemError']:
@@ -212,67 +237,48 @@ class TypeClassTemp(TypeTemp):
 
             return binds, binderr
 
-    def add_base(self, name: str, entry: 'Entry'):
-        self.baseclass[name] = entry
-
-    def add_method(self, name: str, method_type: 'Entry'):
+    def add_method(self, name: str, method_type: 'TypeIns'):
         self.method[name] = method_type
 
-    def add_var(self, name: str, entry: 'Entry'):
-        self.var_attr[name] = entry
-
-    def add_clsvar(self, name: str, entry: 'Entry'):
-        self.cls_attr[name] = entry
+    def add_var(self, name: str, var_type: 'TypeIns'):
+        self.var_attr[name] = var_type
 
     def get_local_attr(
             self,
             name: str,
             binds: Optional[TypeContext] = None) -> Optional['TypeIns']:
         if name in self.var_attr:
-            return self.var_attr[name].get_type()
-        elif name in self.cls_attr:
-            return self.cls_attr[name].get_type()
-        return None
+            return self.var_attr[name]
+        else:
+            return self._in_symtable.lookup_local(name)
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
-        assert 0, "This function should not be called, use add_var or add_clsvar instead"
-        self.add_clsvar(name, Entry(attr_type))
+        assert 0, "This function should not be called, use add_var or instead"
 
     def getattribute(self, name: str, bindlist: BindList,
                      context: Optional[TypeContext]) -> Optional['TypeIns']:
         # FIXME: current implementation doesn't cope bindlist, context and baseclasses
         res = self.get_local_attr(name)
-        if not res:
-            for base_entry in self.baseclass.values():
-                basecls = base_entry.get_real_type()
-                if isinstance(basecls, TypeType):
-                    res = basecls.temp.getattribute(name, bindlist, context)
-                    if res:
-                        return res
         return res
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: ModUri, types: Dict[str, TypeTemp],
-                 local: Dict[str, TypeIns]):
-        super().__init__(uri)
-        assert 0, "not implemented yet"
-        # for tpname in types.keys():
-        #     tpres = types[tpname].get_default_type()
-        #     assert tpres
-        #     if tpres:
-        #         self.cls_attr[tpname] = tpres
-        # self.cls_attr.update(local)
+    def __init__(self, uri: Uri, symtable: 'SymTable'):
+        super().__init__(uri, symtable)
 
     @property
     def uri(self):
         return self.name
 
+    def get_type_def(self, name: str) -> Optional['TypeClassTemp']:
+        """Get types defined inside the symtable, support name like A, A.B"""
+        return self.get_def_symtable().get_type_def(name)
+
 
 class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], uri: ModUri, tp: Dict[str, TypeTemp],
-                 local: Dict[str, TypeIns]):
-        super().__init__(uri, tp, local)
+    def __init__(self, paths: List[str], uri: Uri):
+        assert 0, "not implemented yet"
+        super().__init__(uri)
         self.paths = paths
 
 
@@ -376,7 +382,20 @@ class TypeCallableTemp(TypeTemp):
 
 class TypeGenericTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Generic')
+        super().__init__('typing.Generic')
+
+    def _bind_placeholders(self,
+                           bindlist: BindList) -> Tuple[list, 'GetItemError']:
+        binderr: GetItemError = GetItemError()
+        new_bindlist = []
+        for i, bind_item in enumerate(bindlist):
+            if isinstance(bind_item, TypeType) and isinstance(
+                    bind_item.temp, TypeVar):
+                new_bindlist.append(bind_item)
+            else:
+                assert 0, "For temporary test"
+                binderr.add_error(i, f'a type is required')
+        return new_bindlist, binderr
 
 
 class TypeDummyTemp(TypeTemp):
@@ -415,82 +434,3 @@ ellipsis_ins = ellipsis_type.call()
 
 # dummy, used for test
 dummy_temp = TypeDummyTemp()
-
-# defer related
-
-DeferBindEle = Union['Deferred', List['Deferred']]
-
-
-class DeferredBindList:
-    def __init__(self) -> None:
-        self.binding: List[DeferBindEle] = []
-
-    def add_binded(self, binded: Union['DeferredElement',
-                                       DeferBindEle]) -> None:
-        if isinstance(binded, DeferredElement):
-            defer = Deferred()
-            defer.add_element(binded)
-            self.binding.append(defer)
-            return
-        assert isinstance(binded, (Deferred, list))
-        self.binding.append(binded)
-
-    def get_bind(self, index: int) -> Union['Deferred', List['Deferred']]:
-        return self.binding[index]
-
-    def get_bind_cnt(self) -> int:
-        return len(self.binding)
-
-
-class DeferredElement:
-    def __init__(self, name: str, bindlist: 'DeferredBindList'):
-        self.name = name
-        self.bindlist = bindlist
-
-    def get_bind(self, index: int) -> DeferBindEle:
-        return self.bindlist.get_bind(index)
-
-    def get_bind_cnt(self) -> int:
-        return self.bindlist.get_bind_cnt()
-
-
-class Deferred:
-    def __init__(self) -> None:
-        self.elements: List[DeferredElement] = []
-
-    def add_element(self, item: DeferredElement):
-        assert isinstance(item, DeferredElement)
-        self.elements.append(item)
-
-    def get(self, index: int) -> DeferredElement:
-        return self.elements[index]
-
-
-EntryType = Union[TypeIns, Deferred]
-
-
-class Entry:
-    def __init__(self, tp: EntryType, defnode: Optional[ast.AST] = None):
-        # TODO: turn defnode to non-optional
-        self.tp = tp
-        self.defnode = defnode
-
-    def get_type(self) -> TypeIns:
-        if isinstance(self.tp, Deferred):
-            return any_ins
-        else:
-            return self.tp
-
-    def get_real_type(self) -> EntryType:
-        return self.tp
-
-    def set_type(self, entry_tp: EntryType):
-        self.tp = entry_tp
-
-
-# helper functions
-def get_entry_type_name(entry_tp: EntryType) -> str:
-    if isinstance(entry_tp, Deferred):
-        return entry_tp.get(0).name
-    else:
-        return entry_tp.name

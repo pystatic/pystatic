@@ -1,10 +1,10 @@
 from pystatic.env import Environment
-from pystatic.symtable import SymTable, Tabletype, Entry
+from pystatic.symtable import SymTable, TableScope, Entry
 from pystatic.typesys import (float_temp, int_temp, str_temp, bool_temp,
                               generic_temp, dummy_temp, callable_temp,
                               ellipsis_type)
 
-builtin_symtable = SymTable(None, None, None, Tabletype.GLOB)  # type: ignore
+builtin_symtable = SymTable(None, None, None, TableScope.GLOB)  # type: ignore
 builtin_symtable.glob = builtin_symtable
 builtin_symtable.builtins = builtin_symtable
 
@@ -28,6 +28,6 @@ def get_init_env() -> Environment:
         None,  # type: ignore
         None,
         builtin_symtable,
-        Tabletype.GLOB)
+        TableScope.GLOB)
     new_symtable.glob = new_symtable
     return Environment(new_symtable)

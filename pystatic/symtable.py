@@ -1,19 +1,46 @@
 import ast
 import enum
-from typing import (Dict, Optional, Union, List, Set)
-from pystatic.typesys import TypeIns, any_ins, TypeClassTemp, Entry
+from collections import OrderedDict
+from typing import (Dict, Optional, Union, List, Set, TYPE_CHECKING, Tuple)
+
+if TYPE_CHECKING:
+    from pystatic.typesys import TypeIns, TypeClassTemp, TypeTemp
+    from pystatic.uri import Uri
 
 
-class Tabletype(enum.Enum):
+class TableScope(enum.Enum):
     GLOB = 1
     CLASS = 2
     FUNC = 3
 
 
+AsName = str
+OriginName = str
+ImportItem = Tuple[AsName, OriginName]  # (moduri, name)
+EntryType = Optional[Union['TypeIns', ImportItem]]
+
+
+class Entry:
+    def __init__(self, tp: EntryType, defnode: Optional[ast.AST] = None):
+        self._tp = tp
+        self._defnode = defnode
+
+    def set_type(self, tp: EntryType):
+        self._tp = tp
+
+    def get_type(self) -> EntryType:
+        return self._tp
+
+    def set_defnode(self, defnode: ast.AST):
+        self._defnode = defnode
+
+    def get_defnode(self) -> Optional[ast.AST]:
+        return self._defnode
+
+
 class SymTable:
-    """Symbol table"""
     def __init__(self, glob: 'SymTable', non_local: Optional['SymTable'],
-                 builtins: 'SymTable', table_type: 'Tabletype') -> None:
+                 builtins: 'SymTable', scope: 'TableScope') -> None:
         self.local: Dict[str, Entry] = {}
         self.non_local = non_local
         self.glob = glob
@@ -21,14 +48,28 @@ class SymTable:
 
         self.anonymous_entry: Set[Entry] = set()
 
-        self.table_type = table_type
+        self.scope = scope
 
-        self.subtables = set()
+        self.type_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
 
-        self.attach: Optional[TypeClassTemp] = None
+        self.import_info: Dict['Uri', List[ImportItem]] = {}
 
-    def set_attach(self, tp_temp: 'TypeClassTemp'):
-        self.attach = tp_temp
+    def add_type_def(self, name: str, temp: 'TypeClassTemp'):
+        self.type_defs[name] = temp
+
+    def get_type_def(self, name: str) -> Optional['TypeClassTemp']:
+        """Get types defined inside the symtable, support name like A, A.B"""
+        findlist = name.split('.')
+        assert findlist
+        cur_symtable = self
+        cur_temp = None
+        for i, item in enumerate(findlist):
+            cur_temp = cur_symtable.type_defs.get(findlist[i])
+            if cur_temp:
+                cur_symtable = cur_temp.get_inner_symtable()
+            else:
+                return None
+        return cur_temp
 
     def _legb_lookup(self, name: str, find):
         curtable = self
@@ -51,10 +92,7 @@ class SymTable:
         res = self.local.get(name)
         if not res:
             return None
-        res = res.tp
-        if not isinstance(res, TypeIns):  # Deferred
-            return any_ins
-        return res
+        return res.get_type()
 
     def lookup(self, name: str) -> Optional['TypeIns']:
         return self._legb_lookup(name, SymTable.lookup_local)
@@ -70,13 +108,18 @@ class SymTable:
 
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
-        if self.attach and self.table_type == Tabletype.CLASS:
-            self.attach.add_clsvar(name, entry)
 
-    def add_anon_entry(self, entry: 'Entry'):
-        """Add anonymous entry(mainly used for remove defer)"""
-        self.anonymous_entry.add(entry)
+    def add_import_item(self, name: str, uri: 'Uri', origin_name: str,
+                        defnode: ast.AST):
+        """Add import information to the symtable"""
+        self.local[name] = Entry(None, defnode)  # TODO: name collision?
+        self.import_info.setdefault(uri, []).append((name, origin_name))
 
-    def add_subtable(self, symtable: 'SymTable'):
-        assert symtable.table_type != Tabletype.GLOB
-        self.subtables.add(symtable)
+    def new_symtable(self, new_scope: 'TableScope') -> 'SymTable':
+        builtins = self.builtins
+        if self.scope == TableScope.CLASS:
+            non_local = self.non_local
+        else:
+            non_local = self
+        glob = self.glob
+        return SymTable(glob, non_local, builtins, new_scope)

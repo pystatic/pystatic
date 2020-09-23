@@ -1,10 +1,10 @@
 import os
 from typing import List
 
-ModUri = str
+Uri = str
 
 
-def count_uri_head_dots(uri: ModUri) -> int:
+def count_uri_head_dots(uri: Uri) -> int:
     """find out how many dots at the begining of a uri"""
     i = 0
     while len(uri) > i and uri[i] == '.':
@@ -12,27 +12,27 @@ def count_uri_head_dots(uri: ModUri) -> int:
     return i
 
 
-def uri2list(uri: ModUri) -> List[str]:
+def uri2list(uri: Uri) -> List[str]:
     return [item for item in uri.split('.') if item != '']
 
 
-def list2uri(urilist: List[str]) -> ModUri:
+def list2uri(urilist: List[str]) -> Uri:
     return '.'.join(urilist)
 
 
-def uri_parent(uri: ModUri) -> ModUri:
+def uri_parent(uri: Uri) -> Uri:
     """Return the parent uri(a.b.c -> a.b, a -> ''), uri should be absolute"""
     return '.'.join(uri2list(uri)[:-1])
 
 
-def uri_last(uri: ModUri) -> str:
+def uri_last(uri: Uri) -> str:
     """Return the last(a.b.c -> c, a -> a)"""
     if not uri:
         return ''
     return uri2list(uri)[-1]
 
 
-def absolute_urilist(uri: ModUri, cur_uri: ModUri) -> List[str]:
+def absolute_urilist(uri: Uri, cur_uri: Uri) -> List[str]:
     i = count_uri_head_dots(uri)
     if i == 0:  # the uri itself is an absolute uri
         return uri2list(uri)
@@ -44,7 +44,7 @@ def absolute_urilist(uri: ModUri, cur_uri: ModUri) -> List[str]:
             return uri2list(cur_uri)[:-(i // 2)] + rel_uri
 
 
-def relpath2uri(prefix_path: str, src_path: str) -> ModUri:
+def relpath2uri(prefix_path: str, src_path: str) -> Uri:
     """Generate uri from the path
 
     Example:
@@ -60,7 +60,7 @@ def relpath2uri(prefix_path: str, src_path: str) -> ModUri:
     return '.'.join(relpath.split(os.path.sep))
 
 
-def rel2absuri(cur_uri: ModUri, rel_uri: ModUri):
+def rel2absuri(cur_uri: Uri, rel_uri: Uri):
     i = count_uri_head_dots(rel_uri)
     if i == 0:
         return rel_uri

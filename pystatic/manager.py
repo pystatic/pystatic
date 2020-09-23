@@ -2,15 +2,16 @@ import os
 import ast
 import logging
 import enum
+from collections import deque
 from pystatic.symtable import SymTable
 from pystatic.message import MessageBox
-from typing import Optional, List, TextIO, Set, Dict
+from typing import Optional, List, TextIO, Set, Dict, Union, Deque
 from pystatic import preprocess
 from pystatic.typesys import TypeModuleTemp, TypePackageTemp
 from pystatic.config import Config
 from pystatic.modfinder import (ModuleFinder, ModuleFindRes)
 from pystatic.env import Environment
-from pystatic.moduri import ModUri, relpath2uri, uri2list
+from pystatic.uri import Uri, relpath2uri, uri2list
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +22,14 @@ class ReadNsAst(Exception):
 
 class Stage(enum.IntEnum):
     """Number ascends as the analysis going deeper"""
-    Parse = 0
-    Symtable = 1
+    PreParse = 0
+    PreSymtable = 1
     Deffer = 2
     Check = 4
 
 
 class Target:
-    def __init__(self, uri: ModUri, stage: Stage = Stage.Parse):
+    def __init__(self, uri: Uri, stage: Stage = Stage.PreParse):
         self.uri = uri
         self.stage = stage
 
@@ -36,12 +37,13 @@ class Target:
         ).symtable  # TODO: refactor this
         self.ast: Optional[ast.AST] = None
 
+        self.module_temp = TypeModuleTemp(uri, self.symtable)
+
 
 class Manager:
     def __init__(self, config, module_files: List[str],
                  package_files: List[str], stdout: TextIO, stderr: TextIO):
-        # Modules that need to check
-        self.check_targets: Set[Target] = set()
+        self.check_targets: Dict[Uri, Target] = {}
 
         self.config = Config(config)
 
@@ -56,24 +58,57 @@ class Manager:
         self.stdout = stdout
         self.stderr = stderr
 
-        self.get_check_targets(module_files)
-        self.get_check_targets(package_files)
+        self.find_check_files(module_files)
+        self.find_check_files(package_files)
 
         self.mbox = MessageBox('test')  # TODO: refactor this
 
-    def start_check(self):
-        for target in self.check_targets:
-            if target.stage <= Stage.Parse:
-                self.parse(target)
-            assert target.ast
-            preprocess.get_definition(target.ast, Environment(target.symtable),
-                                      self.mbox)
+        self.targets: Dict[Uri, Target] = {**self.check_targets}
 
-        for target in self.check_targets:
-            preprocess.remove_defer(target.symtable)
+        self.pre_queue: Deque[Target] = deque()
+
+    def add_target(self, uri: Uri):
+        if uri not in self.targets:
+            new_target = Target(uri)
+            self.targets[uri] = new_target
+            self.pre_queue.append(new_target)
+
+    def get_module_temp(self, uri: Uri) -> Optional[TypeModuleTemp]:
+        if uri in self.targets:
+            return self.targets[uri].module_temp
+        else:
+            return None
+
+    def start_check(self):
+        self.preprocess(list(self.check_targets.values()))
 
         for err in self.mbox.error:
             print(err)
+
+    def preprocess(self, targets):
+        if isinstance(targets, Target):
+            self.pre_queue.append(targets)
+        elif isinstance(targets, list):
+            for target in targets:
+                self.pre_queue.append(target)
+
+        to_check = []
+        while len(self.pre_queue) > 0:
+            current = self.pre_queue[0]
+            self.pre_queue.popleft()
+            self.assert_parse(current)
+            assert current.stage == Stage.PreSymtable
+            assert current.ast
+            to_check.append(current)
+
+            preprocess.get_definition(current.ast, self, current.symtable,
+                                      self.mbox, current.uri)
+
+        for target in to_check:
+            preprocess.resolve_import_type(target.symtable, self)
+
+        preprocess.resolve_cls_def(to_check)
+        # preprocess.resolve_typeins(to_check)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""
@@ -87,7 +122,7 @@ class Manager:
                 self.user_path.add(rt_path)
                 logger.debug(f'Add user path: {rt_path}')
 
-    def get_check_targets(self, srcfiles: List[str]):
+    def find_check_files(self, srcfiles: List[str]):
         """Generate Target to be checked according to the srcfiles"""
         for srcfile in srcfiles:
             srcfile = os.path.realpath(srcfile)
@@ -96,16 +131,29 @@ class Manager:
                 continue
             rt_path = crawl_path(os.path.dirname(srcfile))
             uri = relpath2uri(rt_path, srcfile)
-            target = Target(uri, Stage.Parse)
+            target = Target(uri, Stage.PreParse)
             self.parse(target)
-            self.check_targets.add(target)
+            self.check_targets[uri] = target
+
+    def assert_parse(self, target: Target):
+        if target.stage <= Stage.PreParse:
+            self.parse(target)
 
     def parse(self, target: Target) -> ast.AST:
-        assert target.stage == Stage.Parse
+        # TODO: error handling
+        assert target.stage == Stage.PreParse
         target.ast = self.uri2ast(target.uri)
+        target.stage = Stage.PreSymtable
         return target.ast
 
-    def uri2ast(self, uri: ModUri) -> ast.AST:
+    def is_valid_uri(self, uri: Uri) -> bool:
+        find_res = self.finder.find(uri)
+        if find_res:
+            return True
+        else:
+            return False
+
+    def uri2ast(self, uri: Uri) -> ast.AST:
         """Return the ast tree corresponding to uri.
 
         May throw SyntaxError or FileNotFoundError or ReadNsAst exception.

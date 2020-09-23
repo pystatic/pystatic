@@ -4,7 +4,6 @@ from pystatic.reach import Reach
 from pystatic.util import ParseException
 
 
-# Unparse part
 class BaseVisitor(object):
     def whether_visit(self, node):
         if getattr(node, 'reach',
@@ -35,6 +34,23 @@ class BaseVisitor(object):
 
     def accept(self, node):
         return self.visit(node)
+
+
+class VisitorMethodNotFound(Exception):
+    pass
+
+
+class NoGenVisitor(BaseVisitor):
+    def __init__(self):
+        super().__init__()
+
+    def visit(self, node, *args, **kwargs):
+        if self.whether_visit(node):
+            visit_func = self.get_visit_func(node)
+            if visit_func == self.generic_visit:
+                raise VisitorMethodNotFound
+            else:
+                return visit_func(node, *args, **kwargs)
 
 
 class ValueUnParser(BaseVisitor):

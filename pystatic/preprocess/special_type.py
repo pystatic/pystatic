@@ -3,7 +3,7 @@ import enum
 import logging
 from typing import Optional, Union, TYPE_CHECKING, List, Dict, Tuple
 from pystatic.symtable import Entry, SymTable
-from pystatic.typesys import Deferred, TypeIns, TypeVar
+from pystatic.typesys import TypeIns, TypeVar
 from pystatic.message import MessageBox
 from pystatic.visitor import val_unparse, liter_unparse
 from pystatic.preprocess.annotation import parse_annotation
@@ -72,8 +72,7 @@ def analyse_typevar(node: Union[ast.Assign, ast.AnnAssign],
                         mbox.add_err(target,
                                      f"{var_name} doesn't match {tpvar.name}")
                     else:
-                        vardict[var_name] = Entry(tpvar.get_default_type(),
-                                                  target)
+                        vardict[var_name] = Entry(tpvar.get_type(), target)
                 except ParseException as e:
                     mbox.add_err(target, e.msg or 'syntax error')
         else:
@@ -96,8 +95,7 @@ def collect_typevar_info(call_expr: ast.Call, symtable: SymTable,
     cons_list: List['Entry'] = []
     for cons_node in call_expr.args[1:]:
         try:
-            cons_tp = parse_annotation(cons_node, symtable,
-                                       mbox)  # check definition
+            cons_tp = parse_annotation(cons_node, symtable)  # check definition
             if cons_tp:
                 cons_list.append(Entry(cons_tp, cons_node))
             else:
@@ -117,7 +115,7 @@ def collect_typevar_info(call_expr: ast.Call, symtable: SymTable,
                 mbox.add_err(kwarg, "bound and constrains can't coexist")
             else:
                 try:
-                    bound_ins = parse_annotation(kwarg.value, symtable, mbox)
+                    bound_ins = parse_annotation(kwarg.value, symtable)
                 except ParseException as e:
                     mbox.add_err(e.node, e.msg or f'broken type')
                 else:
