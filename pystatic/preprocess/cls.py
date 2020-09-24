@@ -1,5 +1,5 @@
 import ast
-from pystatic.preprocess.annotation import parse_annotation
+from pystatic.preprocess.type_expr import eval_type_expr
 from pystatic import symtable
 from typing import List, TYPE_CHECKING, Optional
 from pystatic.typesys import (TypeClassTemp, TypeModuleTemp, TypeVar)
@@ -71,7 +71,7 @@ def _resolve_cls_inh(clstemp: 'TypeClassTemp'):
     defnode = clstemp.get_defnode()
 
     for base_node in defnode.bases:
-        res_type = parse_annotation(base_node, symtable)
+        res_type = eval_type_expr(base_node, symtable)
         if res_type:
             clstemp.add_base(res_type)
 

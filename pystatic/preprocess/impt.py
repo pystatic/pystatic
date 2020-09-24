@@ -55,3 +55,7 @@ def resolve_import_type(symtable: SymTable, manager: 'Manager'):
                     entry.set_type(cls_temp.get_default_type())
                 else:
                     pass  # TODO: add warning here
+
+    for tp_def in symtable.type_defs.values():
+        inner_symtable = tp_def.get_inner_symtable()
+        resolve_import_type(inner_symtable, manager)

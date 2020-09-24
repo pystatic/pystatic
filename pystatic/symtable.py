@@ -17,14 +17,16 @@ class TableScope(enum.Enum):
 AsName = str
 OriginName = str
 ImportItem = Tuple[AsName, OriginName]  # (moduri, name)
-EntryType = Optional[Union['TypeIns', ImportItem]]
+EntryType = Optional['TypeIns']
+
+TypeDefNode = Union[str, ast.AST]
 
 
 class Entry:
     def __init__(self,
                  tp: EntryType,
                  defnode: Optional[ast.AST] = None,
-                 tpnode: Optional[ast.AST] = None):
+                 tpnode: Optional[TypeDefNode] = None):
         self._tp = tp
         self._defnode = defnode
         self._typenode = tpnode
@@ -44,8 +46,8 @@ class Entry:
     def set_typenode(self, tpnode: ast.AST):
         self._typenode = tpnode
 
-    def get_typenode(self) -> Optional[ast.AST]:
-        return self._typenode
+    def get_typenode(self) -> Optional[TypeDefNode]:
+        return self._typenode or self._defnode
 
 
 class SymTable:

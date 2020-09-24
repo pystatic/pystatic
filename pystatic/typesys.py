@@ -5,6 +5,9 @@ from typing import Optional, Dict, List, Tuple, Union, Set, TYPE_CHECKING
 from collections import OrderedDict
 from pystatic.uri import Uri
 
+if TYPE_CHECKING:
+    from pystatic.arg import Argument
+
 TypeContext = Dict['TypeVar', 'TypeType']
 TypeVarList = List['TypeVar']
 BindList = List[Union['TypeType', List['TypeType'], 'TypeIns']]
@@ -82,6 +85,11 @@ class TypeTemp(BaseType):
                 bindlist: BindList,
                 context: Optional[TypeContext] = None) -> Optional['TypeIns']:
         return self.getattribute(name, bindlist, context)
+
+    def get_str_expr(self,
+                     bindlist: BindList,
+                     context: Optional[TypeContext] = None) -> str:
+        return self.name
 
 
 class TypeVar(TypeTemp):
@@ -168,6 +176,9 @@ class TypeType(TypeIns):
     def getitem(self, bindlist: BindList) -> Tuple['TypeType', 'GetItemError']:
         return self.temp.get_type(bindlist)
 
+    def __str__(self):
+        return self.temp.get_str_expr([])
+
 
 class TypeClassTemp(TypeTemp):
     # FIXME: remove None of symtable and defnode
@@ -183,8 +194,8 @@ class TypeClassTemp(TypeTemp):
         self.var_attr: Dict[str, 'TypeIns'] = {}
         self.method: Dict[str, 'TypeIns'] = {}
 
-        self._inner_symtable = None
-        self._in_symtable = symtable
+        self._inner_symtable = None  # symtable belongs to this cls
+        self._def_symtable = symtable  # symtable where this cls is defined
         self._defnode = defnode
 
     def set_inner_symtable(self, symtable):
@@ -195,7 +206,7 @@ class TypeClassTemp(TypeTemp):
         return self._inner_symtable
 
     def get_def_symtable(self) -> 'SymTable':
-        return self._in_symtable
+        return self._def_symtable
 
     def get_defnode(self) -> ast.ClassDef:
         return self._defnode
@@ -250,7 +261,7 @@ class TypeClassTemp(TypeTemp):
         if name in self.var_attr:
             return self.var_attr[name]
         else:
-            return self._in_symtable.lookup_local(name)
+            return self._inner_symtable.lookup_local(name)
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
         assert 0, "This function should not be called, use add_var or instead"
@@ -260,6 +271,18 @@ class TypeClassTemp(TypeTemp):
         # FIXME: current implementation doesn't cope bindlist, context and baseclasses
         res = self.get_local_attr(name)
         return res
+
+
+class TypeFuncTemp(TypeTemp):
+    def __init__(self, name: str, argument: 'Argument', ret: TypeIns) -> None:
+        self.name = name
+        self.argument = argument
+        self.ret = ret
+
+    def get_str_expr(self,
+                     bindlist: BindList,
+                     context: Optional[TypeContext] = None) -> str:
+        return self.name + str(self.argument) + ' -> ' + str(self.ret)
 
 
 class TypeModuleTemp(TypeClassTemp):

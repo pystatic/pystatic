@@ -110,7 +110,7 @@ class Manager:
         preprocess.resolve_cls_def(to_check)
 
         for target in to_check:
-            preprocess.resolve_typeins(target.symtable)
+            preprocess.resolve_local_typeins(target.symtable)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""

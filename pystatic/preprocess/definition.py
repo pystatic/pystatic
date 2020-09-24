@@ -29,9 +29,10 @@ class TypeDefVisitor(BaseVisitor):
 
         self._is_class = False
         self._clstemp = None
+        self._clsname: List[str] = []
 
     @contextmanager
-    def enter_class(self, clstemp):
+    def enter_class(self, clstemp, clsname: str):
         old_symtable = self.symtable
         old_is_class = self._is_class
         old_clstemp = self._clstemp
@@ -40,12 +41,18 @@ class TypeDefVisitor(BaseVisitor):
         self.symtable = new_symtable
         self._is_class = True
         self._clstemp = clstemp
+        self._clsname.append(clsname)
 
         yield new_symtable
 
         self.symtable = old_symtable
         self._is_class = old_is_class
         self._clstemp = old_clstemp
+        self._clsname.pop()
+
+    @property
+    def cur_clsname(self):
+        return '.'.join(self._clsname)
 
     def _is_new_def(self, node: ast.AST) -> Optional[str]:
         """Whether the node stands for a new definition"""
@@ -80,14 +87,20 @@ class TypeDefVisitor(BaseVisitor):
             # FIXME: class definition should take higher priority
             self.mbox.add_err(node, f'{clsname} is already defined')
         else:
-            clstemp = TypeClassTemp(clsname, self.symtable, node)
+            cur_clsname = self.cur_clsname
+            if cur_clsname:
+                abs_clsname = cur_clsname + '.' + clsname
+            else:
+                abs_clsname = clsname
+
+            clstemp = TypeClassTemp(abs_clsname, self.symtable, node)
             clstype = clstemp.get_default_type()
             entry = Entry(clstype, node)
             self.symtable.add_entry(clsname, entry)
             self.symtable.add_type_def(clsname, clstemp)
 
             # enter class scope
-            with self.enter_class(clstemp):
+            with self.enter_class(clstemp, clsname):
                 clstemp.set_inner_symtable(self.symtable)
                 for body in node.body:
                     self.visit(body)
@@ -108,4 +121,5 @@ class TypeDefVisitor(BaseVisitor):
                 self.symtable.add_import_item(asname, uri, origin_name, node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        pass
+        logger.debug(f'add function {node.name}')
+        self.symtable.add_entry(node.name, Entry(None, node))
