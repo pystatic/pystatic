@@ -1,11 +1,11 @@
 import ast
 import logging
 from contextlib import contextmanager
-from typing import Dict, Union, List, Tuple, Optional
+from typing import Dict, Union, List, Tuple, Optional, TYPE_CHECKING
 from collections import OrderedDict
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeClassTemp, TypeType, TypeIns, any_ins,
-                              TYPE_CHECKING)
+                              TpState)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope
 from pystatic.preprocess.special_type import record_stp
@@ -93,7 +93,8 @@ class TypeDefVisitor(BaseVisitor):
             else:
                 abs_clsname = clsname
 
-            clstemp = TypeClassTemp(abs_clsname, self.symtable, node)
+            clstemp = TypeClassTemp(abs_clsname, TpState.FRESH, self.symtable,
+                                    node)
             clstype = clstemp.get_default_type()
             entry = Entry(clstype, node)
             self.symtable.add_entry(clsname, entry)

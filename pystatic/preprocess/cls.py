@@ -1,8 +1,9 @@
 import ast
+import logging
 from pystatic.preprocess.type_expr import eval_type_expr
-from pystatic import symtable
 from typing import List, TYPE_CHECKING, Optional
-from pystatic.typesys import (TypeClassTemp, TypeModuleTemp, TypeVar)
+from pystatic.typesys import (TypeClassTemp, TypeModuleTemp, TypeVar, TpState,
+                              TypeTemp)
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.preprocess.dependency import DependencyGraph
 
@@ -10,14 +11,18 @@ if TYPE_CHECKING:
     from pystatic.manager import Target
     from pystatic.symtable import SymTable
 
+logger = logging.getLogger(__name__)
+
 
 def resolve_cls_def(targets: List['Target']):
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
-    # for temp in resolve_order:
-    #     _resolve_cls_placeholder(temp)
+    for temp in resolve_order:
+        temp.set_state(TpState.ON)
+        _resolve_cls_placeholder(temp)
     for temp in resolve_order:
         _resolve_cls_inh(temp)
+        temp.set_state(TpState.OVER)
 
 
 def _build_graph(targets: List['Target']) -> 'DependencyGraph':
@@ -41,22 +46,31 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
 
 def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
-    assert isinstance(
-        clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
-    defnode = clstemp.get_defnode()
+    if _check_cls_state(clstemp):
+        graph.add_typetemp(clstemp)
+        assert isinstance(
+            clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
+        defnode = clstemp.get_defnode()
 
-    def_sym = clstemp.get_def_symtable()
-    visitor = _FirstClassTempVisitor(def_sym)
-    for basenode in defnode.bases:
-        first_temp = visitor.accept(basenode)
-        assert isinstance(first_temp, TypeClassTemp) and not isinstance(
-            first_temp,
-            TypeModuleTemp)  # FIXME: if the result is a module, warninng here
-        if first_temp:
-            graph.add_dependency(clstemp, first_temp)
+        def_sym = clstemp.get_def_symtable()
+        visitor = _FirstClassTempVisitor(def_sym)
+        for basenode in defnode.bases:
+            first_temp = visitor.accept(basenode)
+            assert isinstance(first_temp, TypeTemp) and not isinstance(
+                first_temp, TypeModuleTemp
+            )  # FIXME: if the result is a module, warninng here
+            if first_temp and _check_cls_state(first_temp):
+                assert isinstance(first_temp, TypeClassTemp)
+                graph.add_dependency(clstemp, first_temp)
+
+
+def _check_cls_state(temp: 'TypeTemp'):
+    state = temp.get_state()
+    return state != TpState.OVER
 
 
 def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
+    assert _check_cls_state(clstemp)
     symtable = clstemp.get_def_symtable()
     visitor = _TypeVarVisitor(symtable, [])
     defnode = clstemp.get_defnode()
@@ -67,6 +81,7 @@ def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
 
 
 def _resolve_cls_inh(clstemp: 'TypeClassTemp'):
+    assert _check_cls_state(clstemp)
     symtable = clstemp.get_def_symtable()
     defnode = clstemp.get_defnode()
 

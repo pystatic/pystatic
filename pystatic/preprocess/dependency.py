@@ -32,6 +32,9 @@ class DependencyGraph:
         to_node = self.lookup(temp_to)
         from_node.add_dependency(to_node)
 
+    def add_typetemp(self, temp: TypeClassTemp):
+        self.lookup(temp)
+
     def toposort(self) -> List['TypeClassTemp']:
         que: Deque['_Node'] = deque()
         for node in self._nodes:

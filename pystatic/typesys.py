@@ -1,4 +1,5 @@
 import ast
+import enum
 import copy
 from pystatic.symtable import SymTable
 from typing import Optional, Dict, List, Tuple, Union, Set, TYPE_CHECKING
@@ -42,10 +43,24 @@ class BaseType(object):
         return self.name
 
 
+class TpState(enum.IntEnum):
+    FRESH = 0
+    ON = 1
+    OVER = 2
+
+
 class TypeTemp(BaseType):
-    def __init__(self, name: str):
+    def __init__(self, name: str, resolve_state: TpState = TpState.OVER):
         super().__init__(name)
         self.placeholders = []
+
+        self._resolve_state = resolve_state
+
+    def set_state(self, st: TpState):
+        self._resolve_state = st
+
+    def get_state(self) -> TpState:
+        return self._resolve_state
 
     def _bind_placeholders(self,
                            bindlist: BindList) -> Tuple[list, 'GetItemError']:
@@ -184,9 +199,10 @@ class TypeClassTemp(TypeTemp):
     # FIXME: remove None of symtable and defnode
     def __init__(self,
                  clsname: str,
+                 state: TpState,
                  symtable: 'SymTable' = None,
                  defnode: ast.ClassDef = None):
-        super().__init__(clsname)
+        super().__init__(clsname, state)
 
         self.baseclass: 'List[TypeType]'
         self.baseclass = []
@@ -441,12 +457,12 @@ generic_temp = TypeGenericTemp()
 ellipsis_temp = TypeEllipsisTemp()
 callable_temp = TypeCallableTemp()
 
-int_temp = TypeClassTemp('int')
-float_temp = TypeClassTemp('float')
-complex_temp = TypeClassTemp('complex')
-str_temp = TypeClassTemp('str')
-bool_temp = TypeClassTemp('bool')
-func_temp = TypeClassTemp('function')
+int_temp = TypeClassTemp('int', TpState.OVER)
+float_temp = TypeClassTemp('float', TpState.OVER)
+complex_temp = TypeClassTemp('complex', TpState.OVER)
+str_temp = TypeClassTemp('str', TpState.OVER)
+bool_temp = TypeClassTemp('bool', TpState.OVER)
+func_temp = TypeClassTemp('function', TpState.OVER)
 
 ellipsis_type = ellipsis_temp.get_default_type()
 none_type = none_temp.get_default_type()
