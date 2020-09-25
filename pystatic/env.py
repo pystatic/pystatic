@@ -5,7 +5,7 @@ from pystatic.symtable import SymTable, TableScope
 
 class Environment(object):
     def __init__(self, symtable: SymTable):
-        assert symtable.scope == TableScope.GLOB
+        assert symtable._scope == TableScope.GLOB
         self.tables: List[SymTable] = [symtable]
 
     @property
@@ -14,16 +14,16 @@ class Environment(object):
 
     def new_symtable(self, scope: TableScope) -> SymTable:
         glob = self.tables[0]
-        if self.symtable.scope == TableScope.FUNC:
+        if self.symtable._scope == TableScope.FUNC:
             non_local = self.symtable
         else:
-            non_local = self.symtable.non_local
-        builtins = glob.builtins
+            non_local = self.symtable._non_local
+        builtins = glob._builtins
         return SymTable(glob, non_local, builtins, scope)
 
     @contextmanager
     def enter_class(self, table: SymTable):
-        assert table.scope == TableScope.CLASS
+        assert table._scope == TableScope.CLASS
         self.tables.append(table)
         yield table
         assert self.tables

@@ -1,13 +1,15 @@
 import sys
 import os
 import inspect
-from typing import List, Optional, Type, Tuple
+from typing import List, Optional, Type, Tuple, Final
 
 from pystatic.sitepkg import get_sitepkg
 
 PY_VERSION = Tuple[int, int]
 
 pystatic_dir: str = os.path.dirname(__file__)
+
+typeshed: Final[str] = 'faketypeshed'
 
 
 class Config:
@@ -45,7 +47,7 @@ class Config:
         if get('typeshed', str):
             self.typeshed: Optional[str] = get('typeshed')
         else:
-            if os.path.isdir(os.path.join(pystatic_dir, 'typeshed')):
-                self.typeshed = os.path.join(pystatic_dir, 'typeshed')
+            if os.path.isdir(os.path.join(pystatic_dir, typeshed)):
+                self.typeshed = os.path.join(pystatic_dir, typeshed)
             else:
                 self.typeshed = None

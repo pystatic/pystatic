@@ -2,8 +2,7 @@ import ast
 import enum
 import copy
 from pystatic.symtable import SymTable
-from typing import Optional, Dict, List, Tuple, Union, Set, TYPE_CHECKING
-from collections import OrderedDict
+from typing import Optional, Dict, List, Tuple, Union, TYPE_CHECKING
 from pystatic.uri import Uri
 
 if TYPE_CHECKING:
@@ -56,6 +55,9 @@ class TypeTemp(BaseType):
 
         self._resolve_state = resolve_state
 
+    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
+        return None
+
     def set_state(self, st: TpState):
         self._resolve_state = st
 
@@ -64,24 +66,19 @@ class TypeTemp(BaseType):
 
     def _bind_placeholders(self,
                            bindlist: BindList) -> Tuple[list, 'GetItemError']:
-        """Do some check here, return a list that different from the bindlist"""
         binderr: GetItemError = GetItemError()
         if len(bindlist) == 0:
             return [], binderr
         binderr.set_msg(f'No binding is allowed in {self.basename}')
         return [], binderr
 
-    def get_type(self,
-                 bindlist: BindList) -> Tuple['TypeType', 'GetItemError']:
-        """Usually you should make sure when binded and bindlist both are empty
-        then it will not fail.
-
-        May throw BindException."""
+    def generate_typetype(
+            self, bindlist: BindList) -> Tuple['TypeType', 'GetItemError']:
         new_bind, bind_err = self._bind_placeholders(bindlist)
         return TypeType(self, new_bind), bind_err
 
     def get_default_type(self) -> 'TypeType':
-        bind_type, bind_err = self.get_type([])
+        bind_type, bind_err = self.generate_typetype([])
         assert bind_err.empty(), "Get default type should always succeed"
         return bind_type
 
@@ -189,7 +186,7 @@ class TypeType(TypeIns):
         return self.getins()
 
     def getitem(self, bindlist: BindList) -> Tuple['TypeType', 'GetItemError']:
-        return self.temp.get_type(bindlist)
+        return self.temp.generate_typetype(bindlist)
 
     def __str__(self):
         return self.temp.get_str_expr([])
@@ -200,7 +197,8 @@ class TypeClassTemp(TypeTemp):
     def __init__(self,
                  clsname: str,
                  state: TpState,
-                 symtable: 'SymTable' = None,
+                 def_symtable: 'SymTable',
+                 inner_symtable: 'SymTable',
                  defnode: ast.ClassDef = None):
         super().__init__(clsname, state)
 
@@ -210,21 +208,32 @@ class TypeClassTemp(TypeTemp):
         self.var_attr: Dict[str, 'TypeIns'] = {}
         self.method: Dict[str, 'TypeIns'] = {}
 
-        self._inner_symtable = None  # symtable belongs to this cls
-        self._def_symtable = symtable  # symtable where this cls is defined
+        self._inner_symtable = inner_symtable  # symtable belongs to this cls
+        self._def_symtable = def_symtable  # symtable where this cls is defined
         self._defnode = defnode
+
+    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
+        cls_defs = self._inner_symtable.cls_defs
+        spt_defs = self._inner_symtable.spt_defs
+        if name in cls_defs:
+            return cls_defs[name]
+        elif name in spt_defs:
+            return spt_defs[name]
+        else:
+            return None
 
     def set_inner_symtable(self, symtable):
         self._inner_symtable = symtable
 
     def get_inner_symtable(self) -> 'SymTable':
-        assert self._inner_symtable
         return self._inner_symtable
 
     def get_def_symtable(self) -> 'SymTable':
+        assert self._def_symtable
         return self._def_symtable
 
     def get_defnode(self) -> ast.ClassDef:
+        assert self._defnode
         return self._defnode
 
     def add_typevar(self, typevar: TypeVar):
@@ -302,16 +311,16 @@ class TypeFuncTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: Uri, symtable: 'SymTable'):
-        super().__init__(uri, symtable)
+    def __init__(self, uri: Uri, symtable: 'SymTable', state: TpState):
+        # FIXME: inner_symtable and def_symtable should be different
+        super().__init__(uri, state, symtable, symtable)
 
     @property
     def uri(self):
         return self.name
 
-    def get_type_def(self, name: str) -> Optional['TypeClassTemp']:
-        """Get types defined inside the symtable, support name like A, A.B"""
-        return self.get_def_symtable().get_type_def(name)
+    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
+        return self._inner_symtable.get_type_def(name)
 
 
 class TypePackageTemp(TypeModuleTemp):
@@ -437,17 +446,9 @@ class TypeGenericTemp(TypeTemp):
         return new_bindlist, binderr
 
 
-class TypeDummyTemp(TypeTemp):
-    """dummy type that used for test"""
+class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
-        typevarlist = []
-        for i in range(5):
-            typevarlist.append(TypeVar('T' + f'{i}'))
-        super().__init__('dummy')
-
-    def _bind_placeholders(self,
-                           bindlist: BindList) -> Tuple[list, 'GetItemError']:
-        return copy.copy(bindlist), GetItemError()
+        super().__init__('typing.Literal')
 
 
 # default types
@@ -456,13 +457,10 @@ none_temp = TypeNoneTemp()
 generic_temp = TypeGenericTemp()
 ellipsis_temp = TypeEllipsisTemp()
 callable_temp = TypeCallableTemp()
-
-int_temp = TypeClassTemp('int', TpState.OVER)
-float_temp = TypeClassTemp('float', TpState.OVER)
-complex_temp = TypeClassTemp('complex', TpState.OVER)
-str_temp = TypeClassTemp('str', TpState.OVER)
-bool_temp = TypeClassTemp('bool', TpState.OVER)
-func_temp = TypeClassTemp('function', TpState.OVER)
+tuple_temp = TypeTupleTemp()
+optional_temp = TypeOptionalTemp()
+literal_temp = TypeLiteralTemp()
+union_temp = TypeUnionTemp()
 
 ellipsis_type = ellipsis_temp.get_default_type()
 none_type = none_temp.get_default_type()
@@ -470,6 +468,3 @@ any_type = any_temp.get_default_type()
 
 any_ins = any_type.call()
 ellipsis_ins = ellipsis_type.call()
-
-# dummy, used for test
-dummy_temp = TypeDummyTemp()

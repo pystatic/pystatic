@@ -1,7 +1,7 @@
 import ast
 import enum
 from collections import OrderedDict
-from typing import (Dict, Optional, Union, List, Set, TYPE_CHECKING, Tuple)
+from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns, TypeClassTemp, TypeTemp
@@ -58,27 +58,33 @@ class SymTable:
         self.glob = glob
         self.builtins = builtins
 
-        self.anonymous_entry: Set[Entry] = set()
+        self._scope = scope
 
-        self.scope = scope
-
-        self.type_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
+        self.cls_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
+        self.spt_defs: Dict[str, 'TypeTemp'] = {}  # special type template
 
         self.import_info: Dict['Uri', List[ImportItem]] = {}
 
-    def add_type_def(self, name: str, temp: 'TypeClassTemp'):
-        self.type_defs[name] = temp
+    def add_cls_def(self, name: str, temp: 'TypeClassTemp'):
+        self.cls_defs[name] = temp
 
-    def get_type_def(self, name: str) -> Optional['TypeClassTemp']:
-        """Get types defined inside the symtable, support name like A, A.B"""
+    def add_spt_def(self, name: str, temp: 'TypeTemp'):
+        self.spt_defs[name] = temp
+
+    def get_type_def(self, name: str) -> Optional['TypeTemp']:
         findlist = name.split('.')
         assert findlist
-        cur_symtable = self
-        cur_temp = None
-        for i, item in enumerate(findlist):
-            cur_temp = cur_symtable.type_defs.get(findlist[i])
+        if name in self.cls_defs:
+            cur_temp = self.cls_defs[name]
+        elif name in self.spt_defs:
+            cur_temp = self.spt_defs[name]
+        else:
+            return None
+
+        lenf = len(findlist)
+        for i in range(1, lenf):
             if cur_temp:
-                cur_symtable = cur_temp.get_inner_symtable()
+                cur_temp = cur_temp.get_inner_typedef(findlist[i])
             else:
                 return None
         return cur_temp
@@ -129,7 +135,7 @@ class SymTable:
 
     def new_symtable(self, new_scope: 'TableScope') -> 'SymTable':
         builtins = self.builtins
-        if self.scope == TableScope.CLASS:
+        if self._scope == TableScope.CLASS:
             non_local = self.non_local
         else:
             non_local = self

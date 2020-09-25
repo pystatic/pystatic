@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class STPKind(enum.Enum):
+class SPTKind(enum.Enum):
     """SpecialType kind
 
     TypeVar, TypeAlias...
@@ -29,7 +29,7 @@ def record_stp(node: Union[ast.Assign, ast.AnnAssign], symtable: SymTable):
     if not s_type:
         return False
     else:
-        if s_type == STPKind.TypeVar:
+        if s_type == SPTKind.TypeVar:
             assert isinstance(node.value, ast.Call)
             name = get_typevar_name(node.value)
             # FIXME: the defnode given here is incorrect
@@ -42,14 +42,14 @@ def record_stp(node: Union[ast.Assign, ast.AnnAssign], symtable: SymTable):
             return False  # to suppress type warnings...
 
 
-def get_stp_kind(node: Union[ast.Assign, ast.AnnAssign]) -> Optional[STPKind]:
+def get_stp_kind(node: Union[ast.Assign, ast.AnnAssign]) -> Optional[SPTKind]:
     """Return the kind of assignment node, if it's a normal assignment(not TypeVar,
     TypeAlias...), then return None"""
     if isinstance(node.value, ast.Call):
         if isinstance(node.value.func, ast.Name):
             fname = node.value.func.id
             if fname == 'TypeVar':
-                return STPKind.TypeVar
+                return SPTKind.TypeVar
     return None
 
 

@@ -1,4 +1,5 @@
 import ast
+from pystatic.typesys import TypeClassTemp
 from typing import TYPE_CHECKING, Union, Tuple, List, Dict
 from pystatic.uri import uri_last, uri_parent, rel2absuri, Uri
 from pystatic.symtable import SymTable, Entry
@@ -50,12 +51,13 @@ def resolve_import_type(symtable: SymTable, manager: 'Manager'):
                 # the module itself
                 entry.set_type(module_temp.get_default_type())
             else:
-                cls_temp = module_temp.get_type_def(origin_name)
+                cls_temp = module_temp.get_inner_typedef(origin_name)
                 if cls_temp:
                     entry.set_type(cls_temp.get_default_type())
                 else:
                     pass  # TODO: add warning here
 
-    for tp_def in symtable.type_defs.values():
+    for tp_def in symtable.cls_defs.values():
+        assert isinstance(tp_def, TypeClassTemp)
         inner_symtable = tp_def.get_inner_symtable()
         resolve_import_type(inner_symtable, manager)

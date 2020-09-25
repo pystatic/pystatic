@@ -3,15 +3,16 @@ import ast
 import logging
 import enum
 from collections import deque
-from pystatic.symtable import SymTable
 from pystatic.message import MessageBox
-from typing import Optional, List, TextIO, Set, Dict, Union, Deque
+from typing import Optional, List, TextIO, Set, Dict, Deque
 from pystatic import preprocess
-from pystatic.typesys import TypeModuleTemp, TypePackageTemp
+from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
+                                 get_init_env)
+from pystatic.symtable import SymTable
+from pystatic.typesys import TypeModuleTemp, TpState
 from pystatic.config import Config
 from pystatic.modfinder import (ModuleFinder, ModuleFindRes)
-from pystatic.env import Environment
-from pystatic.uri import Uri, relpath2uri, uri2list
+from pystatic.uri import Uri, relpath2uri
 
 logger = logging.getLogger(__name__)
 
@@ -24,20 +25,21 @@ class Stage(enum.IntEnum):
     """Number ascends as the analysis going deeper"""
     PreParse = 0
     PreSymtable = 1
-    Deffer = 2
-    Check = 4
 
 
 class Target:
-    def __init__(self, uri: Uri, stage: Stage = Stage.PreParse):
+    def __init__(self,
+                 uri: Uri,
+                 symtable: Optional[SymTable] = None,
+                 stage: Stage = Stage.PreParse):
         self.uri = uri
         self.stage = stage
 
-        self.symtable = preprocess.get_init_env(
-        ).symtable  # TODO: refactor this
+        self.symtable = symtable or get_init_env(
+        ).symtable  # NOTE: this is a temporary implementation
         self.ast: Optional[ast.AST] = None
 
-        self.module_temp = TypeModuleTemp(uri, self.symtable)
+        self.module_temp = TypeModuleTemp(uri, self.symtable, TpState.OVER)
 
 
 class Manager:
@@ -66,6 +68,15 @@ class Manager:
         self.targets: Dict[Uri, Target] = {**self.check_targets}
 
         self.pre_queue: Deque[Target] = deque()
+
+        self.init_typeshed()
+
+    def init_typeshed(self):
+        builtins_target = Target('builtins', get_builtin_symtable())
+        typing_target = Target('typing', get_typing_symtable())
+        self.targets['builtins'] = builtins_target
+        self.targets['typing'] = typing_target
+        self.preprocess([typing_target, builtins_target])
 
     def add_target(self, uri: Uri):
         if uri not in self.targets:
@@ -133,7 +144,7 @@ class Manager:
                 continue
             rt_path = crawl_path(os.path.dirname(srcfile))
             uri = relpath2uri(rt_path, srcfile)
-            target = Target(uri, Stage.PreParse)
+            target = Target(uri, stage=Stage.PreParse)
             self.parse(target)
             self.check_targets[uri] = target
 

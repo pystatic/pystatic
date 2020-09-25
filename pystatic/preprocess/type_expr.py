@@ -3,7 +3,7 @@ from pystatic.symtable import SymTable, TypeDefNode
 from typing import List, Optional, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeFuncTemp, TypeIns, ellipsis_type, TypeType,
-                              any_type, ellipsis_ins)
+                              any_type)
 from pystatic.arg import Argument, Arg
 
 
@@ -146,7 +146,7 @@ class TypeExprVisitor(BaseVisitor):
             else:
                 res = func(node, *args, **kwargs)
 
-                assert isinstance(res, TypeType)
+                assert isinstance(res, TypeType) or isinstance(res, list)
                 return res
 
     def accept(self, node) -> Optional[TypeType]:

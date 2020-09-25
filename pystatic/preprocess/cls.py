@@ -28,9 +28,9 @@ def resolve_cls_def(targets: List['Target']):
 def _build_graph(targets: List['Target']) -> 'DependencyGraph':
     graph = DependencyGraph()
     for target in targets:
-        for temp in target.symtable.type_defs.values():
-            if isinstance(temp, TypeClassTemp):
-                _build_graph_cls(temp, graph)
+        for temp in target.symtable.cls_defs.values():
+            assert isinstance(temp, TypeClassTemp)
+            _build_graph_cls(temp, graph)
     return graph
 
 
@@ -39,10 +39,10 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
     _build_graph_inh(clstemp, graph)
 
-    for subtemp in inner_sym.type_defs.values():
-        if isinstance(subtemp, TypeClassTemp):
-            _build_graph_cls(subtemp, graph)
-            graph.add_dependency(clstemp, subtemp)
+    for subtemp in inner_sym.cls_defs.values():
+        assert isinstance(subtemp, TypeClassTemp)
+        _build_graph_cls(subtemp, graph)
+        graph.add_dependency(clstemp, subtemp)
 
 
 def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):

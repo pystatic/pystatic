@@ -32,12 +32,11 @@ class TypeDefVisitor(BaseVisitor):
         self._clsname: List[str] = []
 
     @contextmanager
-    def enter_class(self, clstemp, clsname: str):
+    def enter_class(self, new_symtable, clstemp, clsname: str):
         old_symtable = self.symtable
         old_is_class = self._is_class
         old_clstemp = self._clstemp
 
-        new_symtable = self.symtable.new_symtable(TableScope.CLASS)
         self.symtable = new_symtable
         self._is_class = True
         self._clstemp = clstemp
@@ -93,16 +92,16 @@ class TypeDefVisitor(BaseVisitor):
             else:
                 abs_clsname = clsname
 
+            new_symtable = self.symtable.new_symtable(TableScope.CLASS)
             clstemp = TypeClassTemp(abs_clsname, TpState.FRESH, self.symtable,
-                                    node)
+                                    new_symtable, node)
             clstype = clstemp.get_default_type()
             entry = Entry(clstype, node)
             self.symtable.add_entry(clsname, entry)
-            self.symtable.add_type_def(clsname, clstemp)
+            self.symtable.add_cls_def(clsname, clstemp)
 
             # enter class scope
-            with self.enter_class(clstemp, clsname):
-                clstemp.set_inner_symtable(self.symtable)
+            with self.enter_class(new_symtable, clstemp, clsname):
                 for body in node.body:
                     self.visit(body)
 

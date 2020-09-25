@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 from pystatic.preprocess.definition import TypeDefVisitor
-from pystatic.preprocess.predefined import get_builtin_env, get_init_env
 from pystatic.preprocess.cls import resolve_cls_def
 from pystatic.preprocess.impt import resolve_import_type
 from pystatic.preprocess.typeins import resolve_local_typeins

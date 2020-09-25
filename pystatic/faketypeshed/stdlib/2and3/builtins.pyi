@@ -1,44 +1,46 @@
-import sys
-from typing import (Optional, Union, Text, SupportsInt, SupportsIndex, Literal,
-                    Tuple, overload, Iterable, Protocol, SupportsBytes, Any)
+# import sys
+from typing import (Optional, Literal, Tuple, Any)
+
+# class _SupportsIndex(Protocol):
+#     def __index__(self) -> int:
+#         ...
 
 
-class _SupportsIndex(Protocol):
-    def __index__(self) -> int:
-        ...
+class object:
+    pass
 
 
 class int:
-    @overload
-    def __init__(
-            self,
-            x: Union[Text, bytes, SupportsInt, _SupportsIndex] = ...) -> None:
-        ...
+    # @overload
+    # def __init__(
+    #         self,
+    #         x: Union[Text, bytes, SupportsInt, _SupportsIndex] = ...) -> None:
+    #     ...
 
-    @overload
-    def __init__(self, x: Union[Text, bytes, bytearray], base: int) -> None:
-        ...
+    # @overload
+    # def __init__(self, x: Union[Text, bytes, bytearray], base: int) -> None:
+    #     ...
 
-    if sys.version_info >= (3, 8):
+    # if sys.version_info >= (3, 8):
 
-        def as_integer_ratio(self) -> Tuple[int, Literal[1]]:
-            ...
+    #     def as_integer_ratio(self) -> Tuple[int, Literal[1]]:
+    #         ...
 
-    @property
-    def real(self) -> int:
-        ...
+    # @property
+    # def real(self) -> int:
+    #     ...
 
-    @property
-    def imag(self) -> int:
-        ...
+    # @property
+    # def imag(self) -> int:
+    #     ...
 
-    @property
-    def numerator(self) -> int:
-        ...
+    # @property
+    # def numerator(self) -> int:
+    #     ...
 
-    @property
-    def denominator(self) -> int:
-        ...
+    # @property
+    # def denominator(self) -> int:
+    #     ...
 
     def conjugate(self) -> int:
         ...
@@ -55,13 +57,13 @@ class int:
                      signed: bool = ...) -> bytes:
             ...
 
-        @classmethod
-        def from_bytes(cls,
-                       bytes: Union[Iterable[int], SupportsBytes],
-                       byteorder: str,
-                       *,
-                       signed: bool = ...) -> int:
-            ...  # TODO buffer object argument
+        # @classmethod
+        # def from_bytes(cls,
+        #                bytes: Union[Iterable[int], SupportsBytes],
+        #                byteorder: str,
+        #                *,
+        #                signed: bool = ...) -> int:
+        #     ...  # TODO buffer object argument
 
     def __add__(self, x: int) -> int:
         ...
@@ -226,3 +228,23 @@ class int:
 
     def __index__(self) -> int:
         ...
+
+
+class str:
+    pass
+
+
+class float:
+    pass
+
+
+class complex:
+    pass
+
+
+class bool:
+    pass
+
+
+class bytes:
+    pass
