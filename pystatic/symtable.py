@@ -65,6 +65,8 @@ class SymTable:
 
         self.import_info: Dict['Uri', List[ImportItem]] = {}
 
+        self.functions = set()
+
     def add_cls_def(self, name: str, temp: 'TypeClassTemp'):
         self.cls_defs[name] = temp
 
@@ -125,6 +127,10 @@ class SymTable:
         return self._legb_lookup(name, SymTable.lookup_local_entry)
 
     def add_entry(self, name: str, entry: Entry):
+        self.local[name] = entry
+
+    def add_fun_entry(self, name: str, entry: Entry):
+        self.functions.add(name)
         self.local[name] = entry
 
     def add_import_item(self, name: str, uri: 'Uri', origin_name: str,

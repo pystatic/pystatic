@@ -123,6 +123,8 @@ class Manager:
         for target in to_check:
             preprocess.resolve_local_typeins(target.symtable)
 
+        pass
+
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""
         for srcfile in srcfiles:

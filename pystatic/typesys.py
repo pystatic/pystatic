@@ -206,7 +206,6 @@ class TypeClassTemp(TypeTemp):
         self.baseclass = []
 
         self.var_attr: Dict[str, 'TypeIns'] = {}
-        self.method: Dict[str, 'TypeIns'] = {}
 
         self._inner_symtable = inner_symtable  # symtable belongs to this cls
         self._def_symtable = def_symtable  # symtable where this cls is defined
@@ -273,9 +272,6 @@ class TypeClassTemp(TypeTemp):
 
             return binds, binderr
 
-    def add_method(self, name: str, method_type: 'TypeIns'):
-        self.method[name] = method_type
-
     def add_var(self, name: str, var_type: 'TypeIns'):
         self.var_attr[name] = var_type
 
@@ -289,7 +285,8 @@ class TypeClassTemp(TypeTemp):
             return self._inner_symtable.lookup_local(name)
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
-        assert 0, "This function should not be called, use add_var or instead"
+        """Same as add_var in TypeClassTemp"""
+        self.add_var(name, attr_type)
 
     def getattribute(self, name: str, bindlist: BindList,
                      context: Optional[TypeContext]) -> Optional['TypeIns']:

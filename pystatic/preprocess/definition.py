@@ -1,11 +1,9 @@
 import ast
 import logging
 from contextlib import contextmanager
-from typing import Dict, Union, List, Tuple, Optional, TYPE_CHECKING
-from collections import OrderedDict
+from typing import Dict, List, Tuple, Optional, TYPE_CHECKING
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import (TypeClassTemp, TypeType, TypeIns, any_ins,
-                              TpState)
+from pystatic.typesys import (TypeClassTemp, TpState)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope
 from pystatic.preprocess.special_type import record_stp
@@ -65,7 +63,13 @@ class TypeDefVisitor(BaseVisitor):
     def visit_Assign(self, node: ast.Assign):
         # TODO: here we haven't add redefine warning and check consistence, the
         # def node is also incorrect
-        if not record_stp(node, self.symtable):
+        name, entry = record_stp(node)
+        if entry:
+            assert name
+            self.symtable.add_entry(name, entry)
+            logger.debug(f'add type var {name}'
+                         )  # because currently only support TypeVar
+        else:
             for target in node.targets:
                 name = self._is_new_def(target)
                 if name:
@@ -73,11 +77,16 @@ class TypeDefVisitor(BaseVisitor):
                     logger.debug(f'add variable {name}')
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        if not record_stp(node, self.symtable):
+        name, entry = record_stp(node)
+        if entry:
+            assert name
+            self.symtable.add_entry(name, entry)
+            logger.debug(f'add type var {name}'
+                         )  # because currently only support TypeVar
+        else:
             name = self._is_new_def(node.target)
             if name:
-                self.symtable.add_entry(name, Entry(None, node,
-                                                    node.annotation))
+                self.symtable.add_entry(name, Entry(None, node))
                 logger.debug(f'add variable {name}')
 
     def visit_ClassDef(self, node: ast.ClassDef):
@@ -122,4 +131,4 @@ class TypeDefVisitor(BaseVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         logger.debug(f'add function {node.name}')
-        self.symtable.add_entry(node.name, Entry(None, node))
+        self.symtable.add_fun_entry(node.name, Entry(None, node))

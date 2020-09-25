@@ -24,22 +24,20 @@ class SPTKind(enum.Enum):
     TypeAlias = 2
 
 
-def record_stp(node: Union[ast.Assign, ast.AnnAssign], symtable: SymTable):
+def record_stp(node: Union[ast.Assign, ast.AnnAssign]):
     s_type = get_stp_kind(node)
     if not s_type:
-        return False
+        return None, None
     else:
         if s_type == SPTKind.TypeVar:
             assert isinstance(node.value, ast.Call)
             name = get_typevar_name(node.value)
             # FIXME: the defnode given here is incorrect
             entry = Entry(TypeVar(name).get_default_type(), node.value)
-            symtable.add_entry(name, entry)
-            logger.debug(f'add TypeVar {name}')
-            return True
+            return name, entry
         else:
             assert 0, "not implemented yet"
-            return False  # to suppress type warnings...
+            return None, None  # to suppress type warnings...
 
 
 def get_stp_kind(node: Union[ast.Assign, ast.AnnAssign]) -> Optional[SPTKind]:
