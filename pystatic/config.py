@@ -1,24 +1,36 @@
 import sys
 import os
-from typing import List, Optional
+import inspect
+from typing import List, Optional, Type, Tuple, Final
+
 from pystatic.sitepkg import get_sitepkg
+
+PY_VERSION = Tuple[int, int]
+
+pystatic_dir: str = os.path.dirname(__file__)
+
+typeshed: Final[str] = 'faketypeshed'
 
 
 class Config:
     def __init__(self, config):
-        if isinstance(config, dict):
+        def get(attr: str, require_type: Optional[Type] = None):
+            if require_type:
+                assert inspect.isclass(require_type)
+            if isinstance(config, dict):
+                res = config.get(attr)
+            else:
+                res = getattr(config, attr, None)
 
-            def get(attr: str):
-                return config.get(attr)
-        else:
+            if res:
+                if not require_type or isinstance(res, require_type):
+                    return res
+                else:
+                    return None
+            return None
 
-            def get(attr: str):
-                if hasattr(config, attr):
-                    return getattr(config, attr)
-                return None
-
-        self.python_version: tuple = (sys.version_info.major,
-                                      sys.version_info.minor)
+        self.python_version: PY_VERSION = (sys.version_info.major,
+                                           sys.version_info.minor)
 
         # set cwd
         self.cwd = os.getcwd()
@@ -32,4 +44,10 @@ class Config:
 
         self.sitepkg: List[str] = get_sitepkg()
 
-        self.typeshed: Optional[List[str]] = None
+        if get('typeshed', str):
+            self.typeshed: Optional[str] = get('typeshed')
+        else:
+            if os.path.isdir(os.path.join(pystatic_dir, typeshed)):
+                self.typeshed = os.path.join(pystatic_dir, typeshed)
+            else:
+                self.typeshed = None

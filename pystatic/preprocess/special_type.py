@@ -1,10 +1,13 @@
 import ast
 import enum
 import logging
-from typing import Optional, Union, TYPE_CHECKING, List
+from typing import Optional, Union, TYPE_CHECKING, List, Dict, Tuple
+from pystatic.symtable import Entry, SymTable
 from pystatic.typesys import TypeIns, TypeVar
-from pystatic.util import (liter_unparse, val_unparse, ParseException)
-from pystatic.preprocess.annotation import parse_annotation
+from pystatic.message import MessageBox
+from pystatic.visitor import val_unparse, liter_unparse
+from pystatic.preprocess.type_expr import eval_type_expr
+from pystatic.util import ParseException
 
 if TYPE_CHECKING:
     from pystatic.env import Environment
@@ -12,8 +15,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SType(enum.Enum):
-    """Special types
+class SPTKind(enum.Enum):
+    """SpecialType kind
 
     TypeVar, TypeAlias...
     """
@@ -21,69 +24,51 @@ class SType(enum.Enum):
     TypeAlias = 2
 
 
-def special_typing_kind(
-        node: Union[ast.Assign, ast.AnnAssign]) -> Optional[SType]:
+def record_stp(node: Union[ast.Assign, ast.AnnAssign]):
+    s_type = get_stp_kind(node)
+    if not s_type:
+        return None, None
+    else:
+        if s_type == SPTKind.TypeVar:
+            assert isinstance(node.value, ast.Call)
+            name = get_typevar_name(node.value)
+            # FIXME: the defnode given here is incorrect
+            entry = Entry(TypeVar(name).get_default_type(), node.value)
+            return name, entry
+        else:
+            assert 0, "not implemented yet"
+            return None, None  # to suppress type warnings...
+
+
+def get_stp_kind(node: Union[ast.Assign, ast.AnnAssign]) -> Optional[SPTKind]:
     """Return the kind of assignment node, if it's a normal assignment(not TypeVar,
     TypeAlias...), then return None"""
     if isinstance(node.value, ast.Call):
         if isinstance(node.value.func, ast.Name):
             fname = node.value.func.id
             if fname == 'TypeVar':
-                return SType.TypeVar
+                return SPTKind.TypeVar
     return None
 
 
-def analyse_special_typing(kind: SType, node: Union[ast.Assign, ast.AnnAssign],
-                           env: 'Environment'):
-    if kind == SType.TypeVar:
-        analyse_typevar(node, env)
-    else:
-        assert 0, "Not implemented yet"
-
-
-def analyse_typevar(node: Union[ast.Assign, ast.AnnAssign],
-                    env: 'Environment') -> Optional[TypeVar]:
-    assert isinstance(node.value, ast.Call)
-    try:
-        tpvar = collect_typevar_info(node.value, env)
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                var_name = liter_unparse(target)
-                if var_name != tpvar.name:
-                    env.add_err(target,
-                                f"{var_name} doesn't match {tpvar.name}")
-        else:
-            # TODO: analyse annotation
-            var_name = liter_unparse(node.target)
-            if var_name != tpvar.name:
-                env.add_err(node.target,
-                            f"{var_name} doesn't match {tpvar.name}")
-        return tpvar
-    except ParseException as e:
-        env.add_err(e.node, e.msg or '')
-        return None
-
-
-def collect_typevar_info(call_expr: ast.Call, env: 'Environment') -> TypeVar:
-    tpvar_name = get_typevar_name(call_expr)
-    tpvar = env.lookup_local_type(tpvar_name)
-    assert tpvar.name == tpvar_name, f'get {tpvar_name}, expect {tpvar.name}'
-    if not tpvar or not isinstance(tpvar, TypeVar):
-        raise ParseException(call_expr.args[0], f'{tpvar_name} unbound')
-
-    # complete the content in the TypeVar which stored in tpvar
-    # analyse the type constrains
-    cons_list: List[TypeIns] = []
+def collect_typevar_info(tpvar: TypeVar, call_expr: ast.Call,
+                         symtable: SymTable) -> TypeVar:
+    """Complete the content in the TypeVar which stored in tpvar and analyse
+    the type constrains"""
+    cons_list: List['TypeIns'] = []
     for cons_node in call_expr.args[1:]:
         try:
-            cons_tp = parse_annotation(cons_node, env,
-                                       True)  # check definition
+            cons_tp = eval_type_expr(cons_node, symtable)  # check definition
             if cons_tp:
                 cons_list.append(cons_tp)
             else:
-                env.add_err(cons_node, 'failed to get type')
+                assert 0
+                # mbox.add_err(cons_node, 'failed to get type')
+                pass  # TODO: warning information
         except ParseException as e:
-            env.add_err(e.node, e.msg or 'failed to get type')
+            assert 0
+            # mbox.add_err(e.node, e.msg or 'failed to get type')
+            pass  # TODO: warning information
 
     # analyse the keyword arguments
     kw_bound = None
@@ -92,67 +77,101 @@ def collect_typevar_info(call_expr: ast.Call, env: 'Environment') -> TypeVar:
     for kwarg in call_expr.keywords:
         if kwarg.arg == 'bound':
             if kw_bound:
-                env.add_err(kwarg, f'duplicate bound')
+                assert 0
+                # mbox.add_err(kwarg, f'duplicate bound')
+                pass
             elif len(cons_list) > 0:
-                env.add_err(kwarg, "bound and constrains can't coexist")
+                assert 0
+                # mbox.add_err(kwarg, "bound and constrains can't coexist")
+                pass
             else:
                 try:
-                    kw_bound = parse_annotation(kwarg.value, env, False)
+                    bound_ins = eval_type_expr(kwarg.value, symtable)
                 except ParseException as e:
-                    env.add_err(e.node, e.msg or f'broken type')
+                    assert 0
+                    # mbox.add_err(e.node, e.msg or f'broken type')
+                    pass
                 else:
-                    if kw_bound is None:
-                        env.add_err(kwarg, 'invalid type')
+                    if bound_ins is None:
+                        # mbox.add_err(kwarg, 'invalid type')
+                        pass
+                    else:
+                        kw_bound = Entry(bound_ins, kwarg.value)
         elif kwarg.arg == 'covariant':
             if kw_contravariant:
-                env.add_err(kwarg, 'covariant and contravariant is inconsist')
-            else:
-                try:
-                    val = val_unparse(kwarg.value)
-                    if isinstance(val, bool):
-                        kw_contravariant = val
-                    else:
-                        env.add_err(kwarg, 'bool type expected')
-                except ParseException as e:
-                    env.add_err(kwarg, e.msg or 'broken type')
-        elif kwarg.arg == 'contravariant':
-            if kw_covariant:
-                env.add_err(kwarg, 'covariant and contravariant is inconsist')
+                assert 0
+                # mbox.add_err(kwarg, 'covariant and contravariant is inconsist')
+                pass
             else:
                 try:
                     val = val_unparse(kwarg.value)
                     if isinstance(val, bool):
                         kw_covariant = val
                     else:
-                        env.add_err(kwarg, 'bool type expected')
+                        assert 0
+                        # mbox.add_err(kwarg, 'bool type expected')
+                        pass
                 except ParseException as e:
-                    env.add_err(kwarg, e.msg or 'broken type')
+                    assert 0
+                    # mbox.add_err(kwarg, e.msg or 'broken type')
+                    pass
+        elif kwarg.arg == 'contravariant':
+            if kw_covariant:
+                assert 0
+                # mbox.add_err(kwarg, 'covariant and contravariant is inconsist')
+                pass
+            else:
+                try:
+                    val = val_unparse(kwarg.value)
+                    if isinstance(val, bool):
+                        kw_contravariant = val
+                    else:
+                        assert 0
+                        # mbox.add_err(kwarg, 'bool type expected')
+                        pass
+                except ParseException as e:
+                    assert 0
+                    # mbox.add_err(kwarg, e.msg or 'broken type')
+                    pass
         else:
-            env.add_err(
-                kwarg,
-                f'keyword argument must be bound, covariant or contravariant')
+            assert 0
+            # mbox.add_err(
+            #     kwarg,
+            #     f'keyword argument must be bound, covariant or contravariant')
+            pass
 
     # check validity
     tpvar.constrains = cons_list
 
     if kw_bound:
-        assert isinstance(kw_bound, TypeIns)
-        tpvar.bound = kw_bound
+        assert isinstance(kw_bound, Entry)
+        tpvar.bound = kw_bound.get_type()
     if kw_covariant:
         assert isinstance(kw_covariant, bool)
         tpvar.covariant = True
+        tpvar.contravariant = False
+        tpvar.invariant = False
     elif kw_contravariant:
         assert isinstance(kw_contravariant, bool)
+        tpvar.covariant = False
         tpvar.contravariant = True
+        tpvar.invariant = False
     else:
+        tpvar.covariant = False
+        tpvar.contravariant = False
         tpvar.invariant = True
+
+    cons_str = [str(tp) for tp in tpvar.constrains]
+    bound_str = str(tpvar.bound)
+    logger.debug(f'{tpvar.name} constrains: {cons_str}, bound: {bound_str}')
 
     return tpvar
 
 
 def get_typevar_name(call_expr: ast.Call) -> str:
     if len(call_expr.args) <= 0:
-        raise ParseException(call_expr, f'TypeVar need at least one parameter')
+        raise ParseException(call_expr,
+                             f'TypeVar needs at least one parameter')
 
     tpvar_name = liter_unparse(call_expr.args[0])
     if not tpvar_name:
