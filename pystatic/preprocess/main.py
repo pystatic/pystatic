@@ -1,5 +1,6 @@
 import ast
 from collections import deque
+from pystatic.symtable import SymTable
 from typing import Optional, TYPE_CHECKING, Deque, List, Dict, Union
 from pystatic.typesys import TypeModuleTemp
 from pystatic.modfinder import ModuleFinder

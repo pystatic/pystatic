@@ -448,7 +448,7 @@ class TypeLiteralTemp(TypeTemp):
         super().__init__('typing.Literal')
 
 
-# default types
+# special types
 any_temp = TypeAnyTemp()
 none_temp = TypeNoneTemp()
 generic_temp = TypeGenericTemp()

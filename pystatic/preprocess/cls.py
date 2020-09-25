@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_cls_def(targets: List['Target']):
+    """Get class definition information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
     for temp in resolve_order:
@@ -26,6 +27,7 @@ def resolve_cls_def(targets: List['Target']):
 
 
 def _build_graph(targets: List['Target']) -> 'DependencyGraph':
+    """Build dependency graph"""
     graph = DependencyGraph()
     for target in targets:
         for temp in target.symtable.cls_defs.values():
@@ -35,6 +37,7 @@ def _build_graph(targets: List['Target']) -> 'DependencyGraph':
 
 
 def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
+    """Add dependency relations about a class"""
     inner_sym = clstemp.get_inner_symtable()
 
     _build_graph_inh(clstemp, graph)
@@ -42,10 +45,12 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
     for subtemp in inner_sym.cls_defs.values():
         assert isinstance(subtemp, TypeClassTemp)
         _build_graph_cls(subtemp, graph)
+        # add dependency relations due to containment
         graph.add_dependency(clstemp, subtemp)
 
 
 def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
+    """Add dependency relations that due to the inheritance"""
     if _check_cls_state(clstemp):
         graph.add_typetemp(clstemp)
         assert isinstance(
@@ -70,6 +75,7 @@ def _check_cls_state(temp: 'TypeTemp'):
 
 
 def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
+    """Resolve placeholders of a class"""
     assert _check_cls_state(clstemp)
     symtable = clstemp.get_def_symtable()
     visitor = _TypeVarVisitor(symtable, [])
@@ -81,6 +87,7 @@ def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
 
 
 def _resolve_cls_inh(clstemp: 'TypeClassTemp'):
+    """Resolve baseclasses of a class"""
     assert _check_cls_state(clstemp)
     symtable = clstemp.get_def_symtable()
     defnode = clstemp.get_defnode()
@@ -92,6 +99,11 @@ def _resolve_cls_inh(clstemp: 'TypeClassTemp'):
 
 
 class _FirstClassTempVisitor(NoGenVisitor):
+    """Get the first class template.
+
+    Used to build dependency graph. For example class C inherits A.B,
+    this should return A's template so you can add edge from C to A.
+    """
     def __init__(self, symtable: 'SymTable') -> None:
         self.symtable = symtable
 
@@ -111,7 +123,7 @@ class _FirstClassTempVisitor(NoGenVisitor):
     def visit_Attribute(self, node: ast.Attribute):
         res = self.visit(node.value)
         if isinstance(res.temp, TypeModuleTemp):
-            return res.temp.get_type_def(node.attr).get_default_type()
+            return res.temp.get_inner_typedef(node.attr).get_default_type()
         else:
             return res
 
@@ -120,6 +132,10 @@ class _FirstClassTempVisitor(NoGenVisitor):
 
 
 class _TypeVarVisitor(BaseVisitor):
+    """Get the list of TypeVar from baseclass nodes.
+
+    Used to generate correct placeholders.
+    """
     def __init__(self, symtable: 'SymTable',
                  typevars: List['TypeVar']) -> None:
         self.symtable = symtable

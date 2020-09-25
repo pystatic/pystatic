@@ -189,6 +189,7 @@ class TypeExprVisitor(BaseVisitor):
                     if not str_res:
                         raise NotType
                     else:
+                        assert isinstance(str_res, TypeType)
                         return str_res
                 else:
                     raise NotType

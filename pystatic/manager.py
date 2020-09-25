@@ -51,41 +51,11 @@ class Manager:
 
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
-        pass
         for err in self.mbox.error:
             print(err)
 
     def preprocess(self, targets):
         self.preprocessor.process(targets)
-
-    # def preprocess(self, targets):
-    #     if isinstance(targets, Target):
-    #         self.pre_queue.append(targets)
-    #     elif isinstance(targets, list):
-    #         for target in targets:
-    #             self.pre_queue.append(target)
-
-    #     to_check: List[Target] = []
-    #     while len(self.pre_queue) > 0:
-    #         current = self.pre_queue[0]
-    #         self.pre_queue.popleft()
-    #         self.assert_parse(current)
-    #         assert current.stage == Stage.PreSymtable
-    #         assert current.ast
-    #         to_check.append(current)
-
-    #         preprocess.get_definition(current.ast, self, current.symtable,
-    #                                   self.mbox, current.uri)
-
-    #     for target in to_check:
-    #         preprocess.resolve_import_type(target.symtable, self)
-
-    #     preprocess.resolve_cls_def(to_check)
-
-    #     for target in to_check:
-    #         preprocess.resolve_local_typeins(target.symtable)
-
-    #     pass
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""

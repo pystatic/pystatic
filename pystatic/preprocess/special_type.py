@@ -53,8 +53,8 @@ def get_stp_kind(node: Union[ast.Assign, ast.AnnAssign]) -> Optional[SPTKind]:
 
 def collect_typevar_info(tpvar: TypeVar, call_expr: ast.Call,
                          symtable: SymTable) -> TypeVar:
-    # complete the content in the TypeVar which stored in tpvar
-    # analyse the type constrains
+    """Complete the content in the TypeVar which stored in tpvar and analyse
+    the type constrains"""
     cons_list: List['TypeIns'] = []
     for cons_node in call_expr.args[1:]:
         try:
