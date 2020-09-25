@@ -1,45 +1,20 @@
 import os
 import ast
 import logging
-import enum
 from collections import deque
 from pystatic.message import MessageBox
 from typing import Optional, List, TextIO, Set, Dict, Deque
-from pystatic import preprocess
+from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
-                                 get_init_env)
+                                 get_init_symtable)
 from pystatic.symtable import SymTable
 from pystatic.typesys import TypeModuleTemp, TpState
 from pystatic.config import Config
-from pystatic.modfinder import (ModuleFinder, ModuleFindRes)
+from pystatic.modfinder import ModuleFinder
 from pystatic.uri import Uri, relpath2uri
+from pystatic.target import Target, Stage
 
 logger = logging.getLogger(__name__)
-
-
-class ReadNsAst(Exception):
-    pass
-
-
-class Stage(enum.IntEnum):
-    """Number ascends as the analysis going deeper"""
-    PreParse = 0
-    PreSymtable = 1
-
-
-class Target:
-    def __init__(self,
-                 uri: Uri,
-                 symtable: Optional[SymTable] = None,
-                 stage: Stage = Stage.PreParse):
-        self.uri = uri
-        self.stage = stage
-
-        self.symtable = symtable or get_init_env(
-        ).symtable  # NOTE: this is a temporary implementation
-        self.ast: Optional[ast.AST] = None
-
-        self.module_temp = TypeModuleTemp(uri, self.symtable, TpState.OVER)
 
 
 class Manager:
@@ -52,10 +27,10 @@ class Manager:
         self.user_path: Set[str] = set()
         self.set_user_path(module_files)
         self.set_user_path(package_files)
-        self.finder = ModuleFinder(self.config.manual_path,
-                                   list(self.user_path), self.config.sitepkg,
-                                   self.config.typeshed,
-                                   self.config.python_version)
+        finder = ModuleFinder(self.config.manual_path, list(self.user_path),
+                              self.config.sitepkg, self.config.typeshed,
+                              self.config.python_version)
+        self.preprocessor = Preprocessor(self, finder)
 
         self.stdout = stdout
         self.stderr = stderr
@@ -65,8 +40,6 @@ class Manager:
 
         self.mbox = MessageBox('test')  # TODO: refactor this
 
-        self.targets: Dict[Uri, Target] = {**self.check_targets}
-
         self.pre_queue: Deque[Target] = deque()
 
         self.init_typeshed()
@@ -74,56 +47,45 @@ class Manager:
     def init_typeshed(self):
         builtins_target = Target('builtins', get_builtin_symtable())
         typing_target = Target('typing', get_typing_symtable())
-        self.targets['builtins'] = builtins_target
-        self.targets['typing'] = typing_target
         self.preprocess([typing_target, builtins_target])
-
-    def add_target(self, uri: Uri):
-        if uri not in self.targets:
-            new_target = Target(uri)
-            self.targets[uri] = new_target
-            self.pre_queue.append(new_target)
-
-    def get_module_temp(self, uri: Uri) -> Optional[TypeModuleTemp]:
-        if uri in self.targets:
-            return self.targets[uri].module_temp
-        else:
-            return None
 
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
-
+        pass
         for err in self.mbox.error:
             print(err)
 
     def preprocess(self, targets):
-        if isinstance(targets, Target):
-            self.pre_queue.append(targets)
-        elif isinstance(targets, list):
-            for target in targets:
-                self.pre_queue.append(target)
+        self.preprocessor.process(targets)
 
-        to_check: List[Target] = []
-        while len(self.pre_queue) > 0:
-            current = self.pre_queue[0]
-            self.pre_queue.popleft()
-            self.assert_parse(current)
-            assert current.stage == Stage.PreSymtable
-            assert current.ast
-            to_check.append(current)
+    # def preprocess(self, targets):
+    #     if isinstance(targets, Target):
+    #         self.pre_queue.append(targets)
+    #     elif isinstance(targets, list):
+    #         for target in targets:
+    #             self.pre_queue.append(target)
 
-            preprocess.get_definition(current.ast, self, current.symtable,
-                                      self.mbox, current.uri)
+    #     to_check: List[Target] = []
+    #     while len(self.pre_queue) > 0:
+    #         current = self.pre_queue[0]
+    #         self.pre_queue.popleft()
+    #         self.assert_parse(current)
+    #         assert current.stage == Stage.PreSymtable
+    #         assert current.ast
+    #         to_check.append(current)
 
-        for target in to_check:
-            preprocess.resolve_import_type(target.symtable, self)
+    #         preprocess.get_definition(current.ast, self, current.symtable,
+    #                                   self.mbox, current.uri)
 
-        preprocess.resolve_cls_def(to_check)
+    #     for target in to_check:
+    #         preprocess.resolve_import_type(target.symtable, self)
 
-        for target in to_check:
-            preprocess.resolve_local_typeins(target.symtable)
+    #     preprocess.resolve_cls_def(to_check)
 
-        pass
+    #     for target in to_check:
+    #         preprocess.resolve_local_typeins(target.symtable)
+
+    #     pass
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""
@@ -146,55 +108,8 @@ class Manager:
                 continue
             rt_path = crawl_path(os.path.dirname(srcfile))
             uri = relpath2uri(rt_path, srcfile)
-            target = Target(uri, stage=Stage.PreParse)
-            self.parse(target)
+            target = Target(uri, get_init_symtable(), stage=Stage.PreParse)
             self.check_targets[uri] = target
-
-    def assert_parse(self, target: Target):
-        if target.stage <= Stage.PreParse:
-            self.parse(target)
-
-    def parse(self, target: Target) -> ast.AST:
-        # TODO: error handling
-        assert target.stage == Stage.PreParse
-        target.ast = self.uri2ast(target.uri)
-        target.stage = Stage.PreSymtable
-        return target.ast
-
-    def is_valid_uri(self, uri: Uri) -> bool:
-        find_res = self.finder.find(uri)
-        if find_res:
-            return True
-        else:
-            return False
-
-    def uri2ast(self, uri: Uri) -> ast.AST:
-        """Return the ast tree corresponding to uri.
-
-        May throw SyntaxError or FileNotFoundError or ReadNsAst exception.
-        """
-        find_res = self.finder.find(uri)
-        if not find_res:
-            raise FileNotFoundError
-        if find_res.res_type == ModuleFindRes.Module:
-            assert len(find_res.paths) == 1
-            assert find_res.target_file
-            return path2ast(find_res.target_file)
-        elif find_res.res_type == ModuleFindRes.Package:
-            assert len(find_res.paths) == 1
-            assert find_res.target_file
-            return path2ast(find_res.target_file)
-        elif find_res.res_type == ModuleFindRes.Namespace:
-            raise ReadNsAst()
-        else:
-            assert False
-
-
-def path2ast(path: str) -> ast.AST:
-    """May throw FileNotFoundError or SyntaxError"""
-    with open(path, 'r') as f:
-        content = f.read()
-        return ast.parse(content, type_comments=True)
 
 
 def crawl_path(path: str) -> str:

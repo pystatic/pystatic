@@ -11,18 +11,23 @@ from pystatic.preprocess.impt import split_import_stmt
 from pystatic.uri import Uri
 
 if TYPE_CHECKING:
-    from pystatic.manager import Manager
+    from pystatic.preprocess.main import Preprocessor
 
 logger = logging.getLogger(__name__)
 
 
+def get_definition(ast: 'ast.AST', worker: 'Preprocessor',
+                   symtable: 'SymTable', mbox: 'MessageBox', uri: 'Uri'):
+    return TypeDefVisitor(worker, symtable, mbox, uri).accept(ast)
+
+
 class TypeDefVisitor(BaseVisitor):
-    def __init__(self, manager: 'Manager', symtable: 'SymTable',
+    def __init__(self, worker: 'Preprocessor', symtable: 'SymTable',
                  mbox: 'MessageBox', uri: Uri) -> None:
         super().__init__()
         self.symtable = symtable
         self.mbox = mbox
-        self.manager = manager
+        self.worker = worker
         self.uri = uri
 
         self._is_class = False
@@ -125,7 +130,7 @@ class TypeDefVisitor(BaseVisitor):
     def _add_import_info(self, node: ast.AST,
                          imp_dict: Dict[Uri, List[Tuple[str, str]]]):
         for uri, tples in imp_dict.items():
-            self.manager.add_target(uri)
+            self.worker.add_target_uri(uri)
             for asname, origin_name in tples:
                 self.symtable.add_import_item(asname, uri, origin_name, node)
 

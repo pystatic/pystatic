@@ -103,7 +103,8 @@ class SymTable:
                 return res
             curtable = curtable.non_local
         curtable = self.glob
-        res = find(curtable, name)
+        if curtable:
+            res = find(curtable, name)
         if res:
             return res
         return find(self.builtins, name)

@@ -5,7 +5,7 @@ from pystatic.uri import uri_last, uri_parent, rel2absuri, Uri
 from pystatic.symtable import SymTable, Entry
 
 if TYPE_CHECKING:
-    from pystatic.manager import Manager
+    from pystatic.preprocess.main import Preprocessor
 
 
 def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
@@ -38,9 +38,9 @@ def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
     return res
 
 
-def resolve_import_type(symtable: SymTable, manager: 'Manager'):
+def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     for uri, info in symtable.import_info.items():
-        module_temp = manager.get_module_temp(uri)
+        module_temp = worker.get_module_temp(uri)
         if not module_temp:
             assert 0, "this error not handled yet"  # TODO: add warning here
 
@@ -60,4 +60,4 @@ def resolve_import_type(symtable: SymTable, manager: 'Manager'):
     for tp_def in symtable.cls_defs.values():
         assert isinstance(tp_def, TypeClassTemp)
         inner_symtable = tp_def.get_inner_symtable()
-        resolve_import_type(inner_symtable, manager)
+        resolve_import_type(inner_symtable, worker)

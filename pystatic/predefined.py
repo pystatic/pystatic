@@ -52,11 +52,10 @@ def get_typing_symtable() -> SymTable:
     return typing_symtable
 
 
-def get_init_env() -> Environment:
+def get_init_symtable() -> SymTable:
     new_symtable = SymTable(
         None,  # type: ignore
         None,
         builtin_symtable,
         TableScope.GLOB)
-    new_symtable.glob = new_symtable
-    return Environment(new_symtable)
+    return new_symtable
