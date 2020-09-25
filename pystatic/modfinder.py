@@ -147,4 +147,4 @@ def uri_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> str:
 
 def urilist_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> List[str]:
     package = uri2list(curmodule.uri)[:-1]  # the package that cur_module in
-    return absolute_urilist(uri, list2uri(package))
+    return absolute_urilist(list2uri(package), uri)
