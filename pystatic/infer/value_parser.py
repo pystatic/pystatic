@@ -40,7 +40,6 @@ class RValueParser(ValueParser):
             if tp is not None:
                 return tp
         tp = self.var_tree.lookup_attr(node.id)
-
         if not tp:
             self.env.add_err(node, f"unresolved reference '{node.id}'")
         return tp

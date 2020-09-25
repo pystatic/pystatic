@@ -19,10 +19,10 @@ class Scope:
         self.scope_type = scope_type
         self.parent = parent
 
-        self.attr: Dict[str, Scope] = {}
+        self.scopes: Dict[str, Scope] = {}
 
-    def add_attr(self, name: str, scope: "Scope"):
-        self.attr[name] = scope
+    def add_scope(self, name: str, scope: "Scope"):
+        self.scopes[name] = scope
 
     def get_attr(self, name: str):
         return self.tp.getattr(name)
@@ -31,20 +31,20 @@ class Scope:
         self.tp.setattr(name, tp)
 
     def get_cls(self, name):
-        scope = self.attr.get(name)
+        scope = self.scopes.get(name)
         assert scope is not None
         assert scope.scope_type == ScopeType.CLASS_TYPE
         return scope
 
     def get_func(self, name):
-        scope = self.attr.get(name)
+        scope = self.scopes.get(name)
         assert scope is not None
         assert scope.scope_type == ScopeType.LOCAL_TYPE or \
                scope.scope_type == ScopeType.NON_LOCAL_TYPE
         return scope
 
     def is_defined(self, name) -> bool:
-        return name in self.attr
+        return name in self.scopes
 
 
 class VarTree:
@@ -64,11 +64,11 @@ class VarTree:
 
     def add_cls(self, name, tp):
         scope = Scope(name, tp, self.cur_scope, ScopeType.CLASS_TYPE)
-        self.cur_scope.add_attr(name, scope)
+        self.cur_scope.add_scope(name, scope)
 
     def add_var(self, name, tp):
         scope = Scope(name, tp, self.cur_scope, ScopeType.VAR_TYPE)
-        self.cur_scope.add_attr(name, scope)
+        self.cur_scope.add_scope(name, scope)
         self.cur_scope.set_attr(name, tp)
 
     def add_func(self, name, tp):
@@ -76,7 +76,7 @@ class VarTree:
             scope = Scope(name, tp, self.cur_scope, ScopeType.NON_LOCAL_TYPE)
         else:
             scope = Scope(name, tp, self.cur_scope, ScopeType.LOCAL_TYPE)
-        self.cur_scope.add_attr(name, scope)
+        self.cur_scope.add_scope(name, scope)
 
     def enter_cls(self, name):
         self.cur_scope = self.cur_scope.get_cls(name)
@@ -102,6 +102,17 @@ class VarTree:
                 if tp:
                     return tp
             tmp_scope = tmp_scope.parent
+        return None
 
     def is_defined(self, name):
-        return self.cur_scope.is_defined(name)
+        if self.cur_scope.is_defined(name):
+            return True
+        tmp_scope = self.cur_scope.parent
+        while tmp_scope:
+            if tmp_scope.scope_type == ScopeType.LOCAL_TYPE \
+                    or tmp_scope.scope_type == ScopeType.GLOBAL_TYPE:
+                tp = tmp_scope.get_attr(name)
+                if tp:
+                    return tp
+            tmp_scope = tmp_scope.parent
+        return False

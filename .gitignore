@@ -129,7 +129,6 @@ include
 .VSCodeCounter
 
 # pytest
-tests
 pytest.ini
 
 # script

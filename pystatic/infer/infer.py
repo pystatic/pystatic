@@ -23,6 +23,9 @@ class InferVisitor(BaseVisitor):
         self.root = node
         self.checker = TypeChecker(self.env)
 
+        self.ret_value = []
+        self.ret_annotation = None
+
     def infer(self):
         self.visit(self.root)
 
@@ -86,34 +89,24 @@ class InferVisitor(BaseVisitor):
         self.var_tree.leave_func()
 
     def infer_ret_value_of_func(self, node, func_type):
-        rtype = FunctionDefVisitor(self.env, self.var_tree, func_type.ret_type).accept(node)
+        for subnode in node.body:
+            self.visit(subnode)
+        if len(self.ret_value) == 0:
+            rtype = any_type
+            # TODO: type check
+        elif len(self.ret_value) == 1:
+            rtype = self.ret_value[0]
+        else:
+            raise Exception(f"todo")
+        self.ret_value = []
         if func_type.ret_type.__str__() == "Any":
             func_type.ret_type = rtype
 
-
-class FunctionDefVisitor(BaseVisitor):
-    def __init__(self, env, var_tree, annotation):
-        self.env = env
-        self.var_tree = var_tree
-        self.annotation = annotation
-        self.type_list = []
-        self.checker = TypeChecker(self.env)
-
-    def accept(self, node):
-        assert isinstance(node, ast.FunctionDef)
-        self.visit(node)
-        if len(self.type_list) == 0:
-            return any_type
-        elif len(self.type_list) == 1:
-            return self.type_list[0]
-        else:
-            raise Exception(f"todo")
-
     def visit_Return(self, node: ast.Return):
         tp = RValueParser(self.env, self.var_tree).accept(node.value)
-        self.checker.check(self.annotation, tp, node.value)
-        if tp not in self.type_list:
-            self.type_list.append(tp)
+        self.checker.check(self.ret_annotation, tp, node.value)
+        if tp not in self.ret_value:
+            self.ret_value.append(tp)
 
 
 class InferStarter:
@@ -134,42 +127,3 @@ class InferStarter:
             node = ast.parse(data)
             infer_visitor = InferVisitor(node, target.module, target.env)
             infer_visitor.infer()
-            # DisplayVar(target.env, node).accept()
-
-class DisplayVar(BaseVisitor):
-    def __init__(self, env: Environment, ast_rt: ast.AST):
-        self.env = env
-        self.ast_rt = ast_rt
-        self.curscope = self.env.module
-        self.tab = 0
-
-    def accept(self):
-        print(" "*self.tab, self.curscope.name)
-        self.tab += 4
-        print(" "*self.tab, "attribute in this scope")
-        for var in self.curscope.cls_attr.keys():
-            print(" "*self.tab, var, self.curscope.cls_attr[var])
-        self.visit(self.ast_rt)
-        self.tab -= 4
-
-    def visit_ClassDef(self, node: ast.ClassDef):
-        self.displayscopeattribute('class', node)
-
-    def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.displayscopeattribute('function', node)
-
-    def displayscopeattribute(self, whichtype, node):
-        curscopetmp = self.curscope
-        self.curscope = self.curscope.getattr(node.name)
-        print(" "*self.tab, "below is {} scope".format(whichtype))
-        if isinstance(node, ast.ClassDef):
-            print(" "*self.tab, self.curscope.name)
-        else:
-            print(" "*self.tab, node.name, self.curscope)
-        self.tab += 4
-        for var in self.curscope.temp.cls_attr.keys():
-            print(" "*self.tab, var, self.curscope.temp.cls_attr[var])
-        for bodynode in node.body:
-            self.visit(self.ast_rt)
-        self.tab -= 4
-        self.curscope = curscopetmp
