@@ -55,7 +55,7 @@ class Manager:
             print(err)
 
     def preprocess(self, targets):
-        self.preprocessor.process(targets)
+        self.preprocessor.process_module(targets)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""

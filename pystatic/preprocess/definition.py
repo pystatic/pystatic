@@ -130,7 +130,7 @@ class TypeDefVisitor(BaseVisitor):
     def _add_import_info(self, node: ast.AST,
                          imp_dict: Dict[Uri, List[Tuple[str, str]]]):
         for uri, tples in imp_dict.items():
-            self.worker.add_target_uri(uri)
+            self.worker.add_cache_target_uri(uri)
             for asname, origin_name in tples:
                 self.symtable.add_import_item(asname, uri, origin_name, node)
 

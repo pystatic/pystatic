@@ -8,13 +8,13 @@ from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.preprocess.dependency import DependencyGraph
 
 if TYPE_CHECKING:
-    from pystatic.manager import Target
+    from pystatic.target import BlockTarget
     from pystatic.symtable import SymTable
 
 logger = logging.getLogger(__name__)
 
 
-def resolve_cls_def(targets: List['Target']):
+def resolve_cls_def(targets: List['BlockTarget']):
     """Get class definition information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
@@ -26,7 +26,7 @@ def resolve_cls_def(targets: List['Target']):
         temp.set_state(TpState.OVER)
 
 
-def _build_graph(targets: List['Target']) -> 'DependencyGraph':
+def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
     """Build dependency graph"""
     graph = DependencyGraph()
     for target in targets:
