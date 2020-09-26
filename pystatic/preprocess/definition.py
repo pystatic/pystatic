@@ -21,6 +21,12 @@ def get_definition(ast: 'ast.AST', worker: 'Preprocessor',
     return TypeDefVisitor(worker, symtable, mbox, uri).accept(ast)
 
 
+def get_definition_in_method(ast: 'ast.AST', worker: 'Preprocessor',
+                             symtable: 'SymTable', mbox: 'MessageBox',
+                             uri: 'Uri', clstemp: 'TypeClassTemp'):
+    pass
+
+
 class TypeDefVisitor(BaseVisitor):
     def __init__(self, worker: 'Preprocessor', symtable: 'SymTable',
                  mbox: 'MessageBox', uri: Uri) -> None:
@@ -30,7 +36,7 @@ class TypeDefVisitor(BaseVisitor):
         self.worker = worker
         self.uri = uri
 
-        self._is_class = False
+        self._is_class = False  # whether inside a method
         self._clstemp = None
         self._clsname: List[str] = []
 
@@ -130,10 +136,25 @@ class TypeDefVisitor(BaseVisitor):
     def _add_import_info(self, node: ast.AST,
                          imp_dict: Dict[Uri, List[Tuple[str, str]]]):
         for uri, tples in imp_dict.items():
-            self.worker.add_target_uri(uri)
+            self.worker.add_cache_target_uri(uri)
             for asname, origin_name in tples:
                 self.symtable.add_import_item(asname, uri, origin_name, node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         logger.debug(f'add function {node.name}')
         self.symtable.add_fun_entry(node.name, Entry(None, node))
+
+
+class MethodDefVisitor(TypeDefVisitor):
+    def __init__(self, worker: 'Preprocessor', symtable: 'SymTable',
+                 mbox: 'MessageBox', uri: 'Uri',
+                 clstemp: 'TypeClassTemp') -> None:
+        super().__init__(worker, symtable, mbox, uri)
+        self._clstemp = clstemp
+        self._is_class = True
+
+    def visit_Assign(self, node: ast.Assign):
+        pass
+
+    def visit_AnnAssign(self, node: ast.AnnAssign):
+        pass

@@ -41,8 +41,6 @@ class Manager:
 
         self.mbox = MessageBox('test')  # TODO: refactor this
 
-        self.pre_queue: Deque[Target] = deque()
-
         self.init_typeshed()
 
     def init_typeshed(self):
@@ -60,7 +58,7 @@ class Manager:
         InferStarter(self.check_targets, self.mbox).start_infer()
 
     def preprocess(self, targets):
-        self.preprocessor.process(targets)
+        self.preprocessor.process_module(targets)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""

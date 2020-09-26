@@ -4,15 +4,15 @@ import enum
 
 # Enum constant part
 class Reach(enum.Enum):
-    TYPE_TRUE = 1
-    TYPE_FALSE = 2
-    RUNTIME_TRUE = 3
-    RUNTIME_FALSE = 4
-    ALWAYS_TRUE = 5
-    ALWAYS_FALSE = 6
-    CLS_REDEF = 7
-    NEVER = 8
-    UNKNOWN = 9
+    TYPE_TRUE = 1  # true on type checking(see TYPE_CHECKING)
+    TYPE_FALSE = 2  # false on type checking
+    RUNTIME_TRUE = 3  # true on runtime
+    RUNTIME_FALSE = 4  # false on runtime
+    ALWAYS_TRUE = 5  # always true
+    ALWAYS_FALSE = 6  # always wrong
+    CLS_REDEF = 7  # class redefined(usually ommit this)
+    NEVER = 8  # node that will never be visited
+    UNKNOWN = 9  # uncertain about its reachability
 
 
 def cal_neg(res: Reach) -> Reach:
