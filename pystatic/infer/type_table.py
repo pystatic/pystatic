@@ -12,7 +12,7 @@ class ScopeType(Enum):
 
 
 class Scope:
-    def __init__(self, name: str, tp: TypeIns, parent: "Scope",
+    def __init__(self, name: str, tp: Union[TypeType, TypeTemp], parent: "Scope",
                  scope_type: ScopeType):
         self.name = name
         self.tp = tp
@@ -24,8 +24,13 @@ class Scope:
     def add_scope(self, name: str, scope: "Scope"):
         self.scopes[name] = scope
 
-    def get_attr(self, name: str):
-        return self.tp.getattr(name)
+    def get_attr(self, name: str, bindlist=None):
+        if isinstance(self.tp, TypeType):
+            return self.tp.getattribute(name=name, context=None)
+        elif isinstance(self.tp, TypeTemp):
+            return self.tp.getattribute(name=name, bindlist=bindlist, context=None)
+        else:
+            raise Exception("TODO")
 
     def set_attr(self, name, tp):
         self.tp.setattr(name, tp)
@@ -96,7 +101,7 @@ class VarTree:
             return tp
         tmp_scope = self.cur_scope.parent
         while tmp_scope:
-            if tmp_scope.scope_type == ScopeType.LOCAL_TYPE\
+            if tmp_scope.scope_type == ScopeType.LOCAL_TYPE \
                     or tmp_scope.scope_type == ScopeType.GLOBAL_TYPE:
                 tp = tmp_scope.get_attr(name)
                 if tp:
@@ -104,15 +109,5 @@ class VarTree:
             tmp_scope = tmp_scope.parent
         return None
 
-    def is_defined(self, name):
-        if self.cur_scope.is_defined(name):
-            return True
-        tmp_scope = self.cur_scope.parent
-        while tmp_scope:
-            if tmp_scope.scope_type == ScopeType.LOCAL_TYPE \
-                    or tmp_scope.scope_type == ScopeType.GLOBAL_TYPE:
-                tp = tmp_scope.get_attr(name)
-                if tp:
-                    return tp
-            tmp_scope = tmp_scope.parent
-        return False
+    def is_defined_in_cur_scope(self, name):
+        return self.cur_scope.is_defined(name)

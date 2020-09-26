@@ -13,6 +13,7 @@ from pystatic.config import Config
 from pystatic.modfinder import ModuleFinder
 from pystatic.uri import Uri, relpath2uri
 from pystatic.target import Target, Stage
+from pystatic.infer.infer import InferStarter
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,12 @@ class Manager:
 
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
+        self.start_infer()
         for err in self.mbox.error:
             print(err)
+
+    def start_infer(self):
+        InferStarter(self.check_targets, self.mbox).start_infer()
 
     def preprocess(self, targets):
         self.preprocessor.process(targets)

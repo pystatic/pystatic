@@ -1,6 +1,6 @@
 import ast
 from pystatic.arg import Argument
-from pystatic.env import Environment
+from pystatic.message import MessageBox
 from pystatic.typesys import *
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.type_table import VarTree
@@ -8,16 +8,16 @@ from pystatic.infer.checker import TypeChecker
 
 
 class ValueParser(BaseVisitor):
-    def __init__(self, env: Environment,
+    def __init__(self, mbox: MessageBox,
                  var_tree: VarTree):
-        self.env = env
+        self.mbox = mbox
         self.var_tree = var_tree
-        self.checker = TypeChecker(self.env)
+        self.checker = TypeChecker(self.mbox)
 
 
 class LValueParser(ValueParser):
-    def __init__(self, env: Environment, var_tree: VarTree, rtype):
-        super().__init__(env, var_tree)
+    def __init__(self, mbox: MessageBox, var_tree: VarTree, rtype):
+        super().__init__(mbox, var_tree)
         self.single_name_node = False
         self.rtype = rtype
 
@@ -28,8 +28,8 @@ class LValueParser(ValueParser):
 
 
 class RValueParser(ValueParser):
-    def __init__(self, env: Environment, var_tree: VarTree):
-        super().__init__(env, var_tree)
+    def __init__(self, mbox: MessageBox, var_tree: VarTree):
+        super().__init__(mbox, var_tree)
 
     def accept(self, node) -> Optional[TypeIns]:
         return self.visit(node)
@@ -41,7 +41,7 @@ class RValueParser(ValueParser):
                 return tp
         tp = self.var_tree.lookup_attr(node.id)
         if not tp:
-            self.env.add_err(node, f"unresolved reference '{node.id}'")
+            self.mbox.add_err(node, f"unresolved reference '{node.id}'")
         return tp
 
     def visit_Attribute(self, node):
@@ -50,7 +50,7 @@ class RValueParser(ValueParser):
         if value is not None:
             tp = value.getattr(attr)
             if tp is None:
-                self.env.add_err(node, f"{value} has no attr {tp}")
+                self.mbox.add_err(node, f"{value} has no attr {tp}")
             return tp
         return value
 
@@ -81,11 +81,11 @@ class RValueParser(ValueParser):
         param_length = len(node.args)
         arg_length = len(arg_list)
         if param_length > arg_length:
-            self.env.add_err(node.args[arg_length], f"unexpected argument")
-            self.env.add_err(node, f"too more argument for '{node.func.id}'")
+            self.mbox.add_err(node.args[arg_length], f"unexpected argument")
+            self.mbox.add_err(node, f"too more argument for '{node.func.id}'")
             node.args = node.args[:arg_length]
         elif param_length < arg_length:
-            self.env.add_err(node, f"too few argument for '{node.func.id}'")
+            self.mbox.add_err(node, f"too few argument for '{node.func.id}'")
             arg_list = arg_list[:param_length]
 
         for param, arg in zip(node.args, arg_list):
@@ -96,13 +96,13 @@ class RValueParser(ValueParser):
     def visit_Call(self, node: ast.Call):
         # TODO: the action call need a method
         name = node.func.id
-        if not self.var_tree.is_defined(name):
-            self.env.add_err(node, f"unresolved reference '{name}'")
         tp = self.var_tree.lookup_attr(name)
+        if not tp:
+            self.mbox.add_err(node, f"unresolved reference '{name}'")
         if isinstance(tp, TypeType):
             return tp
-        elif isinstance(tp, TypeFuncIns):
+        elif isinstance(tp, TypeFuncTemp):
             self.check_argument_in_call(node, tp.arg)
-            return tp.ret_type
+            return tp.ret
         else:
             raise Exception(f"todo {type(tp)}")
