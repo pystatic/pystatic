@@ -10,6 +10,7 @@ from pystatic.preprocess.dependency import DependencyGraph
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
     from pystatic.symtable import SymTable
+    from pystatic.preprocess.main import Preprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,13 @@ def resolve_cls_def(targets: List['BlockTarget']):
     """Get class definition information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
+
+    # placeholders
     for temp in resolve_order:
         temp.set_state(TpState.ON)
         _resolve_cls_placeholder(temp)
+
+    # inheritance
     for temp in resolve_order:
         _resolve_cls_inh(temp)
         temp.set_state(TpState.OVER)

@@ -40,8 +40,6 @@ class Manager:
 
         self.mbox = MessageBox('test')  # TODO: refactor this
 
-        self.pre_queue: Deque[Target] = deque()
-
         self.init_typeshed()
 
     def init_typeshed(self):

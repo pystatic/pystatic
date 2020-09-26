@@ -1,7 +1,7 @@
 import ast
 from collections import deque
 from typing import Optional, TYPE_CHECKING, Deque, List, Dict, Union
-from pystatic.typesys import TypeModuleTemp
+from pystatic.typesys import TypeClassTemp, TypeModuleTemp
 from pystatic.modfinder import ModuleFinder
 from pystatic import preprocess
 from pystatic.predefined import get_init_symtable
@@ -34,19 +34,19 @@ class Preprocessor:
         self.finder = finder
 
         self.q_parse: Deque[BlockTarget] = deque()
-        self.q_sym: Deque[BlockTarget] = deque()
 
         self.targets: Dict[Uri, Target] = {}
 
-    def process_block(self, blocks: List[BlockTarget], added: bool):
+    def process_block(self, blocks: List[BlockTarget], added: bool = False):
         """Process a block level target.
 
         :param added: whether these blocks are added to the q_parse before
+        (default: False)
         """
         if not added:
             for block in blocks:
                 self.q_parse.append(block)
-        self.deal_preparse()
+        self._deal()
 
     def process_module(self, targets: List[Target]):
         fresh_targets = []
@@ -57,6 +57,12 @@ class Preprocessor:
                 fresh_targets.append(target)
 
         self.process_block(fresh_targets, True)  # type: ignore
+
+    def _process_method(self, methodblks: List[BlockTarget],
+                        clstemp: TypeClassTemp):
+        for block in methodblks:
+            self.q_parse.append(block)
+        self._deal(True, clstemp)
 
     def get_module_temp(self, uri: 'Uri') -> Optional[TypeModuleTemp]:
         if uri in self.targets:
@@ -82,7 +88,7 @@ class Preprocessor:
             return True
         return False
 
-    def deal_preparse(self):
+    def _deal(self, is_method: bool = False, clstemp=None):
         to_check: List[BlockTarget] = []
         while len(self.q_parse) > 0:
             current = self.q_parse[0]
@@ -91,16 +97,23 @@ class Preprocessor:
             assert current.stage == Stage.PreSymtable
             assert current.ast
             to_check.append(current)
-            self.q_sym.append(current)
 
-            get_definition(current.ast, self, current.symtable,
-                           self.manager.mbox, current.uri)
+            # get current module's class definitions
+            if is_method:
+                assert clstemp
+                pass
+            else:
+                get_definition(current.ast, self, current.symtable,
+                               self.manager.mbox, current.uri)
 
+        # get type imported from other module
         for target in to_check:
             resolve_import_type(target.symtable, self)
 
         resolve_cls_def(to_check)
 
+        # from now on, all valid types in the module should be correctly
+        # identified because possible type(class) information is collected
         for target in to_check:
             resolve_local_typeins(target.symtable)
 

@@ -39,6 +39,7 @@ def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
 
 
 def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
+    """Import types(class definition) from other module"""
     for uri, info in symtable.import_info.items():
         module_temp = worker.get_module_temp(uri)
         if not module_temp:
