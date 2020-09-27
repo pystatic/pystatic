@@ -16,9 +16,10 @@ def resolve_local_typeins(symtable: 'SymTable'):
             if typenode:
                 var_type = eval_type_expr(typenode, symtable)
                 if var_type:
-                    entry.set_type(var_type)
+                    entry.set_type(var_type.getins())
                     logger.debug(f'{name}: {var_type}')
                 else:
+                    # TODO: warning here
                     entry.set_type(any_ins)
                     logger.debug(f'{name}: {any_ins}')
             else:

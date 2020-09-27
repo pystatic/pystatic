@@ -1,7 +1,7 @@
 import ast
 import logging
 from contextlib import contextmanager
-from typing import Dict, List, Tuple, Optional, TYPE_CHECKING
+from typing import Dict, List, Tuple, Optional, TYPE_CHECKING, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeClassTemp, TpState)
 from pystatic.message import MessageBox
@@ -12,51 +12,87 @@ from pystatic.uri import Uri
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
+    from pystatic.target import BlockTarget, MethodTarget
 
 logger = logging.getLogger(__name__)
 
 
-def get_definition(ast: 'ast.AST', worker: 'Preprocessor',
-                   symtable: 'SymTable', mbox: 'MessageBox', uri: 'Uri'):
-    return TypeDefVisitor(worker, symtable, mbox, uri).accept(ast)
+def get_definition(target: 'BlockTarget', worker: 'Preprocessor',
+                   mbox: 'MessageBox'):
+    cur_ast = target.ast
+    symtable = target.symtable
+    uri = target.uri
+    assert cur_ast
+    return TypeDefVisitor(worker, symtable, mbox, uri).accept(cur_ast)
 
 
-def get_definition_in_method(ast: 'ast.AST', worker: 'Preprocessor',
-                             symtable: 'SymTable', mbox: 'MessageBox',
-                             uri: 'Uri', clstemp: 'TypeClassTemp'):
-    pass
+def get_definition_in_method(target: 'MethodTarget', worker: 'Preprocessor',
+                             mbox: 'MessageBox'):
+    cur_ast = target.ast
+    symtable = target.symtable
+    clstemp = target.clstemp
+    uri = target.uri
+    assert isinstance(cur_ast, ast.FunctionDef)
+    return TypeDefVisitor(worker, symtable, mbox, uri, clstemp,
+                          True).accept_func(cur_ast)
 
 
 class TypeDefVisitor(BaseVisitor):
-    def __init__(self, worker: 'Preprocessor', symtable: 'SymTable',
-                 mbox: 'MessageBox', uri: Uri) -> None:
+    def __init__(self,
+                 worker: 'Preprocessor',
+                 symtable: 'SymTable',
+                 mbox: 'MessageBox',
+                 uri: Uri,
+                 clstemp: 'TypeClassTemp' = None,
+                 is_method=False) -> None:
         super().__init__()
         self.symtable = symtable
         self.mbox = mbox
         self.worker = worker
         self.uri = uri
 
-        self._is_class = False  # whether inside a method
-        self._clstemp = None
+        self.clstemp: Optional['TypeClassTemp'] = clstemp
+        self._is_method = is_method
+
         self._clsname: List[str] = []
 
+    def _is_self_def(self, node: ast.AST) -> Optional[str]:
+        if isinstance(node, ast.Attribute):
+            if isinstance(node.value, ast.Name):
+                if node.value.id == 'self':
+                    return node.attr
+        return None
+
+    def _try_attr(self, node: ast.AST, target: ast.AST):
+        attr = self._is_self_def(target)
+        if attr:
+            # Unfortunately this is a hack to put temporary information
+            # on class template's var_attr
+            tmp_attr = {
+                'node': node,
+                'symtable': self.symtable,
+            }
+            assert self.clstemp
+            self.clstemp._add_defer_var(attr, tmp_attr)
+
+    def accept_func(self, node: ast.FunctionDef):
+        for stmt in node.body:
+            self.visit(stmt)
+
     @contextmanager
-    def enter_class(self, new_symtable, clstemp, clsname: str):
+    def enter_class(self, new_symtable, clsname: str):
         old_symtable = self.symtable
-        old_is_class = self._is_class
-        old_clstemp = self._clstemp
+        old_is_method = self._is_method
 
         self.symtable = new_symtable
-        self._is_class = True
-        self._clstemp = clstemp
         self._clsname.append(clsname)
+        self._is_method = False
 
         yield new_symtable
 
-        self.symtable = old_symtable
-        self._is_class = old_is_class
-        self._clstemp = old_clstemp
+        self._is_method = old_is_method
         self._clsname.pop()
+        self.symtable = old_symtable
 
     @property
     def cur_clsname(self):
@@ -86,6 +122,8 @@ class TypeDefVisitor(BaseVisitor):
                 if name:
                     self.symtable.add_entry(name, Entry(None, node))
                     logger.debug(f'add variable {name}')
+                elif self._is_method:
+                    self._try_attr(node, target)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         name, entry = record_stp(node)
@@ -99,6 +137,8 @@ class TypeDefVisitor(BaseVisitor):
             if name:
                 self.symtable.add_entry(name, Entry(None, node))
                 logger.debug(f'add variable {name}')
+            elif self._is_method:
+                self._try_attr(node, node.target)
 
     def visit_ClassDef(self, node: ast.ClassDef):
         clsname = node.name
@@ -121,7 +161,7 @@ class TypeDefVisitor(BaseVisitor):
             self.symtable.add_cls_def(clsname, clstemp)
 
             # enter class scope
-            with self.enter_class(new_symtable, clstemp, clsname):
+            with self.enter_class(new_symtable, clsname):
                 for body in node.body:
                     self.visit(body)
 
@@ -143,18 +183,3 @@ class TypeDefVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         logger.debug(f'add function {node.name}')
         self.symtable.add_fun_entry(node.name, Entry(None, node))
-
-
-class MethodDefVisitor(TypeDefVisitor):
-    def __init__(self, worker: 'Preprocessor', symtable: 'SymTable',
-                 mbox: 'MessageBox', uri: 'Uri',
-                 clstemp: 'TypeClassTemp') -> None:
-        super().__init__(worker, symtable, mbox, uri)
-        self._clstemp = clstemp
-        self._is_class = True
-
-    def visit_Assign(self, node: ast.Assign):
-        pass
-
-    def visit_AnnAssign(self, node: ast.AnnAssign):
-        pass

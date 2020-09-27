@@ -1,7 +1,7 @@
 import ast
 import enum
 import copy
-from pystatic.symtable import SymTable
+from pystatic.symtable import Entry, SymTable
 from typing import Optional, Dict, List, Tuple, Union, TYPE_CHECKING
 from pystatic.uri import Uri
 
@@ -211,6 +211,13 @@ class TypeClassTemp(TypeTemp):
         self._def_symtable = def_symtable  # symtable where this cls is defined
         self._defnode = defnode
 
+    def _add_defer_var(self, name, attrs):
+        """Defer attribute type evaluation.
+
+        Never use this unless you have a good reason.
+        """
+        self.var_attr[name] = attrs
+
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         cls_defs = self._inner_symtable.cls_defs
         spt_defs = self._inner_symtable.spt_defs
@@ -296,10 +303,16 @@ class TypeClassTemp(TypeTemp):
 
 
 class TypeFuncTemp(TypeTemp):
-    def __init__(self, name: str, argument: 'Argument', ret: TypeIns) -> None:
+    def __init__(self, name: str, inner_symtable: 'SymTable',
+                 argument: 'Argument', ret: TypeIns) -> None:
         self.name = name
         self.argument = argument
         self.ret = ret
+
+        self._inner_symtable = inner_symtable
+
+    def get_inner_symtable(self) -> 'SymTable':
+        return self._inner_symtable
 
     def get_str_expr(self,
                      bindlist: BindList,
