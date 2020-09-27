@@ -25,6 +25,7 @@ class InferVisitor(BaseVisitor):
 
         self.ret_value = []
         self.ret_annotation = None
+        self.imported_symbol = set()
 
     def infer(self):
         self.visit(self.root)
@@ -71,18 +72,14 @@ class InferVisitor(BaseVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef):
         class_type = self.var_tree.lookup_attr(node.name)
-
-        self.var_tree.add_cls(node.name, class_type)
-        self.var_tree.enter_cls(node.name)
+        self.var_tree.enter_cls(node.name, class_type)
         for subnode in node.body:
             self.visit(subnode)
         self.var_tree.leave_cls()
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         func_type = self.var_tree.lookup_attr(node.name)
-
-        self.var_tree.add_func(node.name, func_type)
-        self.var_tree.enter_func(node.name)
+        self.var_tree.enter_func(node.name, func_type)
 
         self.infer_ret_value_of_func(node, func_type)
         self.var_tree.add_func(node.name, func_type)
@@ -119,7 +116,10 @@ class InferStarter:
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
             md = target.module_temp
-            print(md.getattribute('f1', None, None).temp.ret)
-            print(type(md.getattribute('f1', None, None)))
+            t = target.module_temp.getattribute('b', None, None)
+            # print(t.call())
+            print(t.call())
+            print(type(t.call()))
+
             infer_visitor = InferVisitor(target.ast, target.module_temp, self.mbox)
             infer_visitor.infer()

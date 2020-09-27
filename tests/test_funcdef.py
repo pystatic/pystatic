@@ -6,6 +6,8 @@ class B:
     ...
 
 
+
+
 def f1():
     return A()
 
