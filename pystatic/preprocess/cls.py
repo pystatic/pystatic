@@ -1,9 +1,11 @@
 import ast
 import logging
+from pystatic import symtable
+from pystatic.target import MethodTarget
 from pystatic.preprocess.type_expr import eval_type_expr
 from typing import List, TYPE_CHECKING, Optional
-from pystatic.typesys import (TypeClassTemp, TypeModuleTemp, TypeVar, TpState,
-                              TypeTemp)
+from pystatic.typesys import (TypeClassTemp, TypeFuncTemp, TypeModuleTemp,
+                              TypeVar, TpState, TypeTemp, any_ins)
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.preprocess.dependency import DependencyGraph
 
@@ -158,3 +160,55 @@ class _TypeVarVisitor(BaseVisitor):
 
     def visit_Subscript(self, node: ast.Subscript):
         self.visit(node.slice)
+
+
+def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
+    # uri here is not set correctly
+    for tp_temp in symtable.cls_defs.values():
+        mt = _resolve_cls_method(uri, tp_temp.get_inner_symtable(), tp_temp)
+        if mt:
+            worker.process_block(mt, False)
+
+    for tp_temp in symtable.cls_defs.values():
+        new_uri = '.'.join([uri, tp_temp.basename])
+        resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker)
+
+
+def _resolve_cls_method(uri: str, symtable: 'SymTable',
+                        clstemp: 'TypeClassTemp'):
+    targets = []
+    for method_name in symtable.functions:
+        entry = symtable.lookup_local_entry(method_name)
+        func = symtable.lookup_local(method_name).temp
+        assert isinstance(func, TypeFuncTemp)
+        symtb = func.get_inner_symtable()
+        ast_node = entry.get_defnode()
+        assert isinstance(ast_node, ast.FunctionDef)
+        method_uri = '.'.join([uri, method_name])
+        targets.append(MethodTarget(method_uri, symtb, clstemp, ast_node))
+    return targets
+
+
+def resolve_cls_attr(symtable: 'SymTable'):
+    for tp_temp in symtable.cls_defs.values():
+        _resolve_cls_attr(tp_temp)
+        resolve_cls_attr(tp_temp.get_inner_symtable())
+
+
+def _resolve_cls_attr(clstemp: 'TypeClassTemp'):
+    true_var_attr = {}
+    for name, tp_attr in clstemp.var_attr.items():
+        # tp_attr is the temporary dict set in definition.py
+        typenode = tp_attr.get('node')  # type: ignore
+        symtb = tp_attr.get('symtable')  # type: ignore
+        assert typenode
+        assert symtb
+        var_type = eval_type_expr(typenode, symtb)
+        if var_type:
+            var_ins = var_type.getins()
+            true_var_attr[name] = var_ins
+            logger.debug(f'add attribute {name}: {var_ins} to {clstemp}')
+        else:
+            # TODO: warning here
+            true_var_attr[name] = any_ins
+    clstemp.var_attr = true_var_attr

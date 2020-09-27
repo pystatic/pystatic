@@ -1,15 +1,15 @@
 import ast
 from collections import deque
-from typing import Optional, TYPE_CHECKING, Deque, List, Dict, Union
-from pystatic.typesys import TypeClassTemp, TypeModuleTemp
+from typing import Optional, TYPE_CHECKING, Deque, List, Dict
+from pystatic.typesys import TypeModuleTemp
 from pystatic.modfinder import ModuleFinder
 from pystatic import preprocess
 from pystatic.predefined import get_init_symtable
-from pystatic.preprocess.definition import get_definition
+from pystatic.preprocess.definition import get_definition, get_definition_in_method
 from pystatic.preprocess.impt import resolve_import_type
-from pystatic.preprocess.cls import resolve_cls_def
+from pystatic.preprocess.cls import resolve_cls_def, resolve_cls_method, resolve_cls_attr
 from pystatic.preprocess.typeins import resolve_local_typeins
-from pystatic.target import BlockTarget, Target, Stage
+from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 from pystatic.modfinder import ModuleFinder, ModuleFindRes
 
 if TYPE_CHECKING:
@@ -58,12 +58,6 @@ class Preprocessor:
 
         self.process_block(fresh_targets, True)  # type: ignore
 
-    def _process_method(self, methodblks: List[BlockTarget],
-                        clstemp: TypeClassTemp):
-        for block in methodblks:
-            self.q_parse.append(block)
-        self._deal(True, clstemp)
-
     def get_module_temp(self, uri: 'Uri') -> Optional[TypeModuleTemp]:
         if uri in self.targets:
             return self.targets[uri].module_temp
@@ -88,7 +82,7 @@ class Preprocessor:
             return True
         return False
 
-    def _deal(self, is_method: bool = False, clstemp=None):
+    def _deal(self):
         to_check: List[BlockTarget] = []
         while len(self.q_parse) > 0:
             current = self.q_parse[0]
@@ -99,12 +93,10 @@ class Preprocessor:
             to_check.append(current)
 
             # get current module's class definitions
-            if is_method:
-                assert clstemp
-                pass
+            if isinstance(current, MethodTarget):
+                get_definition_in_method(current, self, self.manager.mbox)
             else:
-                get_definition(current.ast, self, current.symtable,
-                               self.manager.mbox, current.uri)
+                get_definition(current, self, self.manager.mbox)
 
         # get type imported from other module
         for target in to_check:
@@ -116,6 +108,10 @@ class Preprocessor:
         # identified because possible type(class) information is collected
         for target in to_check:
             resolve_local_typeins(target.symtable)
+
+        for target in to_check:
+            resolve_cls_method(target.symtable, target.uri, self)
+            resolve_cls_attr(target.symtable)
 
     def uri2ast(self, uri: 'Uri') -> ast.AST:
         """Return the ast tree corresponding to uri.
@@ -142,12 +138,15 @@ class Preprocessor:
         # TODO: error handling
         assert target.stage == Stage.PreParse
         target.ast = self.uri2ast(target.uri)
-        target.stage = Stage.PreSymtable
         return target.ast
 
     def assert_parse(self, target: BlockTarget):
         if target.stage <= Stage.PreParse:
-            self.parse(target)
+            if isinstance(target, Target):
+                self.parse(target)
+            else:
+                assert target.ast
+        target.stage = Stage.PreSymtable
 
     def is_valid_uri(self, uri: 'Uri') -> bool:
         find_res = self.finder.find(uri)

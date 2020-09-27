@@ -2,7 +2,7 @@ import enum
 import ast
 from pystatic import symtable
 from typing import TYPE_CHECKING, Optional
-from pystatic.typesys import TypeModuleTemp, TpState
+from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TpState
 
 if TYPE_CHECKING:
     from pystatic.uri import Uri
@@ -25,6 +25,18 @@ class BlockTarget:
         self.symtable = symtable
         self.stage = stage
         self.ast: Optional[ast.AST] = None
+
+
+class MethodTarget(BlockTarget):
+    def __init__(self,
+                 uri: 'Uri',
+                 symtable: 'SymTable',
+                 clstemp: 'TypeClassTemp',
+                 astnode: 'ast.AST',
+                 stage: Stage = Stage.PreParse) -> None:
+        super().__init__(uri, symtable, stage)
+        self.clstemp = clstemp
+        self.ast = astnode
 
 
 class Target(BlockTarget):

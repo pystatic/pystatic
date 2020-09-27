@@ -1,5 +1,5 @@
 import ast
-from pystatic.symtable import SymTable, TypeDefNode
+from pystatic.symtable import SymTable, TableScope, TypeDefNode
 from typing import List, Optional, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeFuncTemp, TypeIns, ellipsis_type, TypeType,
@@ -55,7 +55,9 @@ def eval_func_type(node: ast.FunctionDef,
         ret_type = eval_type_expr(node.returns, symtable)
     if not ret_type:
         ret_type = any_type  # default return type is Any
-    return TypeFuncTemp(node.name, argument, ret_type).get_default_type()
+    inner_sym = symtable.new_symtable(TableScope.FUNC)
+    return TypeFuncTemp(node.name, inner_sym, argument,
+                        ret_type).get_default_type()
 
 
 def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
