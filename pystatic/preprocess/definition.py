@@ -6,9 +6,11 @@ from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeClassTemp, TpState)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope
+from pystatic.uri import Uri
 from pystatic.preprocess.special_type import record_stp
 from pystatic.preprocess.impt import split_import_stmt
-from pystatic.uri import Uri
+from pystatic.preprocess.sym_util import (add_import_item, add_fun_entry,
+                                          add_cls_def)
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -158,7 +160,7 @@ class TypeDefVisitor(BaseVisitor):
             clstype = clstemp.get_default_type()
             entry = Entry(clstype, node)
             self.symtable.add_entry(clsname, entry)
-            self.symtable.add_cls_def(clsname, clstemp)
+            add_cls_def(self.symtable, clsname, clstemp)
 
             # enter class scope
             with self.enter_class(new_symtable, clsname):
@@ -178,8 +180,8 @@ class TypeDefVisitor(BaseVisitor):
         for uri, tples in imp_dict.items():
             self.worker.add_cache_target_uri(uri)
             for asname, origin_name in tples:
-                self.symtable.add_import_item(asname, uri, origin_name, node)
+                add_import_item(self.symtable, asname, uri, origin_name, node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         logger.debug(f'add function {node.name}')
-        self.symtable.add_fun_entry(node.name, Entry(None, node))
+        add_fun_entry(self.symtable, node.name, Entry(None, node))

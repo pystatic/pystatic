@@ -58,38 +58,14 @@ class SymTable:
         self.glob = glob
         self.builtins = builtins
 
-        self._scope = scope
+        self.scope = scope
 
-        self.cls_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
-        self.spt_defs: Dict[str, 'TypeTemp'] = {}  # special type template
+        self._cls_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
+        self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
 
-        self.import_info: Dict['Uri', List[ImportItem]] = {}
+        self._import_info: Dict['Uri', List[ImportItem]] = {}
 
-        self.functions = set()
-
-    def add_cls_def(self, name: str, temp: 'TypeClassTemp'):
-        self.cls_defs[name] = temp
-
-    def add_spt_def(self, name: str, temp: 'TypeTemp'):
-        self.spt_defs[name] = temp
-
-    def get_type_def(self, name: str) -> Optional['TypeTemp']:
-        findlist = name.split('.')
-        assert findlist
-        if name in self.cls_defs:
-            cur_temp = self.cls_defs[name]
-        elif name in self.spt_defs:
-            cur_temp = self.spt_defs[name]
-        else:
-            return None
-
-        lenf = len(findlist)
-        for i in range(1, lenf):
-            if cur_temp:
-                cur_temp = cur_temp.get_inner_typedef(findlist[i])
-            else:
-                return None
-        return cur_temp
+        self._functions = set()
 
     def _legb_lookup(self, name: str, find):
         curtable = self
@@ -108,6 +84,24 @@ class SymTable:
         if res:
             return res
         return find(self.builtins, name)
+
+    def get_type_def(self, name: str) -> Optional['TypeTemp']:
+        findlist = name.split('.')
+        assert findlist
+        if name in self._cls_defs:
+            cur_temp = self._cls_defs[name]
+        elif name in self._spt_types:
+            cur_temp = self._spt_types[name]
+        else:
+            return None
+
+        lenf = len(findlist)
+        for i in range(1, lenf):
+            if cur_temp:
+                cur_temp = cur_temp.get_inner_typedef(findlist[i])
+            else:
+                return None
+        return cur_temp
 
     def lookup_local(self, name: str) -> Optional['TypeIns']:
         res = self.local.get(name)
@@ -130,19 +124,9 @@ class SymTable:
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
 
-    def add_fun_entry(self, name: str, entry: Entry):
-        self.functions.add(name)
-        self.local[name] = entry
-
-    def add_import_item(self, name: str, uri: 'Uri', origin_name: str,
-                        defnode: ast.AST):
-        """Add import information to the symtable"""
-        self.local[name] = Entry(None, defnode)  # TODO: name collision?
-        self.import_info.setdefault(uri, []).append((name, origin_name))
-
     def new_symtable(self, new_scope: 'TableScope') -> 'SymTable':
         builtins = self.builtins
-        if self._scope == TableScope.CLASS:
+        if self.scope == TableScope.CLASS:
             non_local = self.non_local
         else:
             non_local = self

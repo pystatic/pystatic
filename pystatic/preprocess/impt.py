@@ -40,7 +40,7 @@ def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
 
 def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     """Import types(class definition) from other module"""
-    for uri, info in symtable.import_info.items():
+    for uri, info in symtable._import_info.items():
         module_temp = worker.get_module_temp(uri)
         if not module_temp:
             assert 0, "this error not handled yet"  # TODO: add warning here
@@ -58,7 +58,7 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
                 else:
                     pass  # TODO: add warning here
 
-    for tp_def in symtable.cls_defs.values():
+    for tp_def in symtable._cls_defs.values():
         assert isinstance(tp_def, TypeClassTemp)
         inner_symtable = tp_def.get_inner_symtable()
         resolve_import_type(inner_symtable, worker)
