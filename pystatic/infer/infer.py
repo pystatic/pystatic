@@ -47,11 +47,10 @@ class InferVisitor(BaseVisitor):
             tp = self.var_tree.lookup_attr(target.id)
             return tp
         else:  # var appear first time
+            self.var_tree.add_symbol(target.id)
             tp = self.var_tree.lookup_attr(target.id)
             if tp.__str__() == "Any":  # var with no annotation
-                self.var_tree.add_symbol(target.id, rtype)
-            else:
-                self.var_tree.add_symbol(target.id)
+                self.var_tree.set_attr(target.id, rtype)
             return tp
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
@@ -64,12 +63,13 @@ class InferVisitor(BaseVisitor):
             self.check_type_consistent(ltype, rtype, target)
 
     def handle_name_node_of_ann_assign(self, target) -> TypeIns:
-        tp = self.var_tree.lookup_attr(target.id)
         if not self.var_tree.is_defined_in_cur_scope(target.id):  # var appear first time
             self.var_tree.add_symbol(target.id)
+        tp = self.var_tree.lookup_attr(target.id)
         return tp
 
     def visit_ClassDef(self, node: ast.ClassDef):
+        self.var_tree.add_symbol(node.name)
         class_type = self.var_tree.lookup_attr(node.name)
         self.var_tree.enter_cls(node.name, class_type)
         for subnode in node.body:
@@ -106,6 +106,7 @@ class InferVisitor(BaseVisitor):
 
     def visit_While(self, node: ast.While):
         k = 0
+        self.visit(node.test)
         for subnode in node.body:
             k += 1
             if isinstance(subnode, ast.Break):
@@ -113,7 +114,6 @@ class InferVisitor(BaseVisitor):
             self.visit(subnode)
         if k < len(node.body):
             self.mbox.add_err(node.body[k], f"This code is unreachable")
-
 
 
 class InferStarter:
@@ -125,10 +125,10 @@ class InferStarter:
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
             md = target.module_temp
-            t = target.module_temp.getattribute('b', None, None)
+            t = target.module_temp.getattribute('A', None, None)
             # print(t.call())
-            print(type(t))
-            print(type(target.module_temp.getattribute('B', None, None)))
+            print(t)
+            print(type(target.module_temp.getattribute('A', None, None)))
 
             infer_visitor = InferVisitor(target.ast, target.module_temp, self.mbox)
             infer_visitor.infer()

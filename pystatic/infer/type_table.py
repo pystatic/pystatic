@@ -26,11 +26,14 @@ class Scope:
     def is_defined(self, name) -> bool:
         return name in self.recorded_symbol
 
-    def get_attr(self, name):
+    def get_attr(self, name, bindlist=None):
         if isinstance(self.tp, TypeType):
             return self.tp.getattribute(name)
         elif isinstance(self.tp, TypeTemp):
-            return self.tp.getattribute(name=name, bindlist=None)
+            return self.tp.getattribute(name=name, bindlist=bindlist, context=None)
+
+    def set_attr(self, name: str, tp: TypeIns):
+        self.tp.setattr(name, tp)
 
 
 class VarTree:
@@ -68,13 +71,16 @@ class VarTree:
 
     def lookup_attr(self, name):
         if self.is_defined_in_cur_scope(name):
-            return self.stack[-1].get_attr(name, None)
+            return self.stack[-1].get_attr(name)
         else:
             for scope in self.stack[::-1][1:]:
                 tp = scope.get_attr(name)
                 if tp:
                     return tp
         return None
+
+    def set_attr(self, name, tp):
+        self.stack[-1].set_attr(name, tp)
 
     def is_defined_in_cur_scope(self, name):
         return self.stack[-1].is_defined(name)

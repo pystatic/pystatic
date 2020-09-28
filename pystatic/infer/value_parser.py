@@ -94,11 +94,11 @@ class RValueParser(ValueParser):
             self.checker.check(arg_tp, param_tp, param)
 
     def visit_Call(self, node: ast.Call):
-        # TODO: the action call need a method
         name = node.func.id
         tp = self.var_tree.lookup_attr(name)
         if not tp:
             self.mbox.add_err(node, f"unresolved reference '{name}'")
+            return
         if isinstance(tp, TypeType):
             return tp.call()
         else:
