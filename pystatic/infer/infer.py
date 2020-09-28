@@ -104,6 +104,17 @@ class InferVisitor(BaseVisitor):
         if tp not in self.ret_value:
             self.ret_value.append(tp)
 
+    def visit_While(self, node: ast.While):
+        k = 0
+        for subnode in node.body:
+            k += 1
+            if isinstance(subnode, ast.Break):
+                break
+            self.visit(subnode)
+        if k < len(node.body):
+            self.mbox.add_err(node.body[k], f"This code is unreachable")
+
+
 
 class InferStarter:
     def __init__(self, sources, mbox):
