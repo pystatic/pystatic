@@ -219,8 +219,8 @@ class TypeClassTemp(TypeTemp):
         self.var_attr[name] = attrs
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
-        cls_defs = self._inner_symtable.cls_defs
-        spt_defs = self._inner_symtable.spt_defs
+        cls_defs = self._inner_symtable._cls_defs
+        spt_defs = self._inner_symtable._spt_types
         if name in cls_defs:
             return cls_defs[name]
         elif name in spt_defs:
@@ -344,6 +344,9 @@ class TypeAnyTemp(TypeTemp):
     def __init__(self):
         super().__init__('Any')
 
+    def get_default_type(self) -> 'TypeType':
+        return any_type
+
     def has_method(self, name: str) -> bool:
         return True
 
@@ -354,6 +357,9 @@ class TypeAnyTemp(TypeTemp):
 class TypeNoneTemp(TypeTemp):
     def __init__(self):
         super().__init__('None')
+
+    def get_default_type(self) -> 'TypeType':
+        return none_type
 
     def has_method(self, name: str) -> bool:
         return False
@@ -385,6 +391,9 @@ class TypeOptionalTemp(TypeTemp):
 class TypeEllipsisTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__('ellipsis')
+
+    def get_default_type(self) -> 'TypeType':
+        return ellipsis_type
 
 
 class TypeCallableTemp(TypeTemp):
@@ -472,9 +481,10 @@ optional_temp = TypeOptionalTemp()
 literal_temp = TypeLiteralTemp()
 union_temp = TypeUnionTemp()
 
-ellipsis_type = ellipsis_temp.get_default_type()
-none_type = none_temp.get_default_type()
-any_type = any_temp.get_default_type()
+# these typetype are shared to save memory
+ellipsis_type, _ = ellipsis_temp.generate_typetype([])
+none_type, _ = none_temp.generate_typetype([])
+any_type, _ = any_temp.generate_typetype([])
 
 any_ins = any_type.call()
 ellipsis_ins = ellipsis_type.call()

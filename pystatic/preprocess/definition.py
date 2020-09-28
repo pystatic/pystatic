@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, Optional, TYPE_CHECKING, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeClassTemp, TpState)
 from pystatic.message import MessageBox
-from pystatic.symtable import Entry, SymTable, TableScope
+from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
 from pystatic.preprocess.special_type import record_stp
 from pystatic.preprocess.impt import split_import_stmt
@@ -175,7 +175,7 @@ class TypeDefVisitor(BaseVisitor):
         imp_dict = split_import_stmt(node, self.uri)
         self._add_import_info(node, imp_dict)
 
-    def _add_import_info(self, node: ast.AST,
+    def _add_import_info(self, node: 'ImportNode',
                          imp_dict: Dict[Uri, List[Tuple[str, str]]]):
         for uri, tples in imp_dict.items():
             self.worker.add_cache_target_uri(uri)

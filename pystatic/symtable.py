@@ -16,25 +16,25 @@ class TableScope(enum.Enum):
 
 AsName = str
 OriginName = str
-ImportItem = Tuple[AsName, OriginName]  # (moduri, name)
-EntryType = Optional['TypeIns']
+ImportNode = Union[ast.Import, ast.ImportFrom]
+ImportItem = Tuple[AsName, OriginName, ImportNode]
 
 TypeDefNode = Union[str, ast.AST]
 
 
 class Entry:
     def __init__(self,
-                 tp: EntryType,
+                 tp: 'TypeIns',
                  defnode: Optional[ast.AST] = None,
                  tpnode: Optional[TypeDefNode] = None):
         self._tp = tp
         self._defnode = defnode
         self._typenode = tpnode
 
-    def set_type(self, tp: EntryType):
+    def set_type(self, tp: 'TypeIns'):
         self._tp = tp
 
-    def get_type(self) -> EntryType:
+    def get_type(self) -> 'TypeIns':
         return self._tp
 
     def set_defnode(self, defnode: ast.AST):
