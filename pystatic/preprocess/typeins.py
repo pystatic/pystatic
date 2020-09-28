@@ -5,7 +5,7 @@ from pystatic.typesys import TpState, TypeClassTemp, any_ins, TypeVar
 from pystatic.preprocess.type_expr import eval_type_expr
 from pystatic.preprocess.special_type import collect_typevar_info
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 def resolve_local_typeins(symtable: 'SymTable'):

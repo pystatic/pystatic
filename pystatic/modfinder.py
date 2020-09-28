@@ -1,4 +1,5 @@
 import os
+import logging
 from pystatic.config import PY_VERSION
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pystatic.uri import uri2list, absolute_urilist, list2uri
@@ -136,7 +137,7 @@ def _resolve_typeshed(typeshed: str, pyv: PY_VERSION) -> List[str]:
             if os.path.isdir(curdir):
                 third_party_res.append(curdir)
 
-    print(stdlib_res + third_party_res)
+    logging.debug(f"typeshed: {stdlib_res + third_party_res}")
 
     return stdlib_res + third_party_res
 
