@@ -60,7 +60,7 @@ class VarTree:
 
     def enter_func(self, name, tp):
         if self.in_func:
-            scope = Scope(name, ScopeType.NON_LOCAL_TYPE)
+            scope = Scope(name, tp, ScopeType.NON_LOCAL_TYPE)
         else:
             scope = Scope(name, tp, ScopeType.LOCAL_TYPE)
             self.in_func = True

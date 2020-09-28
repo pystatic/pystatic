@@ -41,6 +41,9 @@ class InferVisitor(BaseVisitor):
             if isinstance(target, ast.Name):
                 ltype = self.handle_name_node_of_assign(target, rtype)
                 self.check_type_consistent(ltype, rtype, target)
+            elif isinstance(target, ast.Tuple):
+                 if len(target.elts)!=len(rtype):
+
 
     def handle_name_node_of_assign(self, target, rtype) -> TypeIns:
         if self.var_tree.is_defined_in_cur_scope(target.id):
@@ -77,11 +80,12 @@ class InferVisitor(BaseVisitor):
         self.var_tree.leave_cls()
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
+        self.var_tree.add_symbol(node.name)
         func_type = self.var_tree.lookup_attr(node.name)
         self.var_tree.enter_func(node.name, func_type)
-
-        self.infer_ret_value_of_func(node, func_type)
-
+        for subnode in node.body:
+            self.visit(subnode)
+        # self.infer_ret_value_of_func(node, func_type)
         self.var_tree.leave_func()
 
     def infer_ret_value_of_func(self, node, func_type):
@@ -114,6 +118,7 @@ class InferVisitor(BaseVisitor):
             self.visit(subnode)
         if k < len(node.body):
             self.mbox.add_err(node.body[k], f"This code is unreachable")
+
 
 
 class InferStarter:
