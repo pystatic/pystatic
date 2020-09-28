@@ -27,7 +27,7 @@ typing_symtable.builtins = builtin_symtable
 
 def add_spt_def(name, temp, ins=None):
     global typing_symtable
-    typing_symtable.add_spt_def(name, temp)
+    typing_symtable._spt_types[name] = temp
     if ins:
         entry = Entry(ins)
     else:

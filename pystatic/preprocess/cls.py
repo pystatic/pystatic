@@ -37,7 +37,7 @@ def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
     """Build dependency graph"""
     graph = DependencyGraph()
     for target in targets:
-        for temp in target.symtable.cls_defs.values():
+        for temp in target.symtable._cls_defs.values():
             assert isinstance(temp, TypeClassTemp)
             _build_graph_cls(temp, graph)
     return graph
@@ -49,7 +49,7 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
     _build_graph_inh(clstemp, graph)
 
-    for subtemp in inner_sym.cls_defs.values():
+    for subtemp in inner_sym._cls_defs.values():
         assert isinstance(subtemp, TypeClassTemp)
         _build_graph_cls(subtemp, graph)
         # add dependency relations due to containment
@@ -164,12 +164,12 @@ class _TypeVarVisitor(BaseVisitor):
 
 def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
     # uri here is not set correctly
-    for tp_temp in symtable.cls_defs.values():
+    for tp_temp in symtable._cls_defs.values():
         mt = _resolve_cls_method(uri, tp_temp.get_inner_symtable(), tp_temp)
         if mt:
             worker.process_block(mt, False)
 
-    for tp_temp in symtable.cls_defs.values():
+    for tp_temp in symtable._cls_defs.values():
         new_uri = '.'.join([uri, tp_temp.basename])
         resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker)
 
@@ -177,7 +177,7 @@ def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
 def _resolve_cls_method(uri: str, symtable: 'SymTable',
                         clstemp: 'TypeClassTemp'):
     targets = []
-    for method_name in symtable.functions:
+    for method_name in symtable._functions:
         entry = symtable.lookup_local_entry(method_name)
         func = symtable.lookup_local(method_name).temp
         assert isinstance(func, TypeFuncTemp)
@@ -190,7 +190,7 @@ def _resolve_cls_method(uri: str, symtable: 'SymTable',
 
 
 def resolve_cls_attr(symtable: 'SymTable'):
-    for tp_temp in symtable.cls_defs.values():
+    for tp_temp in symtable._cls_defs.values():
         _resolve_cls_attr(tp_temp)
         resolve_cls_attr(tp_temp.get_inner_symtable())
 
