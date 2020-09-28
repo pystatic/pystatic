@@ -188,6 +188,9 @@ class TypeType(TypeIns):
     def getitem(self, bindlist: BindList) -> Tuple['TypeType', 'GetItemError']:
         return self.temp.generate_typetype(bindlist)
 
+    def setattr(self, name, tp):
+        self.temp.setattr(name, tp)
+
     def __str__(self):
         return self.temp.get_str_expr([])
 

@@ -100,9 +100,6 @@ class RValueParser(ValueParser):
         if not tp:
             self.mbox.add_err(node, f"unresolved reference '{name}'")
         if isinstance(tp, TypeType):
-            return tp
-        elif isinstance(tp, TypeFuncTemp):
-            self.check_argument_in_call(node, tp.arg)
-            return tp.ret
+            return tp.call()
         else:
             raise Exception(f"todo {type(tp)}")

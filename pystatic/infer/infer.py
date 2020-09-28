@@ -49,9 +49,9 @@ class InferVisitor(BaseVisitor):
         else:  # var appear first time
             tp = self.var_tree.lookup_attr(target.id)
             if tp.__str__() == "Any":  # var with no annotation
-                self.var_tree.add_var(target.id, rtype)
+                self.var_tree.add_symbol(target.id, rtype)
             else:
-                self.var_tree.add_var(target.id, tp)
+                self.var_tree.add_symbol(target.id)
             return tp
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
@@ -66,8 +66,7 @@ class InferVisitor(BaseVisitor):
     def handle_name_node_of_ann_assign(self, target) -> TypeIns:
         tp = self.var_tree.lookup_attr(target.id)
         if not self.var_tree.is_defined_in_cur_scope(target.id):  # var appear first time
-            tp = self.var_tree.lookup_attr(target.id)
-            self.var_tree.add_var(target.id, tp)
+            self.var_tree.add_symbol(target.id)
         return tp
 
     def visit_ClassDef(self, node: ast.ClassDef):
@@ -82,7 +81,6 @@ class InferVisitor(BaseVisitor):
         self.var_tree.enter_func(node.name, func_type)
 
         self.infer_ret_value_of_func(node, func_type)
-        self.var_tree.add_func(node.name, func_type)
 
         self.var_tree.leave_func()
 
@@ -118,8 +116,8 @@ class InferStarter:
             md = target.module_temp
             t = target.module_temp.getattribute('b', None, None)
             # print(t.call())
-            print(t.call())
-            print(type(t.call()))
+            print(type(t))
+            print(type(target.module_temp.getattribute('B', None, None)))
 
             infer_visitor = InferVisitor(target.ast, target.module_temp, self.mbox)
             infer_visitor.infer()

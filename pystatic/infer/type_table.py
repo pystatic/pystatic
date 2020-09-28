@@ -70,7 +70,7 @@ class VarTree:
         if self.is_defined_in_cur_scope(name):
             return self.stack[-1].get_attr(name, None)
         else:
-            for scope in reversed(self.stack)[1:]:
+            for scope in self.stack[::-1][1:]:
                 tp = scope.get_attr(name)
                 if tp:
                     return tp
