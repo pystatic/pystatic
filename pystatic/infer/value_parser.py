@@ -3,43 +3,33 @@ from pystatic.arg import Argument
 from pystatic.message import MessageBox
 from pystatic.typesys import *
 from pystatic.infer.visitor import BaseVisitor
-from pystatic.infer.type_table import VarTree
 from pystatic.infer.checker import TypeChecker
+from pystatic.infer.recorder import SymbolRecorder
 
 
 class ValueParser(BaseVisitor):
-    def __init__(self, mbox: MessageBox,
-                 var_tree: VarTree):
+    def __init__(self, mbox: MessageBox, recorder: SymbolRecorder):
         self.mbox = mbox
-        self.var_tree = var_tree
         self.checker = TypeChecker(self.mbox)
-
-
-class LValueParser(ValueParser):
-    def __init__(self, mbox: MessageBox, var_tree: VarTree, rtype):
-        super().__init__(mbox, var_tree)
-        self.single_name_node = False
-        self.rtype = rtype
-
-    def accept(self, node: ast.AST) -> TypeIns:
-        if isinstance(node, ast.Name):
-            self.single_name_node = True
-        return self.visit(node)
+        self.recorder = recorder
 
 
 class RValueParser(ValueParser):
-    def __init__(self, mbox: MessageBox, var_tree: VarTree):
-        super().__init__(mbox, var_tree)
+    def __init__(self, mbox: MessageBox, recorder):
+        super().__init__(mbox, recorder)
 
     def accept(self, node) -> Optional[TypeIns]:
         return self.visit(node)
 
+    def lookup_var(self, name):
+        cur_type = self.recorder.cur_type
+        if self.recorder.is_defined(name):
+            return cur_type.lookup_local_var(name)
+        else:
+            return cur_type.lookup_var(name)
+
     def visit_Name(self, node):
-        if node.id == "self":
-            tp = self.var_tree.upper_class()
-            if tp is not None:
-                return tp
-        tp = self.var_tree.lookup_attr(node.id)
+        tp = self.lookup_var(node.id)
         if not tp:
             self.mbox.add_err(node, f"unresolved reference '{node.id}'")
         return tp
@@ -48,7 +38,7 @@ class RValueParser(ValueParser):
         attr: str = node.attr
         value: Optional[TypeIns] = self.visit(node.value)
         if value is not None:
-            tp = value.getattr(attr)
+            tp = value.getattribute(attr)
             if tp is None:
                 self.mbox.add_err(node, f"{value} has no attr {tp}")
             return tp
@@ -95,11 +85,11 @@ class RValueParser(ValueParser):
 
     def visit_Call(self, node: ast.Call):
         name = node.func.id
-        tp = self.var_tree.lookup_attr(name)
+        tp = self.lookup_var(name)
         if not tp:
             self.mbox.add_err(node, f"unresolved reference '{name}'")
             return
-        if isinstance(tp, TypeType):
+        if isinstance(tp, (TypeType, TypeIns)):
             return tp.call()
         else:
-            raise Exception(f"todo {type(tp)}")
+            raise Exception(f"todo {type(tp)} of {tp}")

@@ -2,12 +2,17 @@ class B:
     ...
 
 
+b: B = B()
+
+
 class A:
+    a: int = 1
+
     def __init__(self):
         self.p1 = B()
 
-    def f(self):
-        self.a = 1
+    def fun(self):
+        pass
 
-
-A.a = 1
+def f():
+    pass

@@ -12,4 +12,4 @@ def f1(x: A, y) -> A:
 
 
 a = B()
-b = f1(a)
+a = f1(a)

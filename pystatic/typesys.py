@@ -174,6 +174,10 @@ class TypeIns(BaseType):
     def __str__(self) -> str:
         return self.name
 
+    def call(self):
+        assert isinstance(self.temp, TypeFuncTemp)
+        return self.temp.ret
+
 
 class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
@@ -296,13 +300,22 @@ class TypeClassTemp(TypeTemp):
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
         """Same as add_var in TypeClassTemp"""
-        self.add_var(name, attr_type)
+        if name in self.var_attr:
+            self.add_var(name, attr_type)
+        else:
+            self._inner_symtable.set_local_type(name, attr_type)
 
     def getattribute(self, name: str, bindlist: BindList,
                      context: Optional[TypeContext]) -> Optional['TypeIns']:
         # FIXME: current implementation doesn't cope bindlist, context and baseclasses
         res = self.get_local_attr(name)
         return res
+
+    def lookup_local_var(self, name):
+        return self._inner_symtable.lookup_local(name)
+
+    def lookup_var(self, name):
+        return self._inner_symtable.egb_lookup(name)
 
 
 class TypeFuncTemp(TypeTemp):

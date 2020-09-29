@@ -8,4 +8,4 @@ class B:
 
 a = A()
 a = B()
-b: A = B()
+b: B = A()
