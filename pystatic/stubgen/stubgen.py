@@ -85,9 +85,17 @@ def ins_to_idstrlist(name: str, tpins: TypeIns,
             return [(name + ': ' + str(tpins), level)]
 
 
+def stub_var_def(varname: str, temp: TypeTemp, level: int) -> IndentedStr:
+    return varname + ': ' + str(temp), level
+
+
 def stub_cls_def(clsname: str, temp: TypeClassTemp,
                  level: int) -> List[IndentedStr]:
     header = stub_cls_def_header(clsname, temp, level)
+
+    var_strlist = []
+    for name, tpins in temp.var_attr.items():
+        var_strlist.append(stub_var_def(name, tpins.temp, level + 1))
 
     inner_symtable = temp.get_inner_symtable()
     body = _stubgen_symtable(inner_symtable, level + 1)
@@ -95,7 +103,7 @@ def stub_cls_def(clsname: str, temp: TypeClassTemp,
     if not body:
         header = (header[0] + ' ...', header[1])
 
-    return [header] + body
+    return [header] + var_strlist + body
 
 
 def stub_cls_def_header(clsname: str, temp: TypeClassTemp,
