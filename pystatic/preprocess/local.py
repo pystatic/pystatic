@@ -21,7 +21,7 @@ def resolve_local_typeins(symtable: 'SymTable'):
             # resolved here.
             cur_type = entry.get_type()
             if entry.get_type() is None:
-                typenode = entry.get_typenode()
+                typenode = entry.get_defnode()
                 if typenode:
                     var_type = eval_type_expr(typenode, symtable)
                     if var_type:

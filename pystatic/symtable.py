@@ -23,13 +23,9 @@ TypeDefNode = Union[str, ast.AST]
 
 
 class Entry:
-    def __init__(self,
-                 tp: 'TypeIns',
-                 defnode: Optional[ast.AST] = None,
-                 tpnode: Optional[TypeDefNode] = None):
+    def __init__(self, tp: 'TypeIns', defnode: Optional[ast.AST] = None):
         self._tp = tp
         self._defnode = defnode
-        self._typenode = tpnode
 
     def set_type(self, tp: 'TypeIns'):
         self._tp = tp
@@ -42,12 +38,6 @@ class Entry:
 
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
-
-    def set_typenode(self, tpnode: ast.AST):
-        self._typenode = tpnode
-
-    def get_typenode(self) -> Optional[TypeDefNode]:
-        return self._typenode or self._defnode
 
 
 class SymTable:
