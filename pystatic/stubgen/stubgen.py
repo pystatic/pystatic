@@ -15,7 +15,8 @@ IndentedStr = Tuple[str, int]
 
 
 def stubgen(targets: List[Target], rt_dir=_default_dir):
-    mkstub_dir(rt_dir)
+    if not mkstub_dir(rt_dir):
+        return
 
     for target in targets:
         stub_file = filepath(target, rt_dir)
@@ -29,9 +30,12 @@ def stubgen(targets: List[Target], rt_dir=_default_dir):
 def mkstub_dir(dir: str):
     if os.path.exists(dir):
         if not os.path.isdir(dir):
-            raise OSError  # TODO: report error and quit.
+            r_path = os.path.realpath(dir)
+            logger.error(f'{r_path} already exists and is a file.')
+            return False
     else:
         os.mkdir(dir)
+        return True
 
 
 def filepath(target: Target, rt_dir: str):
