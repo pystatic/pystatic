@@ -13,6 +13,7 @@ from pystatic.config import Config
 from pystatic.modfinder import ModuleFinder
 from pystatic.uri import Uri, relpath2uri
 from pystatic.target import Target, Stage
+from pystatic.stubgen import stubgen
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,14 @@ class Manager:
         builtins_target = Target('builtins', get_builtin_symtable())
         typing_target = Target('typing', get_typing_symtable())
         self.preprocess([typing_target, builtins_target])
+
+    def stubgen(self, rt_dir: Optional[str] = None):
+        check_list = list(self.check_targets.values())
+        self.preprocess(check_list)
+        if rt_dir:
+            stubgen(check_list, rt_dir)
+        else:
+            stubgen(check_list)
 
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))

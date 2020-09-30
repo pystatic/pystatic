@@ -1,7 +1,7 @@
 import ast
 from collections import deque
 from typing import Optional, TYPE_CHECKING, Deque, List, Dict
-from pystatic.typesys import TypeModuleTemp
+from pystatic.typesys import TpState, TypeModuleTemp
 from pystatic.modfinder import ModuleFinder
 from pystatic.predefined import get_init_symtable
 from pystatic.preprocess.definition import (get_definition,
@@ -52,10 +52,11 @@ class Preprocessor:
     def process_module(self, targets: List[Target]):
         fresh_targets = []
         for target in targets:
-            assert isinstance(target, Target)
-            if self.add_cache_target(target):
-                # this is a new target
-                fresh_targets.append(target)
+            if target.stage < Stage.Processed:
+                assert isinstance(target, Target)
+                if self.add_cache_target(target):
+                    # this is a new target
+                    fresh_targets.append(target)
 
         self.process_block(fresh_targets, True)  # type: ignore
 
@@ -116,6 +117,9 @@ class Preprocessor:
         for target in to_check:
             resolve_cls_method(target.symtable, target.uri, self)
             resolve_cls_attr(target.symtable)
+
+            if isinstance(target, Target):
+                target.stage = Stage.Processed
 
     def uri2ast(self, uri: 'Uri') -> ast.AST:
         """Return the ast tree corresponding to uri.
