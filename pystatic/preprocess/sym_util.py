@@ -26,7 +26,7 @@ def add_spt_def(symtable: SymTable, name: str, temp: TypeTemp):
 def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
                     origin_name: str, defnode: 'ImportNode'):
     """
-    Add import information to the symtable, this will not add entry to the
+    Add import information to the symtable, this will add fake_imp_entry to the
     local scope.
     """
     symtable._import_info.setdefault(uri, []).append(
