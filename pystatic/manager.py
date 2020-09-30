@@ -30,7 +30,7 @@ class Manager:
         finder = ModuleFinder(self.config.manual_path, list(self.user_path),
                               self.config.sitepkg, self.config.typeshed,
                               self.config.python_version)
-        self.preprocessor = Preprocessor(self, finder)
+        self.pre_proc = Preprocessor(self, finder)
 
         self.stdout = stdout
         self.stderr = stderr
@@ -53,7 +53,7 @@ class Manager:
             print(err)
 
     def preprocess(self, targets):
-        self.preprocessor.process_module(targets)
+        self.pre_proc.process_module(targets)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""
