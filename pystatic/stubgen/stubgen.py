@@ -1,9 +1,10 @@
 import os
 import logging
+from pystatic.arg import Arg, Argument
 from typing import List, Tuple
 from pystatic.target import Target
 from pystatic.uri import uri2list
-from pystatic.typesys import TypeClassTemp, TypeIns, TypeTemp, TypeType
+from pystatic.typesys import TypeClassTemp, TypeFuncTemp, TypeIns, TypeTemp, TypeType
 from pystatic.symtable import SymTable
 
 logger = logging.getLogger(__name__)
@@ -74,11 +75,14 @@ def _stubgen_symtable(symtable: 'SymTable', level: int) -> List[IndentedStr]:
 
 def ins_to_idstrlist(name: str, tpins: TypeIns,
                      level: int) -> List[IndentedStr]:
+    temp = tpins.temp
     if isinstance(tpins, TypeType):
-        temp = tpins.temp
         return stub_cls_def(name, temp, level)  # type: ignore
     else:
-        return [(name + ': ' + str(tpins), level)]
+        if isinstance(temp, TypeFuncTemp):
+            return [stub_fun_def(name, temp, level)]
+        else:
+            return [(name + ': ' + str(tpins), level)]
 
 
 def stub_cls_def(clsname: str, temp: TypeClassTemp,
@@ -86,14 +90,44 @@ def stub_cls_def(clsname: str, temp: TypeClassTemp,
     header = stub_cls_def_header(clsname, temp, level)
 
     inner_symtable = temp.get_inner_symtable()
-    result = _stubgen_symtable(inner_symtable, level + 1)
+    body = _stubgen_symtable(inner_symtable, level + 1)
 
-    if not result:
+    if not body:
         header = (header[0] + ' ...', header[1])
 
-    return [header] + result
+    return [header] + body
 
 
 def stub_cls_def_header(clsname: str, temp: TypeClassTemp,
                         level: int) -> IndentedStr:
     return ('class ' + clsname + ':', level)
+
+
+def stub_fun_def(funname: str, temp: TypeFuncTemp, level: int) -> IndentedStr:
+    def get_arg_str(arg: Arg):
+        cur_str = arg.name
+        cur_str += ': ' + str(arg.ann)
+        if arg.valid:
+            cur_str += '=...'
+        return cur_str
+
+    arg_strlist = []
+    for arg in temp.argument.args:
+        cur_str = get_arg_str(arg)
+        arg_strlist.append(cur_str)
+
+    if temp.argument.vararg:
+        cur_str = get_arg_str(temp.argument.vararg)
+        arg_strlist.append(cur_str)
+
+    for arg in temp.argument.kwonlyargs:
+        cur_str = get_arg_str(arg)
+        arg_strlist.append(cur_str)
+
+    if temp.argument.kwarg:
+        cur_str = get_arg_str(temp.argument.kwarg)
+        arg_strlist.append(cur_str)
+
+    param = '(' + ', '.join(arg_strlist) + ')'
+
+    return ('def ' + funname + param + ': ...', level)

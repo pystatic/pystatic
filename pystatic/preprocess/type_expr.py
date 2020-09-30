@@ -60,18 +60,6 @@ def eval_func_type(node: ast.FunctionDef,
                         ret_type).get_default_type()
 
 
-def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
-    """Generate an Arg instance according to an ast.arg node"""
-    new_arg = Arg(node.arg)
-    if node.annotation:
-        ann = eval_type_expr(node.annotation, symtable)
-        if not ann:
-            return None
-        else:
-            new_arg.ann = ann
-    return new_arg
-
-
 def eval_argument_type(node: ast.arguments,
                        symtable: SymTable) -> Optional[Argument]:
     """Gernerate an Argument instance according to an ast.arguments node"""
@@ -101,6 +89,7 @@ def eval_argument_type(node: ast.arguments,
     # *args exists
     if node.vararg:
         result = eval_arg_type(node.vararg, symtable)
+        result.name = '*' + result.name
         if result:
             new_args.vararg = result
         else:
@@ -109,6 +98,7 @@ def eval_argument_type(node: ast.arguments,
     # **kwargs exists
     if node.kwarg:
         result = eval_arg_type(node.kwarg, symtable)
+        result.name = '**' + result.name
         if result:
             new_args.kwarg = result
         else:
@@ -126,6 +116,18 @@ def eval_argument_type(node: ast.arguments,
         return new_args
     else:
         return None
+
+
+def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
+    """Generate an Arg instance according to an ast.arg node"""
+    new_arg = Arg(node.arg)
+    if node.annotation:
+        ann = eval_type_expr(node.annotation, symtable)
+        if not ann:
+            return None
+        else:
+            new_arg.ann = ann
+    return new_arg
 
 
 class NotType(Exception):
