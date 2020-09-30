@@ -135,8 +135,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
                 # indirect import
                 cur_state = (cur_entry.uri, cur_entry.origin_name)
                 buf_targets.append((cur_symtable, name_in_mod))
-            else:
-                assert isinstance(cur_entry, Entry)
+            elif isinstance(cur_entry, Entry):
                 tpins = cur_entry.get_type()
 
                 if not tpins:
@@ -153,6 +152,8 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
                     assert isinstance(tpins, TypeIns)
                     result = tpins
                     break
+            else:
+                return False  # fake_entry(not a class definition)
         else:
             result = None  # not found
             break

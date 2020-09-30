@@ -9,8 +9,9 @@ from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
 from pystatic.preprocess.spt import record_stp
 from pystatic.preprocess.impt import split_import_stmt
-from pystatic.preprocess.sym_util import (add_import_item, add_fun_entry,
-                                          add_cls_def)
+from pystatic.preprocess.sym_util import (add_import_item, add_fun_def,
+                                          add_local_var, add_cls_def,
+                                          add_local_var)
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -122,7 +123,7 @@ class TypeDefVisitor(BaseVisitor):
             for target in node.targets:
                 name = self._is_new_def(target)
                 if name:
-                    self.symtable.add_entry(name, Entry(None, node))
+                    add_local_var(self.symtable, name, node)
                     logger.debug(f'add variable {name}')
                 elif self._is_method:
                     self._try_attr(node, target)
@@ -137,7 +138,7 @@ class TypeDefVisitor(BaseVisitor):
         else:
             name = self._is_new_def(node.target)
             if name:
-                self.symtable.add_entry(name, Entry(None, node))
+                add_local_var(self.symtable, name, node)
                 logger.debug(f'add variable {name}')
             elif self._is_method:
                 self._try_attr(node, node.target)
@@ -184,4 +185,4 @@ class TypeDefVisitor(BaseVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         logger.debug(f'add function {node.name}')
-        add_fun_entry(self.symtable, node.name, Entry(None, node))
+        add_fun_def(self.symtable, node.name, node)
