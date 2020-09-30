@@ -1,16 +1,17 @@
+"""
+Special type resolution module.
+"""
+
 import ast
 import enum
 import logging
 from typing import Optional, Union, TYPE_CHECKING, List, Dict, Tuple
 from pystatic.symtable import Entry, SymTable
 from pystatic.typesys import TypeIns, TypeVar
-from pystatic.message import MessageBox
 from pystatic.visitor import val_unparse, liter_unparse
 from pystatic.preprocess.type_expr import eval_type_expr
 from pystatic.util import ParseException
-
-if TYPE_CHECKING:
-    from pystatic.env import Environment
+from pystatic.typesys import TpState
 
 logger = logging.getLogger(__name__)
 
@@ -177,3 +178,9 @@ def get_typevar_name(call_expr: ast.Call) -> str:
     if not tpvar_name:
         raise ParseException(call_expr.args[0], f'invalid syntax')
     return tpvar_name
+
+
+def resolve_typevar_ins(tpvar: TypeVar, node: ast.AST, symtable: 'SymTable'):
+    assert isinstance(node, ast.Call)
+    collect_typevar_info(tpvar, node, symtable)
+    tpvar.set_state(TpState.OVER)

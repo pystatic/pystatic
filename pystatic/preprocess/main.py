@@ -3,12 +3,11 @@ from collections import deque
 from typing import Optional, TYPE_CHECKING, Deque, List, Dict
 from pystatic.typesys import TypeModuleTemp
 from pystatic.modfinder import ModuleFinder
-from pystatic import preprocess
 from pystatic.predefined import get_init_symtable
 from pystatic.preprocess.definition import get_definition, get_definition_in_method
 from pystatic.preprocess.impt import resolve_import_type
 from pystatic.preprocess.cls import resolve_cls_def, resolve_cls_method, resolve_cls_attr
-from pystatic.preprocess.typeins import resolve_local_typeins
+from pystatic.preprocess.local import resolve_local_typeins
 from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 from pystatic.modfinder import ModuleFinder, ModuleFindRes
 

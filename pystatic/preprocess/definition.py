@@ -7,7 +7,7 @@ from pystatic.typesys import (TypeClassTemp, TpState)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
-from pystatic.preprocess.special_type import record_stp
+from pystatic.preprocess.spt import record_stp
 from pystatic.preprocess.impt import split_import_stmt
 from pystatic.preprocess.sym_util import (add_import_item, add_fun_entry,
                                           add_cls_def)

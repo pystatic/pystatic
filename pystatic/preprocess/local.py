@@ -1,14 +1,19 @@
+"""
+Resolve type instance for symbols defined locally.
+"""
+
 import ast
 import logging
 from pystatic.symtable import SymTable
 from pystatic.typesys import TpState, TypeClassTemp, any_ins, TypeVar
 from pystatic.preprocess.type_expr import eval_type_expr
-from pystatic.preprocess.special_type import collect_typevar_info
+from pystatic.preprocess.spt import collect_typevar_info, resolve_typevar_ins
 
 logger = logging.getLogger(__name__)
 
 
 def resolve_local_typeins(symtable: 'SymTable'):
+    """Resolve local symbols' TypeIns, here 'local' means defined inside the scope"""
     for name, entry in symtable.local.items():
         cur_type = entry.get_type()
         if entry.get_type() is None:
@@ -42,9 +47,3 @@ def resolve_import_ins():
     # TODO: resolve instances because of import statement. we need to resolve
     # the order.
     pass
-
-
-def resolve_typevar_ins(tpvar: TypeVar, node: ast.AST, symtable: 'SymTable'):
-    assert isinstance(node, ast.Call)
-    collect_typevar_info(tpvar, node, symtable)
-    tpvar.set_state(TpState.OVER)

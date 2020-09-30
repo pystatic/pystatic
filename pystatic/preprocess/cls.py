@@ -1,3 +1,7 @@
+"""
+Resolve class related type information.
+"""
+
 import ast
 import logging
 from pystatic import symtable

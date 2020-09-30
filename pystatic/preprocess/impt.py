@@ -1,3 +1,7 @@
+"""
+Resovle import related type information.
+"""
+
 import ast
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeTemp, TypeType
 from typing import Optional, TYPE_CHECKING, Union, Tuple, List, Dict, Any
@@ -41,7 +45,7 @@ def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
 
 
 def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
-    """Import types(class definition) from other module"""
+    """Resolve types(class definition) imported from other module"""
     new_import_info = {}
     for uri, info in symtable._import_info.items():
         module_temp = worker.get_module_temp(uri)
@@ -49,7 +53,7 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
 
         new_info = []
         for name, origin_name, defnode in info:
-            is_module = _resolve_import_chain(symtable, name, worker)
+            is_module = _resolve_import_type_chain(symtable, name, worker)
             if not is_module:
                 new_info.append((name, origin_name, defnode))
 
@@ -64,9 +68,12 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
         resolve_import_type(inner_symtable, worker)
 
 
-def _resolve_import_chain(symtable: 'SymTable', name: str,
-                          worker: 'Preprocessor') -> bool:
-    """Return true if it truly stands for an module"""
+def _resolve_import_type_chain(symtable: 'SymTable', name: str,
+                               worker: 'Preprocessor') -> bool:
+    """Resolve type from an import chaine
+
+    Return true if it truly stands for an module
+    """
     imp_entry: Any = symtable.lookup_entry(name)
 
     if not isinstance(imp_entry, fake_imp_entry):
