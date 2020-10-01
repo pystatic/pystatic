@@ -53,9 +53,16 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
 
         new_info = []
         for name, origin_name, defnode in info:
-            is_module = _resolve_import_chain(symtable, name, worker, True)
-            if not is_module:
-                new_info.append((name, origin_name, defnode))
+            if not origin_name:
+                # the module itself
+                entry: Any = symtable.local.get(name)
+                assert entry and not isinstance(entry, Entry)  # not complete
+                module_type = module_temp.get_default_type()
+                symtable.local[name] = Entry(module_type.getins(), defnode)
+            else:
+                is_module = _resolve_import_chain(symtable, name, worker, True)
+                if not is_module:
+                    new_info.append((name, origin_name, defnode))
 
         if new_info:
             new_import_info[uri] = new_info
