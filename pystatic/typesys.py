@@ -271,7 +271,7 @@ class TypeClassTemp(TypeTemp):
                 )
                 # error recovery:
                 # if bindlist is shorter than.placeholders, then extend bindlist with Any.
-                # if bindlist is longer than.placeholders, then trucate it(through zip).
+                # if bindlist is longer than.placeholders, then truncate it(through zip).
                 if len(bindlist) < len(self.placeholders):
                     supply = [any_type
                               ] * (len(self.placeholders) - len(bindlist))

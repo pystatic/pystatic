@@ -41,8 +41,7 @@ def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
     Add import information to the symtable, this will add fake_imp_entry to the
     local scope.
     """
-    symtable._import_info.setdefault(uri, []).append(
-        (name, origin_name, defnode))
+    symtable._import_info.setdefault(uri, []).append(defnode)
 
     # add fake import entry to the local scope
     # TODO: warning if name collision happens

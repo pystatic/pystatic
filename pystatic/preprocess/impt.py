@@ -50,25 +50,34 @@ def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
 def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     """Resolve types(class definition) imported from other module"""
     new_import_info = {}
-    for uri, info in symtable._import_info.items():
-        module_temp = worker.get_module_temp(uri)
+    for module_uri, nodelist in symtable._import_info.items():
+        module_temp = worker.get_module_temp(module_uri)
         assert module_temp, "module not found error not handled yet"  # TODO: add warning here
 
         new_info = []
-        for name, origin_name, defnode in info:
-            if not origin_name:
-                # the module itself
-                entry: Any = symtable.local.get(name)
-                assert entry and not isinstance(entry, Entry)  # not complete
-                module_type = module_temp.get_default_type()
-                symtable.local[name] = Entry(module_type.getins(), defnode)
-            else:
-                is_module = _resolve_import_chain(symtable, name, worker, True)
-                if not is_module:
-                    new_info.append((name, origin_name, defnode))
+        for defnode in nodelist:
+            assert isinstance(defnode, ast.ImportFrom) or isinstance(
+                defnode, ast.Import)
+            imp_dict = split_import_stmt(defnode, symtable.glob_uri)
+
+            for uri, tples in imp_dict.items():
+                for asname, origin_name in tples:
+                    if not origin_name:
+                        # the module itself
+                        entry: Any = symtable.local.get(asname)
+                        assert entry and not isinstance(entry,
+                                                        Entry)  # not complete
+                        module_type = module_temp.get_default_type()
+                        symtable.local[asname] = Entry(module_type.getins(),
+                                                       defnode)
+                    else:
+                        is_module = _resolve_import_chain(
+                            symtable, asname, worker, True)
+                        if not is_module:
+                            new_info.append((asname, origin_name, defnode))
 
         if new_info:
-            new_import_info[uri] = new_info
+            new_import_info[module_uri] = new_info
 
     # set up _import_info_cache, this should be the first function called
     assert not hasattr(symtable, '_import_info_cache')
@@ -143,7 +152,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
         # TODO: warning here
         assert isinstance(
             module_temp, TypeModuleTemp
-        ), "this test may fail because the module can't be found, I'll instead warning will in the future"
+        ), "this test may fail because the module can't be found, I'll instead warning in the future"
 
         cur_symtable = module_temp.get_inner_symtable()
 

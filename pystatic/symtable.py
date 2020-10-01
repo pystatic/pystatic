@@ -56,9 +56,13 @@ class SymTable:
         self._cls_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
         self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
 
-        self._import_info: Dict['Uri', List[ImportItem]] = {}
+        self._import_info: Dict[str, List[ImportNode]] = {}
 
         self._functions = set()
+
+    @property
+    def glob_uri(self):
+        return self.glob.uri
 
     def _legb_lookup(self, name: str, find):
         curtable = self
