@@ -59,7 +59,7 @@ def eval_func_type(node: ast.FunctionDef,
     func_name = node.name
     inner_sym = symtable.new_symtable(func_name, TableScope.FUNC)
 
-    return TypeFuncTemp(node.name, inner_sym, argument,
+    return TypeFuncTemp(node.name, symtable.uri, inner_sym, argument,
                         ret_type).get_default_type()
 
 

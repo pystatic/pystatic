@@ -25,7 +25,7 @@ class SPTKind(enum.Enum):
     TypeAlias = 2
 
 
-def record_stp(node: Union[ast.Assign, ast.AnnAssign]):
+def record_stp(module_uri: str, node: Union[ast.Assign, ast.AnnAssign]):
     s_type = get_stp_kind(node)
     if not s_type:
         return None, None

@@ -115,7 +115,7 @@ class TypeDefVisitor(BaseVisitor):
     def visit_Assign(self, node: ast.Assign):
         # TODO: here we haven't add redefine warning and check consistence, the
         # def node is also incorrect
-        name, entry = record_stp(node)
+        name, entry = record_stp(self.glob_uri, node)
         if entry:
             assert name
             self.symtable.add_entry(name, entry)
@@ -131,7 +131,7 @@ class TypeDefVisitor(BaseVisitor):
                     self._try_attr(node, target)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        name, entry = record_stp(node)
+        name, entry = record_stp(self.glob_uri, node)
         if entry:
             assert name
             self.symtable.add_entry(name, entry)
