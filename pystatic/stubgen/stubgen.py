@@ -74,14 +74,16 @@ def stubgen_symtable(symtable: 'SymTable', level: int) -> List[IndentedStr]:
             logger.warn(f'{name} has incomplete type.')
             continue
 
-        results += ins_to_idstrlist(name, tpins, level)
+        if tpins.temp.module_uri == symtable.glob.uri:
+            # don't care about symbols that's imported from other module
+            results += ins_to_idstrlist(name, tpins, level)
 
     return results
 
 
 def stubgen_import(symtable: 'SymTable', level: int) -> List[IndentedStr]:
     results = []
-    for uri, infolst in symtable._import_info:
+    for uri, infolst in symtable._import_info.items():
         module_name = uri
 
         from_impt: List[str] = []
@@ -89,7 +91,7 @@ def stubgen_import(symtable: 'SymTable', level: int) -> List[IndentedStr]:
         for asname, origin_name, _ in infolst:
             if not origin_name:
                 # import <module_name>
-                results.append((module_name, level))
+                results.append((f'import {module_name}', level))
             else:
                 # from module_name import ... as ...
                 if origin_name == asname:
@@ -99,7 +101,10 @@ def stubgen_import(symtable: 'SymTable', level: int) -> List[IndentedStr]:
 
         if from_impt:
             impt_str = ', '.join(from_impt)
-            from_stmt = f'from {module_name} import ({impt_str})'
+            if len(from_impt) > 5:
+                from_stmt = f'from {module_name} import ({impt_str})'
+            else:
+                from_stmt = f'from {module_name} import {impt_str}'
             results.append((from_stmt, level))
     return results
 
