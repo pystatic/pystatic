@@ -331,9 +331,9 @@ class TypeFuncTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: Uri, symtable: 'SymTable', state: TpState):
+    def __init__(self, uri: Uri, symtable: 'SymTable'):
         # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(uri, uri, state, symtable, symtable)
+        super().__init__(uri, uri, TpState.OVER, symtable, symtable)
 
     @property
     def uri(self):
@@ -344,9 +344,8 @@ class TypeModuleTemp(TypeClassTemp):
 
 
 class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], uri: Uri):
-        assert 0, "not implemented yet"
-        super().__init__(uri)
+    def __init__(self, paths: List[str], symtable: 'SymTable', uri: Uri):
+        super().__init__(uri, symtable)
         self.paths = paths
 
 
@@ -478,6 +477,12 @@ class TypeGenericTemp(TypeTemp):
 class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__('Literal', 'typing')
+
+
+class TypePackageIns(TypeIns):
+    def __init__(self, pkgtemp: TypePackageTemp) -> None:
+        super().__init__(pkgtemp, [])
+        self.submodule: Dict[str, TypeIns] = {}  # submodule
 
 
 # special types

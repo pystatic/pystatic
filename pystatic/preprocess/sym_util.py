@@ -1,10 +1,15 @@
 import ast
+import logging
+from pystatic.uri import absolute_urilist, Uri
 from typing import Optional, TYPE_CHECKING, Any
-from pystatic.typesys import TypeClassTemp, TypeTemp
+from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
+                              TypePackageIns, TypeTemp, TypePackageTemp)
 from pystatic.symtable import SymTable, Entry, ImportNode
 
 if TYPE_CHECKING:
-    from pystatic.uri import Uri
+    from pystatic.preprocess.main import Preprocessor
+
+logger = logging.getLogger(__name__)
 
 
 class fake_fun_entry:
@@ -57,3 +62,50 @@ def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
 def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
     # add fake local variable entry to the local scope
     symtable.local[name] = fake_local_entry(name, node)  # type: ignore
+
+
+def add_uri_symtable(symtable: 'SymTable', uri: str,
+                     worker: 'Preprocessor') -> Optional[TypeModuleTemp]:
+    urilist = absolute_urilist(symtable.glob_uri, uri)
+    assert urilist
+
+    cur_uri = urilist[0]
+    cur_ins: TypeIns
+    if urilist[0] in symtable._import_tree:
+        cur_ins = symtable._import_tree[urilist[0]]
+    else:
+        temp = worker.get_module_temp(urilist[0])
+        if not temp:
+            return None
+
+        if isinstance(temp, TypePackageTemp):
+            cur_ins = TypePackageIns(temp)
+        else:
+            cur_ins = TypeIns(temp, [])
+
+        symtable._import_tree[urilist[0]] = cur_ins
+
+    assert isinstance(cur_ins.temp, TypeModuleTemp)
+
+    for i in range(1, len(urilist)):
+        if not isinstance(cur_ins, TypePackageIns):
+            return None
+
+        cur_uri += f'.{urilist[i]}'
+        if urilist[i] not in cur_ins.submodule:
+            temp = worker.get_module_temp(cur_uri)
+            if not temp:
+                return None
+
+            assert isinstance(temp, TypeModuleTemp)
+            if isinstance(temp, TypePackageTemp):
+                cur_ins.submodule[urilist[i]] = TypePackageIns(temp)
+            else:
+                if i != len(urilist) - 1:
+                    return None
+                cur_ins.submodule[urilist[i]] = TypeIns(temp, [])
+                return temp
+
+        cur_ins = cur_ins.submodule[urilist[i]]
+
+    return cur_ins.temp

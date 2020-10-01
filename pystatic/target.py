@@ -48,4 +48,4 @@ class Target(BlockTarget):
                  stage: Stage = Stage.PreParse):
         super().__init__(uri, symtable, stage)
         # NOTE: TpStage.OVER may be wrong.
-        self.module_temp = TypeModuleTemp(uri, self.symtable, TpState.OVER)
+        self.module_temp = TypeModuleTemp(uri, self.symtable)

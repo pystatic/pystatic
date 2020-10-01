@@ -34,7 +34,8 @@ def record_stp(module_uri: str, node: Union[ast.Assign, ast.AnnAssign]):
             assert isinstance(node.value, ast.Call)
             name = get_typevar_name(node.value)
             # FIXME: the defnode given here is incorrect
-            entry = Entry(TypeVar(name).get_default_type(), node.value)
+            entry = Entry(
+                TypeVar(module_uri, name).get_default_type(), node.value)
             return name, entry
         else:
             assert 0, "not implemented yet"

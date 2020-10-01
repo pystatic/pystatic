@@ -6,12 +6,12 @@ This module will add attribute '_import_info_cache' to symtable to avoid modify
 """
 
 import ast
-from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeTemp, TypeType
-from typing import Optional, TYPE_CHECKING, Union, Tuple, List, Dict, Any
-from pystatic.uri import uri_last, uri_parent, rel2absuri, Uri
+from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType
+from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
+from pystatic.uri import rel2absuri, Uri
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
-from pystatic.preprocess.sym_util import fake_imp_entry
+from pystatic.preprocess.sym_util import fake_imp_entry, add_uri_symtable
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -51,7 +51,10 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     """Resolve types(class definition) imported from other module"""
     new_import_info = {}
     for module_uri, nodelist in symtable._import_info.items():
-        module_temp = worker.get_module_temp(module_uri)
+        module_temp = add_uri_symtable(symtable, module_uri, worker)
+
+        # module_temp = worker.get_module_temp(module_uri)
+        # module_temp = search_uri_symtable(symtable, module_uri)
         assert module_temp, "module not found error not handled yet"  # TODO: add warning here
 
         new_info = []
@@ -90,8 +93,6 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
 
 
 def resolve_import_ins(symtable: SymTable, worker: 'Preprocessor'):
-    # TODO: resolve instances because of import statement. we need to resolve
-    # the order.
     new_import_info = {}
 
     assert hasattr(symtable,
