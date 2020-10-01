@@ -55,7 +55,10 @@ def eval_func_type(node: ast.FunctionDef,
         ret_type = eval_type_expr(node.returns, symtable)
     if not ret_type:
         ret_type = any_type  # default return type is Any
-    inner_sym = symtable.new_symtable(TableScope.FUNC)
+
+    func_name = node.name
+    inner_sym = symtable.new_symtable(func_name, TableScope.FUNC)
+
     return TypeFuncTemp(node.name, inner_sym, argument,
                         ret_type).get_default_type()
 
@@ -73,7 +76,7 @@ def eval_argument_type(node: ast.arguments,
 
     # parse a list of args
     def add_to_list(target_list, order_list, args):
-        global ok
+        nonlocal ok
         for arg in args:
             gen_arg = eval_arg_type(arg, symtable)
             if gen_arg:

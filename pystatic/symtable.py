@@ -41,8 +41,11 @@ class Entry:
 
 
 class SymTable:
-    def __init__(self, glob: 'SymTable', non_local: Optional['SymTable'],
-                 builtins: 'SymTable', scope: 'TableScope') -> None:
+    def __init__(self, uri: 'Uri', glob: 'SymTable',
+                 non_local: Optional['SymTable'], builtins: 'SymTable',
+                 scope: 'TableScope') -> None:
+        self.uri = uri
+
         self.local: Dict[str, Entry] = {}
         self.non_local = non_local
         self.glob = glob
@@ -114,11 +117,12 @@ class SymTable:
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
 
-    def new_symtable(self, new_scope: 'TableScope') -> 'SymTable':
+    def new_symtable(self, name: str, new_scope: 'TableScope') -> 'SymTable':
         builtins = self.builtins
         if self.scope == TableScope.CLASS:
             non_local = self.non_local
         else:
             non_local = self
         glob = self.glob
-        return SymTable(glob, non_local, builtins, new_scope)
+        new_uri = self.uri + '.' + name
+        return SymTable(new_uri, glob, non_local, builtins, new_scope)

@@ -196,6 +196,7 @@ class TypeClassTemp(TypeTemp):
     # FIXME: remove None of symtable and defnode
     def __init__(self,
                  clsname: str,
+                 module_uri: str,
                  state: TpState,
                  def_symtable: 'SymTable',
                  inner_symtable: 'SymTable',
@@ -210,6 +211,8 @@ class TypeClassTemp(TypeTemp):
         self._inner_symtable = inner_symtable  # symtable belongs to this cls
         self._def_symtable = def_symtable  # symtable where this cls is defined
         self._defnode = defnode
+
+        self._glob_uri = module_uri  # the module uri that this class is defined
 
     def _add_defer_var(self, name, attrs):
         """Defer attribute type evaluation.
@@ -323,7 +326,7 @@ class TypeFuncTemp(TypeTemp):
 class TypeModuleTemp(TypeClassTemp):
     def __init__(self, uri: Uri, symtable: 'SymTable', state: TpState):
         # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(uri, state, symtable, symtable)
+        super().__init__(uri, uri, state, symtable, symtable)
 
     @property
     def uri(self):

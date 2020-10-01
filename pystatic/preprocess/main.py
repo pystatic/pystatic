@@ -3,7 +3,7 @@ from collections import deque
 from typing import Optional, TYPE_CHECKING, Deque, List, Dict
 from pystatic.typesys import TpState, TypeModuleTemp
 from pystatic.modfinder import ModuleFinder
-from pystatic.predefined import get_init_symtable
+from pystatic.predefined import get_init_module_symtable
 from pystatic.preprocess.definition import (get_definition,
                                             get_definition_in_method)
 from pystatic.preprocess.impt import resolve_import_type, resolve_import_ins
@@ -67,7 +67,7 @@ class Preprocessor:
     def add_cache_target_uri(self, uri: 'Uri'):
         """Add and cache target through its uri"""
         if uri not in self.targets:
-            new_target = Target(uri, get_init_symtable())
+            new_target = Target(uri, get_init_module_symtable(uri))
             self.targets[uri] = new_target
             self.q_parse.append(new_target)
             return True

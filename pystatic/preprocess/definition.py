@@ -59,6 +59,8 @@ class TypeDefVisitor(BaseVisitor):
 
         self._clsname: List[str] = []
 
+        self.glob_uri = symtable.glob.uri  # the module's uri
+
     def _is_self_def(self, node: ast.AST) -> Optional[str]:
         if isinstance(node, ast.Attribute):
             if isinstance(node.value, ast.Name):
@@ -155,9 +157,10 @@ class TypeDefVisitor(BaseVisitor):
             else:
                 abs_clsname = clsname
 
-            new_symtable = self.symtable.new_symtable(TableScope.CLASS)
-            clstemp = TypeClassTemp(abs_clsname, TpState.FRESH, self.symtable,
-                                    new_symtable, node)
+            new_symtable = self.symtable.new_symtable(clsname,
+                                                      TableScope.CLASS)
+            clstemp = TypeClassTemp(abs_clsname, self.glob_uri, TpState.FRESH,
+                                    self.symtable, new_symtable, node)
             clstype = clstemp.get_default_type()
             entry = Entry(clstype, node)
             self.symtable.add_entry(clsname, entry)

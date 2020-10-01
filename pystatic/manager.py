@@ -6,7 +6,7 @@ from pystatic.message import MessageBox
 from typing import Optional, List, TextIO, Set, Dict, Deque
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
-                                 get_init_symtable)
+                                 get_init_module_symtable)
 from pystatic.symtable import SymTable
 from pystatic.typesys import TypeModuleTemp, TpState
 from pystatic.config import Config
@@ -85,7 +85,9 @@ class Manager:
                 continue
             rt_path = crawl_path(os.path.dirname(srcfile))
             uri = relpath2uri(rt_path, srcfile)
-            target = Target(uri, get_init_symtable(), stage=Stage.PreParse)
+            target = Target(uri,
+                            get_init_module_symtable(uri),
+                            stage=Stage.PreParse)
             self.check_targets[uri] = target
 
 
