@@ -1,5 +1,8 @@
 """
 Resovle import related type information.
+
+This module will add attribute '_import_info_cache' to symtable to avoid modify
+'import_info' attribute of the symtable.
 """
 
 import ast
@@ -67,7 +70,9 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
         if new_info:
             new_import_info[uri] = new_info
 
-    symtable._import_info = new_import_info
+    # set up _import_info_cache, this should be the first function called
+    assert not hasattr(symtable, '_import_info_cache')
+    setattr(symtable, '_import_info_cache', new_import_info)
 
     for tp_def in symtable._cls_defs.values():
         assert isinstance(tp_def, TypeClassTemp)
@@ -79,7 +84,12 @@ def resolve_import_ins(symtable: SymTable, worker: 'Preprocessor'):
     # TODO: resolve instances because of import statement. we need to resolve
     # the order.
     new_import_info = {}
-    for uri, info in symtable._import_info.items():
+
+    assert hasattr(symtable,
+                   '_import_info_cache'), "_import_info_cache not set"
+    target_import_info = getattr(symtable, '_import_info_cache', None)
+
+    for uri, info in target_import_info.items():
         module_temp = worker.get_module_temp(uri)
         assert module_temp, "module not found error not handled yet"  # TODO: add warning here
 
@@ -92,7 +102,8 @@ def resolve_import_ins(symtable: SymTable, worker: 'Preprocessor'):
         if new_info:
             new_import_info[uri] = new_info
 
-    symtable._import_info = new_import_info
+    assert hasattr(symtable, '_import_info_cache')
+    delattr(symtable, '_import_info_cache')
 
     for tp_def in symtable._cls_defs.values():
         assert isinstance(tp_def, TypeClassTemp)

@@ -33,6 +33,7 @@ def mkstub_dir(dir: str):
             r_path = os.path.realpath(dir)
             logger.error(f'{r_path} already exists and is a file.')
             return False
+        return True
     else:
         os.mkdir(dir)
         return True
@@ -58,13 +59,14 @@ def indented_to_str(idstr: IndentedStr):
 
 
 def stubgen_main(target: Target) -> str:
-    idstr_list = _stubgen_symtable(target.symtable, 0)
+    idstr_list = stubgen_symtable(target.symtable, 0)
     str_list = [indented_to_str(item) for item in idstr_list]
     return '\n'.join(str_list)
 
 
-def _stubgen_symtable(symtable: 'SymTable', level: int) -> List[IndentedStr]:
-    results: List[IndentedStr] = []
+def stubgen_symtable(symtable: 'SymTable', level: int) -> List[IndentedStr]:
+    results: List[IndentedStr] = stubgen_import(symtable, level)
+
     for name, entry in symtable.local.items():
         tpins = entry.get_type()
         if not tpins:
@@ -74,6 +76,31 @@ def _stubgen_symtable(symtable: 'SymTable', level: int) -> List[IndentedStr]:
 
         results += ins_to_idstrlist(name, tpins, level)
 
+    return results
+
+
+def stubgen_import(symtable: 'SymTable', level: int) -> List[IndentedStr]:
+    results = []
+    for uri, infolst in symtable._import_info:
+        module_name = uri
+
+        from_impt: List[str] = []
+
+        for asname, origin_name, _ in infolst:
+            if not origin_name:
+                # import <module_name>
+                results.append((module_name, level))
+            else:
+                # from module_name import ... as ...
+                if origin_name == asname:
+                    from_impt.append(f"{asname}")
+                else:
+                    from_impt.append(f"{origin_name} as {asname}")
+
+        if from_impt:
+            impt_str = ', '.join(from_impt)
+            from_stmt = f'from {module_name} import ({impt_str})'
+            results.append((from_stmt, level))
     return results
 
 
@@ -102,7 +129,7 @@ def stub_cls_def(clsname: str, temp: TypeClassTemp,
         var_strlist.append(stub_var_def(name, tpins.temp, level + 1))
 
     inner_symtable = temp.get_inner_symtable()
-    body = _stubgen_symtable(inner_symtable, level + 1)
+    body = stubgen_symtable(inner_symtable, level + 1)
 
     if not body:
         header = (header[0] + ' ...', header[1])
