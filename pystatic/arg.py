@@ -1,13 +1,9 @@
-from pystatic.typesys import BaseType, TypeAnyTemp, any_temp
+from pystatic.typesys import TypeAnyTemp, any_temp
 from typing import Optional, List
 
 
 class Arg(object):
-    def __init__(self,
-                 name,
-                 ann: BaseType = any_temp,
-                 default=None,
-                 valid=False):
+    def __init__(self, name, ann=any_temp, default=None, valid=False):
         """
         valid: whether this argument has default value
         """

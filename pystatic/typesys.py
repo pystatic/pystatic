@@ -28,36 +28,27 @@ class GetItemError(Exception):
         self.msg = msg
 
 
-class BaseType(object):
-    def __init__(self, typename: str):
-        self.name = typename
-
-    @property
-    def basename(self) -> str:
-        rpos = self.name.rfind('.')
-        return self.name[rpos + 1:]
-
-    def __str__(self):
-        """ Used for type hint """
-        return self.name
-
-
 class TpState(enum.IntEnum):
     FRESH = 0
     ON = 1
     OVER = 2
 
 
-class TypeTemp(BaseType):
+class TypeTemp:
     def __init__(self,
                  name: str,
                  module_uri: str,
                  resolve_state: TpState = TpState.OVER):
-        super().__init__(name)
+        self.name = name
         self.placeholders = []
 
         self.module_uri = module_uri  # the module uri that define this type
         self._resolve_state = resolve_state
+
+    @property
+    def basename(self) -> str:
+        rpos = self.name.rfind('.')
+        return self.name[rpos + 1:]
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
@@ -107,6 +98,9 @@ class TypeTemp(BaseType):
                      context: Optional[TypeContext] = None) -> str:
         return self.name
 
+    def __str__(self):
+        return self.name
+
 
 class TypeVar(TypeTemp):
     def __init__(self,
@@ -130,10 +124,9 @@ class TypeVar(TypeTemp):
         self.constrains: List['TypeIns'] = list(*args)
 
 
-class TypeIns(BaseType):
+class TypeIns:
     def __init__(self, temp: TypeTemp, bindlist: BindList):
         """bindlist will be shallowly copied"""
-        super().__init__(temp.name)
         self.temp = temp
         self.bindlist = copy.copy(bindlist)
 
@@ -173,7 +166,7 @@ class TypeIns(BaseType):
 
     def getitem(self, items) -> Tuple['TypeIns', 'GetItemError']:
         getitem_err = GetItemError()
-        getitem_err.set_msg(f"{self.basename} doesn't support __getitem__")
+        getitem_err.set_msg(f"{self.temp.name} doesn't support __getitem__")
         return (any_ins, getitem_err)
 
     def __str__(self) -> str:
@@ -425,7 +418,7 @@ class TypeCallableTemp(TypeTemp):
             for i, item in enumerate(bindlist[0]):  # type: ignore
                 if not isinstance(item, TypeType):
                     assert isinstance(item, TypeIns)
-                    binderr.add_error(i, f'{item.basename} is not a type')
+                    # binderr.add_error(i, f'{item.basename} is not a type')
                     param_list.append(any_type)
                 else:
                     param_list.append(item)
