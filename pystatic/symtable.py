@@ -57,6 +57,7 @@ class SymTable:
         self._cls_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
         self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
 
+        self._import_nodes: List[ImportNode] = []
         self._import_tree: Dict[str, 'TypeIns'] = {}
 
         self._functions = set()
