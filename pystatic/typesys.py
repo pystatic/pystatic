@@ -465,7 +465,7 @@ class TypeGenericTemp(TypeTemp):
                     bind_item.temp, TypeVar):
                 new_bindlist.append(bind_item)
             else:
-                assert 0, "For temporary test"
+                assert False, "For temporary test"
                 binderr.add_error(i, f'a type is required')
         return new_bindlist, binderr
 
