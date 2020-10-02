@@ -1,6 +1,7 @@
 import ast
 import os
 import logging
+from contextlib import contextmanager
 from pystatic.arg import Arg, Argument
 from typing import List, Tuple
 from pystatic.target import Target
@@ -84,9 +85,6 @@ class NameTree:
         module_uri = temp.module_uri
         uri = temp.name
 
-        if module_uri == self.module_uri or module_uri == 'builtins':
-            return uri
-
         urilist = uri2list(module_uri) + uri2list(uri)
         cur_node = self.root
         namelist = []
@@ -122,6 +120,12 @@ class StubGen:
         self.target = target
         self.name_tree = NameTree(target.uri)
         self.in_class = False
+        self.from_typing = []
+        self.cur_uri = ''
+
+    @property
+    def module_uri(self):
+        return self.target.uri
 
     @staticmethod
     def scoped_list_to_str(lst: List[Tuple[str, int]]):
@@ -140,10 +144,24 @@ class StubGen:
         return ''.join(results)
 
     def generate(self):
-        return self.stubgen_symtable(self.target.symtable, 0)
+        src_str = self.stubgen_symtable(self.target.symtable, 0)
+        impt_typing = ', '.join(self.from_typing)
+        if impt_typing:
+            return f'from typing import {impt_typing}\n' + src_str
+        else:
+            return src_str
 
-    def enter_class(self):
-        pass
+    @contextmanager
+    def enter_class(self, clsname: str):
+        old_uri = self.cur_uri
+        old_in_class = self.in_class
+        if not self.cur_uri:
+            self.cur_uri = f'{clsname}'
+        else:
+            self.cur_uri += f'.{clsname}'
+        yield
+        self.cur_uri = old_uri
+        self.in_class = old_in_class
 
     def stubgen_symtable(self, symtable: 'SymTable', level: int):
         results: List[Tuple[str, int]] = []
@@ -233,18 +251,39 @@ class StubGen:
                  for stmt, ident in results]) + '\n'
 
     def stub_var_def(self, varname: str, temp: TypeTemp, level: int):
-        return _indent_unit * level + varname + ': ' + self.name_tree.ask(
-            temp) + '\n'
+        module_uri = temp.module_uri
+        uri = temp.name
+        type_str = ''
+
+        if module_uri == 'builtins':
+            type_str = uri
+
+        elif module_uri == 'typing':
+            type_str = module_uri + '.' + uri
+
+        elif module_uri == self.module_uri:
+            if self.cur_uri and uri.find(
+                    self.cur_uri) == 0 and len(uri) > len(self.cur_uri):
+                type_str = uri[len(self.cur_uri) + 1:]
+            else:
+                type_str = uri
+
+        else:
+            type_str = self.name_tree.ask(temp)
+
+        return _indent_unit * level + varname + ': ' + type_str + '\n'
 
     def stub_cls_def(self, clsname: str, temp: TypeClassTemp, level: int):
         header = self.stub_cls_def_header(clsname, temp, level)
 
-        var_strlist = []
-        for name, tpins in temp.var_attr.items():
-            var_strlist.append(self.stub_var_def(name, tpins.temp, level + 1))
-
         inner_symtable = temp.get_inner_symtable()
-        body = self.stubgen_symtable(inner_symtable, level + 1)
+        var_strlist = []
+        with self.enter_class(clsname):
+            for name, tpins in temp.var_attr.items():
+                var_strlist.append(
+                    self.stub_var_def(name, tpins.temp, level + 1))
+
+            body = self.stubgen_symtable(inner_symtable, level + 1)
 
         if not body or body == '\n':
             header += '...\n'
