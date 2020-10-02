@@ -9,6 +9,7 @@ import ast
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType
 from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
 from pystatic.uri import rel2absuri, Uri, uri2list
+from pystatic.util import split_import_stmt
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
 from pystatic.preprocess.sym_util import (fake_imp_entry, add_uri_symtable,
@@ -18,78 +19,45 @@ if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
 
 
-def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
-                      uri: Uri) -> Dict[Uri, List[Tuple[str, str]]]:
-    """Return: imported Moduri mapped to (name1, name2) where name1 is the name in the
-    current module and name2 is the name in the imported module.
-    """
-    res = {}
-    if isinstance(node, ast.Import):
-        for alias in node.names:
-            module_uri = alias.name
-            as_name = alias.asname or module_uri
-            res.setdefault(module_uri, []).append(
-                (as_name, ''))  # empty string means the module itself
-
-    elif isinstance(node, ast.ImportFrom):
-        imp_name = '.' * node.level
-        imp_name += node.module or ''
-        module_uri = rel2absuri(uri, imp_name)
-        imported = []
-        for alias in node.names:
-            attr_name = alias.name
-            as_name = alias.asname or attr_name
-            imported.append((as_name, attr_name))
-        res = {module_uri: imported}
-
-    else:
-        raise TypeError("node doesn't stand for an import statement")
-
-    return res
-
-
 def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     """Resolve types(class definition) imported from other module"""
     new_import_info = {}
-    if hasattr(symtable, '_import_nodes'):
-        for impt_node in symtable._import_nodes:  # type: ignore
-            impt_dict = split_import_stmt(impt_node, symtable.glob_uri)
+    for impt_node in symtable._import_nodes:
+        impt_dict = split_import_stmt(impt_node, symtable.glob_uri)
 
-            if isinstance(impt_node, ast.Import):
-                for uri, tpls in impt_dict.items():
-                    add_uri_symtable(symtable, uri, worker)
-                    module_ins = search_uri_symtable(symtable, uri)
-                    assert module_ins, "module not found error not handled yet"
+        if isinstance(impt_node, ast.Import):
+            for uri, tpls in impt_dict.items():
+                add_uri_symtable(symtable, uri, worker)
+                module_ins = search_uri_symtable(symtable, uri)
+                assert module_ins, "module not found error not handled yet"
 
-                    for asname, origin_name in tpls:
-                        if asname == uri:
-                            assert uri2list(uri)
-                            top_uri = uri2list(uri)[0]
+                for asname, origin_name in tpls:
+                    if asname == uri:
+                        assert uri2list(uri)
+                        top_uri = uri2list(uri)[0]
 
-                            if top_uri not in symtable.local:
-                                top_module_ins = search_uri_symtable(
-                                    symtable, top_uri)
-                                assert top_module_ins, "module not found error not handled yet"
-                                symtable.local[top_uri] = Entry(
-                                    top_module_ins, impt_node)
+                        if top_uri not in symtable.local:
+                            top_module_ins = search_uri_symtable(
+                                symtable, top_uri)
+                            assert top_module_ins, "module not found error not handled yet"
+                            symtable.local[top_uri] = Entry(
+                                top_module_ins, impt_node)
 
-                        else:
-                            symtable.local[asname] = Entry(
-                                module_ins, impt_node)
+                    else:
+                        symtable.local[asname] = Entry(module_ins, impt_node)
 
-            else:
-                for uri, tpls in impt_dict.items():
-                    new_info = []
+        else:
+            for uri, tpls in impt_dict.items():
+                new_info = []
 
-                    for asname, origin_name in tpls:
-                        is_module = _resolve_import_chain(
-                            symtable, asname, worker, True)
-                        if not is_module:
-                            new_info.append((asname, origin_name, impt_node))
+                for asname, origin_name in tpls:
+                    is_module = _resolve_import_chain(symtable, asname, worker,
+                                                      True)
+                    if not is_module:
+                        new_info.append((asname, origin_name, impt_node))
 
-                    if new_info:
-                        new_import_info[uri] = new_info
-        del symtable._import_nodes  # type: ignore
+                if new_info:
+                    new_import_info[uri] = new_info
 
     assert not hasattr(symtable, '_import_info_cache')
     setattr(symtable, '_import_info_cache', new_import_info)
