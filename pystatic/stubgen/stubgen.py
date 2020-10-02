@@ -120,7 +120,7 @@ class StubGen:
         self.target = target
         self.name_tree = NameTree(target.uri)
         self.in_class = False
-        self.from_typing = []
+        self.from_typing = set()
         self.cur_uri = ''
 
     @property
@@ -145,7 +145,11 @@ class StubGen:
 
     def generate(self):
         src_str = self.stubgen_symtable(self.target.symtable, 0)
-        impt_typing = ', '.join(self.from_typing)
+        sym_local = self.target.symtable.local
+        typing_list = filter(
+            lambda name: (name not in sym_local) and name.find('.') < 0,
+            self.from_typing)
+        impt_typing = ', '.join(typing_list)
         if impt_typing:
             return f'from typing import {impt_typing}\n' + src_str
         else:
@@ -259,7 +263,8 @@ class StubGen:
             type_str = uri
 
         elif module_uri == 'typing':
-            type_str = module_uri + '.' + uri
+            self.from_typing.add(uri)
+            type_str = uri
 
         elif module_uri == self.module_uri:
             if self.cur_uri and uri.find(
