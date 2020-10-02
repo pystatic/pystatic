@@ -1,9 +1,13 @@
-from pystatic.typesys import TypeAnyTemp, any_temp
+from pystatic.typesys import TypeAnyTemp, TypeIns, any_ins
 from typing import Optional, List
 
 
 class Arg(object):
-    def __init__(self, name, ann=any_temp, default=None, valid=False):
+    def __init__(self,
+                 name,
+                 ann: TypeIns = any_ins,
+                 default=None,
+                 valid=False):
         """
         valid: whether this argument has default value
         """
@@ -14,7 +18,7 @@ class Arg(object):
 
     def __str__(self):
         result = self.name
-        if not isinstance(self.ann, TypeAnyTemp):
+        if self.ann == any_ins:
             result += ': ' + str(self.ann)
         if self.valid:
             result += ' = ...'
