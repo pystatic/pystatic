@@ -3,7 +3,7 @@ from pystatic.symtable import SymTable, TableScope, TypeDefNode
 from typing import List, Optional, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeFuncTemp, TypeIns, ellipsis_type, TypeType,
-                              any_type)
+                              any_type, none_type)
 from pystatic.arg import Argument, Arg
 
 
@@ -59,7 +59,7 @@ def eval_func_type(node: ast.FunctionDef,
     func_name = node.name
     inner_sym = symtable.new_symtable(func_name, TableScope.FUNC)
 
-    return TypeFuncTemp(node.name, symtable.uri, inner_sym, argument,
+    return TypeFuncTemp(node.name, symtable.glob_uri, inner_sym, argument,
                         ret_type).get_default_type()
 
 
@@ -153,7 +153,7 @@ class TypeExprVisitor(BaseVisitor):
             else:
                 res = func(node, *args, **kwargs)
 
-                assert isinstance(res, TypeType) or isinstance(res, list)
+                assert isinstance(res, TypeIns) or isinstance(res, list)
                 return res
 
     def accept(self, node) -> Optional[TypeType]:
@@ -164,28 +164,26 @@ class TypeExprVisitor(BaseVisitor):
         except NotType:
             return None  # TODO: warning?
 
-    def visit_Attribute(self, node: ast.Attribute) -> TypeType:
+    def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
         left_type = self.visit(node.value)
-
-        assert isinstance(left_type, TypeType)
+        assert isinstance(left_type, TypeIns)
 
         res_type = left_type.getattribute(node.attr)
         # TODO: report error when res_type is not TypeIns
-        assert isinstance(res_type, TypeType)
+        assert isinstance(res_type, TypeIns)
         return res_type
 
     def visit_Ellipsis(self, node: ast.Ellipsis) -> TypeType:
         return ellipsis_type
 
-    def visit_Name(self, node: ast.Name) -> TypeType:
+    def visit_Name(self, node: ast.Name) -> TypeIns:
         res = self.symtable.lookup(node.id)
         if res:
-            assert isinstance(res, TypeType)
             return res
         else:
             raise NotType
 
-    def visit_Constant(self, node: ast.Constant) -> TypeType:
+    def visit_Constant(self, node: ast.Constant) -> TypeIns:
         if node.value is Ellipsis:
             return ellipsis_type
         elif isinstance(node.value, str):
@@ -196,16 +194,18 @@ class TypeExprVisitor(BaseVisitor):
                     if not str_res:
                         raise NotType
                     else:
-                        assert isinstance(str_res, TypeType)
+                        assert isinstance(str_res, TypeIns)
                         return str_res
                 else:
                     raise NotType
             except SyntaxError:
                 raise NotType
+        elif not node.kind:
+            return none_type
         else:
             raise NotType
 
-    def visit_Subscript(self, node: ast.Subscript) -> TypeType:
+    def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
         value = self.visit(node.value)
         assert isinstance(value, TypeType)
         if isinstance(node.slice, (ast.Tuple, ast.Index)):
@@ -216,13 +216,13 @@ class TypeExprVisitor(BaseVisitor):
                 slc = self.visit(node.slice.value)
             if isinstance(slc, list):
                 return value.getitem(slc)[0]  # TODO: add check here
-            assert isinstance(slc, TypeType)
+            assert isinstance(slc, TypeIns)
             return value.getitem([slc])[0]  # TODO: add check here
         else:
             assert 0, "Not implemented yet"
             raise InvalidAnnSyntax
 
-    def visit_Tuple(self, node: ast.Tuple) -> List[TypeType]:
+    def visit_Tuple(self, node: ast.Tuple) -> List[TypeIns]:
         items = []
         for subnode in node.elts:
             res = self.visit(subnode)
@@ -230,6 +230,6 @@ class TypeExprVisitor(BaseVisitor):
             items.append(res)
         return items
 
-    def visit_List(self, node: ast.List) -> List[TypeType]:
+    def visit_List(self, node: ast.List) -> List[TypeIns]:
         # ast.List and ast.Tuple has similar structure
         return self.visit_Tuple(node)  # type: ignore

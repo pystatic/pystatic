@@ -28,36 +28,27 @@ class GetItemError(Exception):
         self.msg = msg
 
 
-class BaseType(object):
-    def __init__(self, typename: str):
-        self.name = typename
-
-    @property
-    def basename(self) -> str:
-        rpos = self.name.rfind('.')
-        return self.name[rpos + 1:]
-
-    def __str__(self):
-        """ Used for type hint """
-        return self.name
-
-
 class TpState(enum.IntEnum):
     FRESH = 0
     ON = 1
     OVER = 2
 
 
-class TypeTemp(BaseType):
+class TypeTemp:
     def __init__(self,
                  name: str,
                  module_uri: str,
                  resolve_state: TpState = TpState.OVER):
-        super().__init__(name)
+        self.name = name
         self.placeholders = []
 
         self.module_uri = module_uri  # the module uri that define this type
         self._resolve_state = resolve_state
+
+    @property
+    def basename(self) -> str:
+        rpos = self.name.rfind('.')
+        return self.name[rpos + 1:]
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
@@ -107,6 +98,9 @@ class TypeTemp(BaseType):
                      context: Optional[TypeContext] = None) -> str:
         return self.name
 
+    def __str__(self):
+        return self.name
+
 
 class TypeVar(TypeTemp):
     def __init__(self,
@@ -130,10 +124,9 @@ class TypeVar(TypeTemp):
         self.constrains: List['TypeIns'] = list(*args)
 
 
-class TypeIns(BaseType):
+class TypeIns:
     def __init__(self, temp: TypeTemp, bindlist: BindList):
         """bindlist will be shallowly copied"""
-        super().__init__(temp.name)
         self.temp = temp
         self.bindlist = copy.copy(bindlist)
 
@@ -173,11 +166,11 @@ class TypeIns(BaseType):
 
     def getitem(self, items) -> Tuple['TypeIns', 'GetItemError']:
         getitem_err = GetItemError()
-        getitem_err.set_msg(f"{self.basename} doesn't support __getitem__")
+        getitem_err.set_msg(f"{self.temp.name} doesn't support __getitem__")
         return (any_ins, getitem_err)
 
     def __str__(self) -> str:
-        return self.name
+        return self.temp.get_str_expr(self.bindlist)
 
 
 class TypeType(TypeIns):
@@ -236,7 +229,7 @@ class TypeClassTemp(TypeTemp):
         else:
             return None
 
-    def set_inner_symtable(self, symtable):
+    def set_inner_symtable(self, symtable: 'SymTable'):
         self._inner_symtable = symtable
 
     def get_inner_symtable(self) -> 'SymTable':
@@ -271,7 +264,7 @@ class TypeClassTemp(TypeTemp):
                 )
                 # error recovery:
                 # if bindlist is shorter than.placeholders, then extend bindlist with Any.
-                # if bindlist is longer than.placeholders, then trucate it(through zip).
+                # if bindlist is longer than.placeholders, then truncate it(through zip).
                 if len(bindlist) < len(self.placeholders):
                     supply = [any_type
                               ] * (len(self.placeholders) - len(bindlist))
@@ -331,9 +324,9 @@ class TypeFuncTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: Uri, symtable: 'SymTable', state: TpState):
+    def __init__(self, uri: Uri, symtable: 'SymTable'):
         # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(uri, uri, state, symtable, symtable)
+        super().__init__(uri, uri, TpState.OVER, symtable, symtable)
 
     @property
     def uri(self):
@@ -344,10 +337,12 @@ class TypeModuleTemp(TypeClassTemp):
 
 
 class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], uri: Uri):
-        assert 0, "not implemented yet"
-        super().__init__(uri)
+    def __init__(self, paths: List[str], symtable: 'SymTable', uri: Uri):
+        super().__init__(uri, symtable)
         self.paths = paths
+
+    def get_default_type(self) -> 'TypeType':
+        return TypePackageType(self)
 
 
 class TypeAnyTemp(TypeTemp):
@@ -423,7 +418,7 @@ class TypeCallableTemp(TypeTemp):
             for i, item in enumerate(bindlist[0]):  # type: ignore
                 if not isinstance(item, TypeType):
                     assert isinstance(item, TypeIns)
-                    binderr.add_error(i, f'{item.basename} is not a type')
+                    # binderr.add_error(i, f'{item.basename} is not a type')
                     param_list.append(any_type)
                 else:
                     param_list.append(item)
@@ -470,7 +465,7 @@ class TypeGenericTemp(TypeTemp):
                     bind_item.temp, TypeVar):
                 new_bindlist.append(bind_item)
             else:
-                assert 0, "For temporary test"
+                assert False, "For temporary test"
                 binderr.add_error(i, f'a type is required')
         return new_bindlist, binderr
 
@@ -478,6 +473,27 @@ class TypeGenericTemp(TypeTemp):
 class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__('Literal', 'typing')
+
+
+class TypePackageType(TypeType):
+    def __init__(self, temp: TypePackageTemp) -> None:
+        super().__init__(temp, [])
+
+    def getins(self) -> 'TypeIns':
+        assert isinstance(self.temp, TypePackageTemp)
+        return TypePackageIns(self.temp)
+
+
+class TypePackageIns(TypeIns):
+    def __init__(self, pkgtemp: TypePackageTemp) -> None:
+        super().__init__(pkgtemp, [])
+        self.submodule: Dict[str, TypeIns] = {}  # submodule
+
+    def add_submodule(self, name: str, ins: TypeIns):
+        self.submodule[name] = ins
+        assert isinstance(self.temp, TypePackageTemp)
+        inner_sym = self.temp.get_inner_symtable()
+        inner_sym.add_entry(name, Entry(ins))
 
 
 # special types

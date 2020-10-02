@@ -33,7 +33,7 @@ def resolve_local_typeins(symtable: 'SymTable'):
                 # TODO warning here
                 tpins = any_ins
             new_entry[name] = Entry(tpins, defnode)
-            logger.debug(f'{name}: {tpins}')
+            logger.debug(f'({symtable.uri}) {name}: {tpins}')
 
     symtable.local.update(new_entry)
 

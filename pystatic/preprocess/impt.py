@@ -6,71 +6,59 @@ This module will add attribute '_import_info_cache' to symtable to avoid modify
 """
 
 import ast
-from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeTemp, TypeType
-from typing import Optional, TYPE_CHECKING, Union, Tuple, List, Dict, Any
-from pystatic.uri import uri_last, uri_parent, rel2absuri, Uri
+from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType
+from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
+from pystatic.uri import rel2absuri, Uri, uri2list
+from pystatic.util import split_import_stmt
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
-from pystatic.preprocess.sym_util import fake_imp_entry
+from pystatic.preprocess.sym_util import (fake_imp_entry, add_uri_symtable,
+                                          search_uri_symtable)
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
 
 
-def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
-                      uri: Uri) -> Dict[Uri, List[Tuple[str, str]]]:
-    """Return: imported Moduri mapped to (name1, name2) where name1 is the name in the
-    current module and name2 is the name in the imported module.
-    """
-    res = {}
-    if isinstance(node, ast.Import):
-        for alias in node.names:
-            module_uri = alias.name
-            as_name = alias.asname or module_uri
-            res.setdefault(module_uri, []).append(
-                (as_name, ''))  # empty string means the module itself
-
-    elif isinstance(node, ast.ImportFrom):
-        imp_name = '.' * node.level
-        imp_name += node.module or ''
-        module_uri = rel2absuri(uri, imp_name)
-        imported = []
-        for alias in node.names:
-            attr_name = alias.name
-            as_name = alias.asname or attr_name
-            imported.append((as_name, attr_name))
-        res = {module_uri: imported}
-
-    else:
-        raise TypeError("node doesn't stand for an import statement")
-
-    return res
-
-
 def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     """Resolve types(class definition) imported from other module"""
     new_import_info = {}
-    for uri, info in symtable._import_info.items():
-        module_temp = worker.get_module_temp(uri)
-        assert module_temp, "module not found error not handled yet"  # TODO: add warning here
+    for impt_node in symtable._import_nodes:
+        impt_dict = split_import_stmt(impt_node, symtable.glob_uri)
 
-        new_info = []
-        for name, origin_name, defnode in info:
-            if not origin_name:
-                # the module itself
-                entry: Any = symtable.local.get(name)
-                assert entry and not isinstance(entry, Entry)  # not complete
-                module_type = module_temp.get_default_type()
-                symtable.local[name] = Entry(module_type.getins(), defnode)
-            else:
-                is_module = _resolve_import_chain(symtable, name, worker, True)
-                if not is_module:
-                    new_info.append((name, origin_name, defnode))
+        if isinstance(impt_node, ast.Import):
+            for uri, tpls in impt_dict.items():
+                add_uri_symtable(symtable, uri, worker)
+                module_ins = search_uri_symtable(symtable, uri)
+                assert module_ins, "module not found error not handled yet"
 
-        if new_info:
-            new_import_info[uri] = new_info
+                for asname, origin_name in tpls:
+                    if asname == uri:
+                        assert uri2list(uri)
+                        top_uri = uri2list(uri)[0]
 
-    # set up _import_info_cache, this should be the first function called
+                        if top_uri not in symtable.local:
+                            top_module_ins = search_uri_symtable(
+                                symtable, top_uri)
+                            assert top_module_ins, "module not found error not handled yet"
+                            symtable.local[top_uri] = Entry(
+                                top_module_ins, impt_node)
+
+                    else:
+                        symtable.local[asname] = Entry(module_ins, impt_node)
+
+        else:
+            for uri, tpls in impt_dict.items():
+                new_info = []
+
+                for asname, origin_name in tpls:
+                    is_module = _resolve_import_chain(symtable, asname, worker,
+                                                      True)
+                    if not is_module:
+                        new_info.append((asname, origin_name, impt_node))
+
+                if new_info:
+                    new_import_info[uri] = new_info
+
     assert not hasattr(symtable, '_import_info_cache')
     setattr(symtable, '_import_info_cache', new_import_info)
 
@@ -81,8 +69,6 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
 
 
 def resolve_import_ins(symtable: SymTable, worker: 'Preprocessor'):
-    # TODO: resolve instances because of import statement. we need to resolve
-    # the order.
     new_import_info = {}
 
     assert hasattr(symtable,
@@ -143,7 +129,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
         # TODO: warning here
         assert isinstance(
             module_temp, TypeModuleTemp
-        ), "this test may fail because the module can't be found, I'll instead warning will in the future"
+        ), "this test may fail because the module can't be found, I'll instead warning in the future"
 
         cur_symtable = module_temp.get_inner_symtable()
 

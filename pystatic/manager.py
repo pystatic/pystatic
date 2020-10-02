@@ -1,14 +1,10 @@
 import os
-import ast
 import logging
-from collections import deque
 from pystatic.message import MessageBox
-from typing import Optional, List, TextIO, Set, Dict, Deque
+from typing import Optional, List, TextIO, Set, Dict
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
                                  get_init_module_symtable)
-from pystatic.symtable import SymTable
-from pystatic.typesys import TypeModuleTemp, TpState
 from pystatic.config import Config
 from pystatic.modfinder import ModuleFinder
 from pystatic.uri import Uri, relpath2uri

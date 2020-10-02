@@ -7,8 +7,8 @@ from pystatic.typesys import (TypeClassTemp, TpState)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
+from pystatic.util import split_import_stmt
 from pystatic.preprocess.spt import record_stp
-from pystatic.preprocess.impt import split_import_stmt
 from pystatic.preprocess.sym_util import (add_import_item, add_fun_def,
                                           add_local_var, add_cls_def,
                                           add_local_var)
@@ -187,5 +187,4 @@ class TypeDefVisitor(BaseVisitor):
                 add_import_item(self.symtable, asname, uri, origin_name, node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        logger.debug(f'add function {node.name}')
         add_fun_def(self.symtable, node.name, node)
