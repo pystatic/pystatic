@@ -8,7 +8,6 @@ from pystatic.uri import uri2list
 from pystatic.util import split_import_stmt
 from pystatic.typesys import TypeClassTemp, TypeFuncTemp, TypeIns, TypeTemp, TypeType
 from pystatic.symtable import SymTable
-from pystatic.stubgen.clsname import NameTree
 
 logger = logging.getLogger(__name__)
 
@@ -66,20 +65,56 @@ def stubgen_main(target: Target) -> str:
     return creator.generate()
 
 
-def scoped_list_to_str(lst: List[Tuple[str, int]]):
-    if not lst:
-        return ''
-    results = [lst[0][0]]
-    prev_scope = lst[0][1]
-    for item, scope in lst[1:]:
-        if prev_scope == scope:
-            results.append(item)
-        else:
-            results.append('\n')
-            results.append(item)
-        prev_scope = scope
+class Node:
+    def __init__(self, uri: str):
+        self.uri = uri
+        self.suburi = {}
+        self.alias = None
 
-    return ''.join(results)
+    def set_alias(self, alias: str):
+        self.alias = alias
+
+
+class NameTree:
+    def __init__(self, module_uri: str):
+        self.root = Node('')
+        self.module_uri = module_uri
+
+    def ask(self, temp: TypeTemp) -> str:
+        module_uri = temp.module_uri
+        uri = temp.name
+
+        if module_uri == self.module_uri or module_uri == 'builtins':
+            return uri
+
+        urilist = uri2list(module_uri) + uri2list(uri)
+        cur_node = self.root
+        namelist = []
+        for subname in urilist:
+            if subname in cur_node.suburi:
+                cur_node = cur_node.suburi[subname]
+                if cur_node.alias:
+                    namelist = [cur_node.alias]
+                else:
+                    namelist.append(subname)
+            else:
+                return '.'.join(urilist)
+        return '.'.join(namelist)
+
+    def add_import(self, module_uri: str, uri: str, asname: str):
+        urilist = uri2list(module_uri) + uri2list(uri)
+        cur_node = self.root
+
+        for subname in urilist:
+            if not subname:
+                continue
+            if subname in cur_node.suburi:
+                cur_node = cur_node.suburi[subname]
+            else:
+                cur_node.suburi[subname] = Node(subname)
+
+        if asname:
+            cur_node.alias = asname
 
 
 class StubGen:
@@ -87,6 +122,22 @@ class StubGen:
         self.target = target
         self.name_tree = NameTree(target.uri)
         self.in_class = False
+
+    @staticmethod
+    def scoped_list_to_str(lst: List[Tuple[str, int]]):
+        if not lst:
+            return ''
+        results = [lst[0][0]]
+        prev_scope = lst[0][1]
+        for item, scope in lst[1:]:
+            if prev_scope == scope:
+                results.append(item)
+            else:
+                results.append('\n')
+                results.append(item)
+            prev_scope = scope
+
+        return ''.join(results)
 
     def generate(self):
         return self.stubgen_symtable(self.target.symtable, 0)
@@ -106,18 +157,16 @@ class StubGen:
                 logger.warn(f'{name} has incomplete type.')
                 continue
 
-            if tpins.temp.module_uri == symtable.glob.uri:
-                # don't care about symbols that's imported from other module
-                temp = tpins.temp
-                if isinstance(tpins, TypeType):
-                    assert isinstance(temp, TypeClassTemp)
-                    results.append((self.stub_cls_def(name, temp, level), CLS))
-                elif isinstance(temp, TypeFuncTemp):
-                    results.append((self.stub_fun_def(name, temp, level), FUN))
-                else:
-                    results.append((self.stub_var_def(name, temp, level), VAR))
+            temp = tpins.temp
+            if isinstance(tpins, TypeType):
+                assert isinstance(temp, TypeClassTemp)
+                results.append((self.stub_cls_def(name, temp, level), CLS))
+            elif isinstance(temp, TypeFuncTemp):
+                results.append((self.stub_fun_def(name, temp, level), FUN))
+            else:
+                results.append((self.stub_var_def(name, temp, level), VAR))
 
-        return scoped_list_to_str(results)
+        return self.scoped_list_to_str(results)
 
     def stubgen_import(self, symtable: 'SymTable', level: int) -> str:
         results = []
@@ -132,9 +181,15 @@ class StubGen:
                     for asname, origin_name in infolist:
                         assert not origin_name
                         if asname == module_name:
+                            top_name = uri2list(asname)[0]
+                            if top_name:
+                                symtable.local.pop(top_name, None)
+
                             import_subitem.append(f'{module_name}')
                             self.name_tree.add_import(module_name, '', '')
                         else:
+                            symtable.local.pop(asname, None)
+
                             import_subitem.append(f'{module_name} as {asname}')
                             self.name_tree.add_import(module_name, '', asname)
 
@@ -150,12 +205,15 @@ class StubGen:
                     from_impt: List[str] = []
 
                     for asname, origin_name in infolist:
-                        # from module_name import ... as ...
                         if origin_name == asname:
+                            symtable.local.pop(asname, None)
+
                             from_impt.append(f"{asname}")
                             self.name_tree.add_import(module_name, origin_name,
                                                       '')
                         else:
+                            symtable.local.pop(asname, None)
+
                             from_impt.append(f"{origin_name} as {asname}")
                             self.name_tree.add_import(module_name, origin_name,
                                                       asname)
