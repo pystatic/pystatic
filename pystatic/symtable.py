@@ -4,7 +4,8 @@ from collections import OrderedDict
 from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
 
 if TYPE_CHECKING:
-    from pystatic.typesys import TypeIns, TypeClassTemp, TypeTemp
+    from pystatic.typesys import (TypeIns, TypeClassTemp, TypeTemp,
+                                  TypePackageIns)
     from pystatic.uri import Uri
 
 
@@ -56,8 +57,7 @@ class SymTable:
         self._cls_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
         self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
 
-        self._import_info: Dict[str, List[ImportNode]] = {}
-        self._import_tree: Dict[str, TypePackage] = {}
+        self._import_tree: Dict[str, 'TypeIns'] = {}
 
         self._functions = set()
 

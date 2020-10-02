@@ -8,10 +8,11 @@ This module will add attribute '_import_info_cache' to symtable to avoid modify
 import ast
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType
 from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
-from pystatic.uri import rel2absuri, Uri
+from pystatic.uri import rel2absuri, Uri, uri2list
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
-from pystatic.preprocess.sym_util import fake_imp_entry, add_uri_symtable
+from pystatic.preprocess.sym_util import (fake_imp_entry, add_uri_symtable,
+                                          search_uri_symtable)
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -50,39 +51,46 @@ def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
 def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     """Resolve types(class definition) imported from other module"""
     new_import_info = {}
-    for module_uri, nodelist in symtable._import_info.items():
-        module_temp = add_uri_symtable(symtable, module_uri, worker)
+    if hasattr(symtable, '_import_nodes'):
+        for impt_node in symtable._import_nodes:  # type: ignore
+            impt_dict = split_import_stmt(impt_node, symtable.glob_uri)
 
-        # module_temp = worker.get_module_temp(module_uri)
-        # module_temp = search_uri_symtable(symtable, module_uri)
-        assert module_temp, "module not found error not handled yet"  # TODO: add warning here
+            if isinstance(impt_node, ast.Import):
+                for uri, tpls in impt_dict.items():
+                    add_uri_symtable(symtable, uri, worker)
+                    module_ins = search_uri_symtable(symtable, uri)
+                    assert module_ins, "module not found error not handled yet"
 
-        new_info = []
-        for defnode in nodelist:
-            assert isinstance(defnode, ast.ImportFrom) or isinstance(
-                defnode, ast.Import)
-            imp_dict = split_import_stmt(defnode, symtable.glob_uri)
+                    for asname, origin_name in tpls:
+                        if asname == uri:
+                            assert uri2list(uri)
+                            top_uri = uri2list(uri)[0]
 
-            for uri, tples in imp_dict.items():
-                for asname, origin_name in tples:
-                    if not origin_name:
-                        # the module itself
-                        entry: Any = symtable.local.get(asname)
-                        assert entry and not isinstance(entry,
-                                                        Entry)  # not complete
-                        module_type = module_temp.get_default_type()
-                        symtable.local[asname] = Entry(module_type.getins(),
-                                                       defnode)
-                    else:
+                            if top_uri not in symtable.local:
+                                top_module_ins = search_uri_symtable(
+                                    symtable, top_uri)
+                                assert top_module_ins, "module not found error not handled yet"
+                                symtable.local[top_uri] = Entry(
+                                    top_module_ins, impt_node)
+
+                        else:
+                            symtable.local[asname] = Entry(
+                                module_ins, impt_node)
+
+            else:
+                for uri, tpls in impt_dict.items():
+                    new_info = []
+
+                    for asname, origin_name in tpls:
                         is_module = _resolve_import_chain(
                             symtable, asname, worker, True)
                         if not is_module:
-                            new_info.append((asname, origin_name, defnode))
+                            new_info.append((asname, origin_name, impt_node))
 
-        if new_info:
-            new_import_info[module_uri] = new_info
+                    if new_info:
+                        new_import_info[uri] = new_info
+        del symtable._import_nodes  # type: ignore
 
-    # set up _import_info_cache, this should be the first function called
     assert not hasattr(symtable, '_import_info_cache')
     setattr(symtable, '_import_info_cache', new_import_info)
 

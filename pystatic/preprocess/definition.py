@@ -187,5 +187,4 @@ class TypeDefVisitor(BaseVisitor):
                 add_import_item(self.symtable, asname, uri, origin_name, node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        logger.debug(f'add function {node.name}')
         add_fun_def(self.symtable, node.name, node)

@@ -36,9 +36,9 @@ class Argument(object):
     def __str__(self):
         arg_list = [str(arg) for arg in self.posonlyargs + self.args]
         if self.vararg:
-            arg_list.append('*' + str(self.vararg))
+            arg_list.append(str(self.vararg))
         arg_list += [str(arg) for arg in self.kwonlyargs]
         if self.kwarg:
-            arg_list.append('**' + str(self.kwarg))
+            arg_list.append(str(self.kwarg))
 
         return '(' + ', '.join(arg_list) + ')'

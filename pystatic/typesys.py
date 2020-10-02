@@ -177,7 +177,7 @@ class TypeIns(BaseType):
         return (any_ins, getitem_err)
 
     def __str__(self) -> str:
-        return self.name
+        return self.temp.get_str_expr(self.bindlist)
 
 
 class TypeType(TypeIns):
@@ -236,7 +236,7 @@ class TypeClassTemp(TypeTemp):
         else:
             return None
 
-    def set_inner_symtable(self, symtable):
+    def set_inner_symtable(self, symtable: 'SymTable'):
         self._inner_symtable = symtable
 
     def get_inner_symtable(self) -> 'SymTable':
@@ -347,6 +347,9 @@ class TypePackageTemp(TypeModuleTemp):
     def __init__(self, paths: List[str], symtable: 'SymTable', uri: Uri):
         super().__init__(uri, symtable)
         self.paths = paths
+
+    def get_default_type(self) -> 'TypeType':
+        return TypePackageType(self)
 
 
 class TypeAnyTemp(TypeTemp):
@@ -479,10 +482,25 @@ class TypeLiteralTemp(TypeTemp):
         super().__init__('Literal', 'typing')
 
 
+class TypePackageType(TypeType):
+    def __init__(self, temp: TypePackageTemp) -> None:
+        super().__init__(temp, [])
+
+    def getins(self) -> 'TypeIns':
+        assert isinstance(self.temp, TypePackageTemp)
+        return TypePackageIns(self.temp)
+
+
 class TypePackageIns(TypeIns):
     def __init__(self, pkgtemp: TypePackageTemp) -> None:
         super().__init__(pkgtemp, [])
         self.submodule: Dict[str, TypeIns] = {}  # submodule
+
+    def add_submodule(self, name: str, ins: TypeIns):
+        self.submodule[name] = ins
+        assert isinstance(self.temp, TypePackageTemp)
+        inner_sym = self.temp.get_inner_symtable()
+        inner_sym.add_entry(name, Entry(ins))
 
 
 # special types

@@ -1,10 +1,10 @@
 import ast
 import logging
-from pystatic.uri import absolute_urilist, Uri
+from pystatic.uri import absolute_urilist, Uri, uri2list
 from typing import Optional, TYPE_CHECKING, Any
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
                               TypePackageIns, TypeTemp, TypePackageTemp)
-from pystatic.symtable import SymTable, Entry, ImportNode
+from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -46,12 +46,16 @@ def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
     Add import information to the symtable, this will add fake_imp_entry to the
     local scope.
     """
-    symtable._import_info.setdefault(uri, []).append(defnode)
+    if not hasattr(symtable, '_import_nodes'):
+        setattr(symtable, '_import_nodes', [])
+
+    symtable._import_nodes.append(defnode)  # type: ignore
 
     # add fake import entry to the local scope
     # TODO: warning if name collision happens
-    tmp_entry = fake_imp_entry(uri, origin_name, defnode)
-    symtable.local[name] = tmp_entry  # type: ignore
+    if isinstance(defnode, ast.ImportFrom):
+        tmp_entry = fake_imp_entry(uri, origin_name, defnode)
+        symtable.local[name] = tmp_entry  # type: ignore
 
 
 def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
@@ -65,7 +69,7 @@ def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
 
 
 def add_uri_symtable(symtable: 'SymTable', uri: str,
-                     worker: 'Preprocessor') -> Optional[TypeModuleTemp]:
+                     worker: 'Preprocessor') -> Optional[TypeIns]:
     urilist = absolute_urilist(symtable.glob_uri, uri)
     assert urilist
 
@@ -99,13 +103,25 @@ def add_uri_symtable(symtable: 'SymTable', uri: str,
 
             assert isinstance(temp, TypeModuleTemp)
             if isinstance(temp, TypePackageTemp):
-                cur_ins.submodule[urilist[i]] = TypePackageIns(temp)
+                cur_ins.add_submodule(urilist[i], TypePackageIns(temp))
             else:
                 if i != len(urilist) - 1:
                     return None
-                cur_ins.submodule[urilist[i]] = TypeIns(temp, [])
-                return temp
+                res_ins = TypeIns(temp, [])
+                cur_ins.add_submodule(urilist[i], res_ins)
+                return res_ins
 
         cur_ins = cur_ins.submodule[urilist[i]]
 
-    return cur_ins.temp
+    return cur_ins
+
+
+def search_uri_symtable(symtable: 'SymTable', uri: str) -> Optional[TypeIns]:
+    urilist = uri2list(uri)
+    assert urilist
+    cur_ins = symtable._import_tree[urilist[0]]
+    for i in range(1, len(urilist)):
+        cur_ins = cur_ins.getattribute(urilist[i])
+        if not cur_ins:
+            return None
+    return cur_ins
