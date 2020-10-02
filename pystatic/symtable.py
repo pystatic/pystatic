@@ -23,13 +23,9 @@ TypeDefNode = Union[str, ast.AST]
 
 
 class Entry:
-    def __init__(self,
-                 tp: 'TypeIns',
-                 defnode: Optional[ast.AST] = None,
-                 tpnode: Optional[TypeDefNode] = None):
+    def __init__(self, tp: 'TypeIns', defnode: Optional[ast.AST] = None):
         self._tp = tp
         self._defnode = defnode
-        self._typenode = tpnode
 
     def set_type(self, tp: 'TypeIns'):
         self._tp = tp
@@ -43,16 +39,13 @@ class Entry:
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
 
-    def set_typenode(self, tpnode: ast.AST):
-        self._typenode = tpnode
-
-    def get_typenode(self) -> Optional[TypeDefNode]:
-        return self._typenode or self._defnode
-
 
 class SymTable:
-    def __init__(self, glob: 'SymTable', non_local: Optional['SymTable'],
-                 builtins: 'SymTable', scope: 'TableScope') -> None:
+    def __init__(self, uri: 'Uri', glob: 'SymTable',
+                 non_local: Optional['SymTable'], builtins: 'SymTable',
+                 scope: 'TableScope') -> None:
+        self.uri = uri
+
         self.local: Dict[str, Entry] = {}
         self.non_local = non_local
         self.glob = glob
@@ -124,11 +117,12 @@ class SymTable:
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
 
-    def new_symtable(self, new_scope: 'TableScope') -> 'SymTable':
+    def new_symtable(self, name: str, new_scope: 'TableScope') -> 'SymTable':
         builtins = self.builtins
         if self.scope == TableScope.CLASS:
             non_local = self.non_local
         else:
             non_local = self
         glob = self.glob
-        return SymTable(glob, non_local, builtins, new_scope)
+        new_uri = self.uri + '.' + name
+        return SymTable(new_uri, glob, non_local, builtins, new_scope)

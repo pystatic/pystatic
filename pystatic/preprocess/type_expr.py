@@ -55,21 +55,12 @@ def eval_func_type(node: ast.FunctionDef,
         ret_type = eval_type_expr(node.returns, symtable)
     if not ret_type:
         ret_type = any_type  # default return type is Any
-    inner_sym = symtable.new_symtable(TableScope.FUNC)
-    return TypeFuncTemp(node.name, inner_sym, argument,
+
+    func_name = node.name
+    inner_sym = symtable.new_symtable(func_name, TableScope.FUNC)
+
+    return TypeFuncTemp(node.name, symtable.uri, inner_sym, argument,
                         ret_type).get_default_type()
-
-
-def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
-    """Generate an Arg instance according to an ast.arg node"""
-    new_arg = Arg(node.arg)
-    if node.annotation:
-        ann = eval_type_expr(node.annotation, symtable)
-        if not ann:
-            return None
-        else:
-            new_arg.ann = ann
-    return new_arg
 
 
 def eval_argument_type(node: ast.arguments,
@@ -85,7 +76,7 @@ def eval_argument_type(node: ast.arguments,
 
     # parse a list of args
     def add_to_list(target_list, order_list, args):
-        global ok
+        nonlocal ok
         for arg in args:
             gen_arg = eval_arg_type(arg, symtable)
             if gen_arg:
@@ -101,6 +92,7 @@ def eval_argument_type(node: ast.arguments,
     # *args exists
     if node.vararg:
         result = eval_arg_type(node.vararg, symtable)
+        result.name = '*' + result.name
         if result:
             new_args.vararg = result
         else:
@@ -109,6 +101,7 @@ def eval_argument_type(node: ast.arguments,
     # **kwargs exists
     if node.kwarg:
         result = eval_arg_type(node.kwarg, symtable)
+        result.name = '**' + result.name
         if result:
             new_args.kwarg = result
         else:
@@ -126,6 +119,18 @@ def eval_argument_type(node: ast.arguments,
         return new_args
     else:
         return None
+
+
+def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
+    """Generate an Arg instance according to an ast.arg node"""
+    new_arg = Arg(node.arg)
+    if node.annotation:
+        ann = eval_type_expr(node.annotation, symtable)
+        if not ann:
+            return None
+        else:
+            new_arg.ann = ann
+    return new_arg
 
 
 class NotType(Exception):

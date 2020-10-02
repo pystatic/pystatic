@@ -6,13 +6,14 @@ from pystatic.message import MessageBox
 from typing import Optional, List, TextIO, Set, Dict, Deque
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
-                                 get_init_symtable)
+                                 get_init_module_symtable)
 from pystatic.symtable import SymTable
 from pystatic.typesys import TypeModuleTemp, TpState
 from pystatic.config import Config
 from pystatic.modfinder import ModuleFinder
 from pystatic.uri import Uri, relpath2uri
 from pystatic.target import Target, Stage
+from pystatic.stubgen import stubgen
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class Manager:
         finder = ModuleFinder(self.config.manual_path, list(self.user_path),
                               self.config.sitepkg, self.config.typeshed,
                               self.config.python_version)
-        self.preprocessor = Preprocessor(self, finder)
+        self.pre_proc = Preprocessor(self, finder)
 
         self.stdout = stdout
         self.stderr = stderr
@@ -47,13 +48,21 @@ class Manager:
         typing_target = Target('typing', get_typing_symtable())
         self.preprocess([typing_target, builtins_target])
 
+    def stubgen(self, rt_dir: Optional[str] = None):
+        check_list = list(self.check_targets.values())
+        self.preprocess(check_list)
+        if rt_dir:
+            stubgen(check_list, rt_dir)
+        else:
+            stubgen(check_list)
+
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
         for err in self.mbox.error:
             print(err)
 
     def preprocess(self, targets):
-        self.preprocessor.process_module(targets)
+        self.pre_proc.process_module(targets)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""
@@ -76,7 +85,9 @@ class Manager:
                 continue
             rt_path = crawl_path(os.path.dirname(srcfile))
             uri = relpath2uri(rt_path, srcfile)
-            target = Target(uri, get_init_symtable(), stage=Stage.PreParse)
+            target = Target(uri,
+                            get_init_module_symtable(uri),
+                            stage=Stage.PreParse)
             self.check_targets[uri] = target
 
 

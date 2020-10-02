@@ -13,6 +13,7 @@ class Stage(enum.IntEnum):
     """Number ascends as the analysis going deeper"""
     PreParse = 0
     PreSymtable = 1
+    Processed = 2
 
 
 class BlockTarget:

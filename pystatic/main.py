@@ -36,5 +36,10 @@ def test_pystatic(config: dict, src: List[str]):
     manager.start_check()
 
 
+def test_stubgen(config: dict, src: List[str]):
+    manager = Manager(config, src, [], sys.stdout, sys.stderr)
+    manager.stubgen()
+
+
 if __name__ == '__main__':
     cmdline(sys.stdout, sys.stderr)

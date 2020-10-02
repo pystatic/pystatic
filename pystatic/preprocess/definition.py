@@ -7,10 +7,11 @@ from pystatic.typesys import (TypeClassTemp, TpState)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
-from pystatic.preprocess.special_type import record_stp
+from pystatic.preprocess.spt import record_stp
 from pystatic.preprocess.impt import split_import_stmt
-from pystatic.preprocess.sym_util import (add_import_item, add_fun_entry,
-                                          add_cls_def)
+from pystatic.preprocess.sym_util import (add_import_item, add_fun_def,
+                                          add_local_var, add_cls_def,
+                                          add_local_var)
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -57,6 +58,8 @@ class TypeDefVisitor(BaseVisitor):
         self._is_method = is_method
 
         self._clsname: List[str] = []
+
+        self.glob_uri = symtable.glob.uri  # the module's uri
 
     def _is_self_def(self, node: ast.AST) -> Optional[str]:
         if isinstance(node, ast.Attribute):
@@ -112,7 +115,7 @@ class TypeDefVisitor(BaseVisitor):
     def visit_Assign(self, node: ast.Assign):
         # TODO: here we haven't add redefine warning and check consistence, the
         # def node is also incorrect
-        name, entry = record_stp(node)
+        name, entry = record_stp(self.glob_uri, node)
         if entry:
             assert name
             self.symtable.add_entry(name, entry)
@@ -122,13 +125,13 @@ class TypeDefVisitor(BaseVisitor):
             for target in node.targets:
                 name = self._is_new_def(target)
                 if name:
-                    self.symtable.add_entry(name, Entry(None, node))
+                    add_local_var(self.symtable, name, node)
                     logger.debug(f'add variable {name}')
                 elif self._is_method:
                     self._try_attr(node, target)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        name, entry = record_stp(node)
+        name, entry = record_stp(self.glob_uri, node)
         if entry:
             assert name
             self.symtable.add_entry(name, entry)
@@ -137,7 +140,7 @@ class TypeDefVisitor(BaseVisitor):
         else:
             name = self._is_new_def(node.target)
             if name:
-                self.symtable.add_entry(name, Entry(None, node))
+                add_local_var(self.symtable, name, node)
                 logger.debug(f'add variable {name}')
             elif self._is_method:
                 self._try_attr(node, node.target)
@@ -154,9 +157,10 @@ class TypeDefVisitor(BaseVisitor):
             else:
                 abs_clsname = clsname
 
-            new_symtable = self.symtable.new_symtable(TableScope.CLASS)
-            clstemp = TypeClassTemp(abs_clsname, TpState.FRESH, self.symtable,
-                                    new_symtable, node)
+            new_symtable = self.symtable.new_symtable(clsname,
+                                                      TableScope.CLASS)
+            clstemp = TypeClassTemp(abs_clsname, self.glob_uri, TpState.FRESH,
+                                    self.symtable, new_symtable, node)
             clstype = clstemp.get_default_type()
             entry = Entry(clstype, node)
             self.symtable.add_entry(clsname, entry)
@@ -184,4 +188,4 @@ class TypeDefVisitor(BaseVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         logger.debug(f'add function {node.name}')
-        add_fun_entry(self.symtable, node.name, Entry(None, node))
+        add_fun_def(self.symtable, node.name, node)

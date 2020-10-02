@@ -7,6 +7,18 @@ if TYPE_CHECKING:
     from pystatic.uri import Uri
 
 
+class fake_fun_entry:
+    def __init__(self, name: str, defnode: ast.AST) -> None:
+        self.name = name
+        self.defnode = defnode
+
+
+class fake_local_entry:
+    def __init__(self, name: str, defnode: ast.AST) -> None:
+        self.name = name
+        self.defnode = defnode
+
+
 class fake_imp_entry:
     def __init__(self, uri: 'Uri', origin_name: str,
                  defnode: ImportNode) -> None:
@@ -26,7 +38,7 @@ def add_spt_def(symtable: SymTable, name: str, temp: TypeTemp):
 def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
                     origin_name: str, defnode: 'ImportNode'):
     """
-    Add import information to the symtable, this will not add entry to the
+    Add import information to the symtable, this will add fake_imp_entry to the
     local scope.
     """
     symtable._import_info.setdefault(uri, []).append(
@@ -38,6 +50,11 @@ def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
     symtable.local[name] = tmp_entry  # type: ignore
 
 
-def add_fun_entry(symtable: 'SymTable', name: str, entry: Entry):
+def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
     symtable._functions.add(name)
-    symtable.local[name] = entry
+    symtable.local[name] = fake_fun_entry(name, node)  # type: ignore
+
+
+def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
+    # add fake local variable entry to the local scope
+    symtable.local[name] = fake_local_entry(name, node)  # type: ignore

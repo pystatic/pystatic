@@ -49,10 +49,14 @@ class TpState(enum.IntEnum):
 
 
 class TypeTemp(BaseType):
-    def __init__(self, name: str, resolve_state: TpState = TpState.OVER):
+    def __init__(self,
+                 name: str,
+                 module_uri: str,
+                 resolve_state: TpState = TpState.OVER):
         super().__init__(name)
         self.placeholders = []
 
+        self.module_uri = module_uri  # the module uri that define this type
         self._resolve_state = resolve_state
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
@@ -107,11 +111,12 @@ class TypeTemp(BaseType):
 class TypeVar(TypeTemp):
     def __init__(self,
                  name: str,
+                 module_uri: str,
                  *args: 'TypeIns',
                  bound: Optional['TypeIns'] = None,
                  covariant=False,
                  contravariant=False):
-        super().__init__(name)
+        super().__init__(module_uri, name)
         self.bound = bound
         if contravariant:
             self.covariant = False
@@ -196,11 +201,12 @@ class TypeClassTemp(TypeTemp):
     # FIXME: remove None of symtable and defnode
     def __init__(self,
                  clsname: str,
+                 module_uri: str,
                  state: TpState,
                  def_symtable: 'SymTable',
                  inner_symtable: 'SymTable',
                  defnode: ast.ClassDef = None):
-        super().__init__(clsname, state)
+        super().__init__(clsname, module_uri, state)
 
         self.baseclass: 'List[TypeType]'
         self.baseclass = []
@@ -210,6 +216,8 @@ class TypeClassTemp(TypeTemp):
         self._inner_symtable = inner_symtable  # symtable belongs to this cls
         self._def_symtable = def_symtable  # symtable where this cls is defined
         self._defnode = defnode
+
+        self._glob_uri = module_uri  # the module uri that this class is defined
 
     def _add_defer_var(self, name, attrs):
         """Defer attribute type evaluation.
@@ -303,9 +311,11 @@ class TypeClassTemp(TypeTemp):
 
 
 class TypeFuncTemp(TypeTemp):
-    def __init__(self, name: str, inner_symtable: 'SymTable',
+    def __init__(self, name: str, module_uri: str, inner_symtable: 'SymTable',
                  argument: 'Argument', ret: TypeIns) -> None:
         self.name = name
+        self.module_uri = module_uri
+
         self.argument = argument
         self.ret = ret
 
@@ -323,7 +333,7 @@ class TypeFuncTemp(TypeTemp):
 class TypeModuleTemp(TypeClassTemp):
     def __init__(self, uri: Uri, symtable: 'SymTable', state: TpState):
         # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(uri, state, symtable, symtable)
+        super().__init__(uri, uri, state, symtable, symtable)
 
     @property
     def uri(self):
@@ -342,7 +352,7 @@ class TypePackageTemp(TypeModuleTemp):
 
 class TypeAnyTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Any')
+        super().__init__('Any', 'typing')
 
     def get_default_type(self) -> 'TypeType':
         return any_type
@@ -356,7 +366,7 @@ class TypeAnyTemp(TypeTemp):
 
 class TypeNoneTemp(TypeTemp):
     def __init__(self):
-        super().__init__('None')
+        super().__init__('None', 'typing')
 
     def get_default_type(self) -> 'TypeType':
         return none_type
@@ -370,27 +380,27 @@ class TypeNoneTemp(TypeTemp):
 
 class TypeTupleTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Tuple')
+        super().__init__('Tuple', 'typing')
 
 
 class TypeDictTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Dict')
+        super().__init__('Dict', 'typing')
 
 
 class TypeUnionTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Union')
+        super().__init__('Union', 'typing')
 
 
 class TypeOptionalTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Optional')
+        super().__init__('Optional', 'typing')
 
 
 class TypeEllipsisTemp(TypeTemp):
     def __init__(self) -> None:
-        super().__init__('ellipsis')
+        super().__init__('ellipsis', 'typing')
 
     def get_default_type(self) -> 'TypeType':
         return ellipsis_type
@@ -398,7 +408,7 @@ class TypeEllipsisTemp(TypeTemp):
 
 class TypeCallableTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Callable')
+        super().__init__('Callable', 'typing')
 
     def _bind_placeholders(self,
                            bindlist: BindList) -> Tuple[list, 'GetItemError']:
@@ -449,7 +459,7 @@ class TypeCallableTemp(TypeTemp):
 
 class TypeGenericTemp(TypeTemp):
     def __init__(self):
-        super().__init__('typing.Generic')
+        super().__init__('Generic', 'typing')
 
     def _bind_placeholders(self,
                            bindlist: BindList) -> Tuple[list, 'GetItemError']:
@@ -467,7 +477,7 @@ class TypeGenericTemp(TypeTemp):
 
 class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
-        super().__init__('typing.Literal')
+        super().__init__('Literal', 'typing')
 
 
 # special types
