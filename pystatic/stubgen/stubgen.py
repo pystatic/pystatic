@@ -1,9 +1,11 @@
+import ast
 import os
 import logging
 from pystatic.arg import Arg, Argument
 from typing import List, Tuple
 from pystatic.target import Target
 from pystatic.uri import uri2list
+from pystatic.util import split_import_stmt
 from pystatic.typesys import TypeClassTemp, TypeFuncTemp, TypeIns, TypeTemp, TypeType
 from pystatic.symtable import SymTable
 
@@ -59,119 +61,144 @@ def indented_to_str(idstr: IndentedStr):
 
 
 def stubgen_main(target: Target) -> str:
-    idstr_list = stubgen_symtable(target.symtable, 0)
+    creator = StubGen(target)
+    idstr_list = creator.generate()
     str_list = [indented_to_str(item) for item in idstr_list]
     return '\n'.join(str_list)
 
 
-def stubgen_symtable(symtable: 'SymTable', level: int) -> List[IndentedStr]:
-    results: List[IndentedStr] = stubgen_import(symtable, level)
+class StubGen:
+    def __init__(self, target: Target):
+        self.target = target
 
-    for name, entry in symtable.local.items():
-        tpins = entry.get_type()
-        if not tpins:
-            # TODO: warning here
-            logger.warn(f'{name} has incomplete type.')
-            continue
+    def generate(self):
+        return self.stubgen_symtable(self.target.symtable, 0)
 
-        if tpins.temp.module_uri == symtable.glob.uri:
-            # don't care about symbols that's imported from other module
-            results += ins_to_idstrlist(name, tpins, level)
+    def stubgen_symtable(self, symtable: 'SymTable',
+                         level: int) -> List[IndentedStr]:
+        results: List[IndentedStr] = self.stubgen_import(symtable, level)
 
-    return results
+        for name, entry in symtable.local.items():
+            tpins = entry.get_type()
+            if not tpins:
+                # TODO: warning here
+                logger.warn(f'{name} has incomplete type.')
+                continue
 
+            if tpins.temp.module_uri == symtable.glob.uri:
+                # don't care about symbols that's imported from other module
+                results += self.ins_to_idstrlist(name, tpins, level)
 
-def stubgen_import(symtable: 'SymTable', level: int) -> List[IndentedStr]:
-    results = []
-    for uri, infolst in symtable._import_info.items():
-        module_name = uri
+        return results
 
-        from_impt: List[str] = []
+    def stubgen_import(self, symtable: 'SymTable',
+                       level: int) -> List[IndentedStr]:
+        results = []
+        for impt_node in symtable._import_nodes:
+            impt_dict = split_import_stmt(impt_node, symtable.glob_uri)
+            if isinstance(impt_node, ast.Import):
+                import_stmt = 'import '
+                import_subitem = []
+                for uri, infolist in impt_dict.items():
+                    module_name = uri
 
-        for asname, origin_name, _ in infolst:
-            if not origin_name:
-                # import <module_name>
-                results.append((f'import {module_name}', level))
-            else:
-                # from module_name import ... as ...
-                if origin_name == asname:
-                    from_impt.append(f"{asname}")
+                    for asname, origin_name in infolist:
+                        if not origin_name:
+                            if asname == module_name:
+                                import_subitem.append(f'{module_name}')
+                            else:
+                                import_subitem.append(
+                                    f'{module_name} as {asname}')
+
+                if len(import_subitem) > 5:
+                    import_stmt += '(' + ', '.join(import_subitem) + ')'
                 else:
-                    from_impt.append(f"{origin_name} as {asname}")
+                    import_stmt += ', '.join(import_subitem)
+                results.append((import_stmt, level))
 
-        if from_impt:
-            impt_str = ', '.join(from_impt)
-            if len(from_impt) > 5:
-                from_stmt = f'from {module_name} import ({impt_str})'
             else:
-                from_stmt = f'from {module_name} import {impt_str}'
-            results.append((from_stmt, level))
-    return results
+                for uri, infolist in impt_dict.items():
+                    module_name = uri
+                    from_impt: List[str] = []
 
+                    for asname, origin_name in infolist:
+                        # from module_name import ... as ...
+                        if origin_name == asname:
+                            from_impt.append(f"{asname}")
+                        else:
+                            from_impt.append(f"{origin_name} as {asname}")
 
-def ins_to_idstrlist(name: str, tpins: TypeIns,
-                     level: int) -> List[IndentedStr]:
-    temp = tpins.temp
-    if isinstance(tpins, TypeType):
-        return stub_cls_def(name, temp, level)  # type: ignore
-    else:
-        if isinstance(temp, TypeFuncTemp):
-            return [stub_fun_def(name, temp, level)]
+                    if from_impt:
+                        impt_str = ', '.join(from_impt)
+                        if len(from_impt) > 5:
+                            from_stmt = f'from {module_name} import ({impt_str})'
+                        else:
+                            from_stmt = f'from {module_name} import {impt_str}'
+                        results.append((from_stmt, level))
+        return results
+
+    def ins_to_idstrlist(self, name: str, tpins: TypeIns,
+                         level: int) -> List[IndentedStr]:
+        temp = tpins.temp
+        if isinstance(tpins, TypeType):
+            assert isinstance(temp, TypeClassTemp)
+            return self.stub_cls_def(name, temp, level)
         else:
-            return [(name + ': ' + str(tpins), level)]
+            if isinstance(temp, TypeFuncTemp):
+                return [self.stub_fun_def(name, temp, level)]
+            else:
+                return [(name + ': ' + str(tpins), level)]
 
+    def stub_var_def(self, varname: str, temp: TypeTemp,
+                     level: int) -> IndentedStr:
+        return varname + ': ' + str(temp), level
 
-def stub_var_def(varname: str, temp: TypeTemp, level: int) -> IndentedStr:
-    return varname + ': ' + str(temp), level
+    def stub_cls_def(self, clsname: str, temp: TypeClassTemp,
+                     level: int) -> List[IndentedStr]:
+        header = self.stub_cls_def_header(clsname, temp, level)
 
+        var_strlist = []
+        for name, tpins in temp.var_attr.items():
+            var_strlist.append(self.stub_var_def(name, tpins.temp, level + 1))
 
-def stub_cls_def(clsname: str, temp: TypeClassTemp,
-                 level: int) -> List[IndentedStr]:
-    header = stub_cls_def_header(clsname, temp, level)
+        inner_symtable = temp.get_inner_symtable()
+        body = self.stubgen_symtable(inner_symtable, level + 1)
 
-    var_strlist = []
-    for name, tpins in temp.var_attr.items():
-        var_strlist.append(stub_var_def(name, tpins.temp, level + 1))
+        if not body:
+            header = (header[0] + ' ...', header[1])
 
-    inner_symtable = temp.get_inner_symtable()
-    body = stubgen_symtable(inner_symtable, level + 1)
+        return [header] + var_strlist + body
 
-    if not body:
-        header = (header[0] + ' ...', header[1])
+    def stub_cls_def_header(self, clsname: str, temp: TypeClassTemp,
+                            level: int) -> IndentedStr:
+        return ('class ' + clsname + ':', level)
 
-    return [header] + var_strlist + body
+    def stub_fun_def(self, funname: str, temp: TypeFuncTemp,
+                     level: int) -> IndentedStr:
+        def get_arg_str(arg: Arg):
+            cur_str = arg.name
+            cur_str += ': ' + str(arg.ann)
+            if arg.valid:
+                cur_str += '=...'
+            return cur_str
 
+        arg_strlist = []
+        for arg in temp.argument.args:
+            cur_str = get_arg_str(arg)
+            arg_strlist.append(cur_str)
 
-def stub_cls_def_header(clsname: str, temp: TypeClassTemp,
-                        level: int) -> IndentedStr:
-    return ('class ' + clsname + ':', level)
+        if temp.argument.vararg:
+            cur_str = get_arg_str(temp.argument.vararg)
+            arg_strlist.append(cur_str)
 
+        for arg in temp.argument.kwonlyargs:
+            cur_str = get_arg_str(arg)
+            arg_strlist.append(cur_str)
 
-def stub_fun_def(funname: str, temp: TypeFuncTemp, level: int) -> IndentedStr:
-    def get_arg_str(arg: Arg):
-        cur_str = arg.name
-        cur_str += ': ' + str(arg.ann)
-        if arg.valid:
-            cur_str += '=...'
-        return cur_str
+        if temp.argument.kwarg:
+            cur_str = get_arg_str(temp.argument.kwarg)
+            arg_strlist.append(cur_str)
 
-    arg_strlist = []
-    for arg in temp.argument.args:
-        cur_str = get_arg_str(arg)
-        arg_strlist.append(cur_str)
+        param = '(' + ', '.join(arg_strlist) + ')'
 
-    if temp.argument.vararg:
-        cur_str = get_arg_str(temp.argument.vararg)
-        arg_strlist.append(cur_str)
-
-    for arg in temp.argument.kwonlyargs:
-        cur_str = get_arg_str(arg)
-        arg_strlist.append(cur_str)
-
-    if temp.argument.kwarg:
-        cur_str = get_arg_str(temp.argument.kwarg)
-        arg_strlist.append(cur_str)
-
-    param = '(' + ', '.join(arg_strlist) + ')'
-
-    return ('def ' + funname + param + ': ...', level)
+        return ('def ' + funname + param + ': ...', level)
