@@ -10,7 +10,7 @@ from pystatic.preprocess.definition import (get_definition,
 from pystatic.preprocess.impt import resolve_import_type, resolve_import_ins
 from pystatic.preprocess.cls import (resolve_cls_def, resolve_cls_method,
                                      resolve_cls_attr)
-from pystatic.preprocess.local import resolve_local_typeins
+from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
 from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 from pystatic.modfinder import ModuleFinder, ModuleFindRes
 
@@ -120,6 +120,7 @@ class Preprocessor:
         # identified because possible type(class) information is collected
         for target in to_check:
             resolve_local_typeins(target.symtable)
+            resolve_local_func(target.symtable)
 
         for target in to_check:
             resolve_import_ins(target.symtable, self)

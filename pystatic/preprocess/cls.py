@@ -6,12 +6,13 @@ import ast
 import logging
 from pystatic import symtable
 from pystatic.target import MethodTarget
-from pystatic.preprocess.type_expr import eval_type_expr
+from pystatic.preprocess.type_expr import eval_type_expr, eval_func_type
 from typing import List, TYPE_CHECKING, Optional
 from pystatic.typesys import (TypeClassTemp, TypeFuncTemp, TypeModuleTemp,
                               TypeVar, TpState, TypeTemp, any_ins)
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.preprocess.dependency import DependencyGraph
+from pystatic.preprocess.sym_util import fake_fun_entry
 
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
@@ -169,7 +170,7 @@ class _TypeVarVisitor(BaseVisitor):
 def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
     # uri here is not set correctly
     for tp_temp in symtable._cls_defs.values():
-        mt = _resolve_cls_method(uri, tp_temp.get_inner_symtable(), tp_temp)
+        mt = _resolve_cls_method(uri, tp_temp)
         if mt:
             worker.process_block(mt, False)
 
@@ -178,18 +179,19 @@ def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
         resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker)
 
 
-def _resolve_cls_method(uri: str, symtable: 'SymTable',
-                        clstemp: 'TypeClassTemp'):
+def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
     targets = []
-    for method_name in symtable._functions:
-        entry = symtable.lookup_local_entry(method_name)
-        func = symtable.lookup_local(method_name).temp
-        assert isinstance(func, TypeFuncTemp)
-        symtb = func.get_inner_symtable()
-        ast_node = entry.get_defnode()
-        assert isinstance(ast_node, ast.FunctionDef)
-        method_uri = '.'.join([uri, method_name])
-        targets.append(MethodTarget(method_uri, symtb, clstemp, ast_node))
+    new_fun_defs = {}
+    symtable = clstemp.get_inner_symtable()
+    for name, entry in symtable._func_defs.items():  # type: ignore
+        entry: 'fake_fun_entry'
+        assert isinstance(entry, fake_fun_entry)
+        func_temp = eval_func_type(entry.defnode, symtable).temp
+        assert isinstance(func_temp, TypeFuncTemp)
+        new_fun_defs[name] = func_temp
+        symtb = func_temp.get_inner_symtable()
+        method_uri = '.'.join([uri, name])
+        targets.append(MethodTarget(method_uri, symtb, clstemp, entry.defnode))
     return targets
 
 
