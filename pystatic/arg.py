@@ -18,7 +18,7 @@ class Arg(object):
 
     def __str__(self):
         result = self.name
-        if self.ann == any_ins:
+        if self.ann != any_ins:
             result += ': ' + str(self.ann)
         if self.valid:
             result += ' = ...'
