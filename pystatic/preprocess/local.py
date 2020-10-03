@@ -52,7 +52,7 @@ def resolve_local_func(symtable: 'SymTable'):
         assert isinstance(func_temp, TypeFuncTemp)
         new_func_defs[name] = func_temp
         # TODO: check name collision
-        tpins = TypeIns(func_temp, [])
+        tpins = func_temp.get_default_ins()
         symtable.local[name] = Entry(tpins, entry.defnode)
         logger.debug(f'({symtable.uri}) {name}: {tpins}')
 

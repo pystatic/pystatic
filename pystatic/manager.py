@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 class Manager:
     def __init__(self, config, module_files: List[str],
-                 package_files: List[str], stdout: TextIO, stderr: TextIO):
+                 package_files: List[str], stdout: TextIO, stderr: TextIO,
+                 load_typeshed: bool):
         self.check_targets: Dict[Uri, Target] = {}
 
         self.config = Config(config)
@@ -37,7 +38,8 @@ class Manager:
 
         self.mbox = MessageBox('test')  # TODO: refactor this
 
-        self.init_typeshed()
+        if load_typeshed:
+            self.init_typeshed()
 
     def init_typeshed(self):
         builtins_target = Target('builtins', get_builtin_symtable())

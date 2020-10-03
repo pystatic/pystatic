@@ -125,7 +125,7 @@ def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
     """Generate an Arg instance according to an ast.arg node"""
     new_arg = Arg(node.arg)
     if node.annotation:
-        ann = eval_type_expr(node.annotation, symtable)
+        ann = eval_type_expr(node.annotation, symtable).getins()
         if not ann:
             return None
         else:

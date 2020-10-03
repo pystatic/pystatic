@@ -67,9 +67,11 @@ def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
 
 def add_uri_symtable(symtable: 'SymTable', uri: str,
                      worker: 'Preprocessor') -> Optional[TypeIns]:
+    """Update symtable's import tree with uri"""
     urilist = absolute_urilist(symtable.glob_uri, uri)
     assert urilist
 
+    # get the initial module ins or package ins
     cur_uri = urilist[0]
     cur_ins: TypeIns
     if urilist[0] in symtable._import_tree:
@@ -82,7 +84,8 @@ def add_uri_symtable(symtable: 'SymTable', uri: str,
         if isinstance(temp, TypePackageTemp):
             cur_ins = TypePackageIns(temp)
         else:
-            cur_ins = TypeIns(temp, [])
+            assert isinstance(temp, TypeModuleTemp)
+            cur_ins = temp.get_default_ins()
 
         symtable._import_tree[urilist[0]] = cur_ins
 
@@ -104,7 +107,7 @@ def add_uri_symtable(symtable: 'SymTable', uri: str,
             else:
                 if i != len(urilist) - 1:
                     return None
-                res_ins = TypeIns(temp, [])
+                res_ins = temp.get_default_ins()
                 cur_ins.add_submodule(urilist[i], res_ins)
                 return res_ins
 

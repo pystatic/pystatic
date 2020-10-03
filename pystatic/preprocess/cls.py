@@ -4,15 +4,17 @@ Resolve class related type information.
 
 import ast
 import logging
-from pystatic import symtable
+import copy
 from pystatic.target import MethodTarget
 from pystatic.preprocess.type_expr import eval_type_expr, eval_func_type
 from typing import List, TYPE_CHECKING, Optional
 from pystatic.typesys import (TypeClassTemp, TypeFuncTemp, TypeModuleTemp,
-                              TypeVar, TpState, TypeTemp, any_ins)
+                              TypeVar, TpState, TypeTemp, any_ins, TypeIns)
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
+from pystatic.symtable import Entry
 from pystatic.preprocess.dependency import DependencyGraph
 from pystatic.preprocess.sym_util import fake_fun_entry
+from pystatic.arg import copy_argument
 
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
@@ -183,15 +185,51 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
     targets = []
     new_fun_defs = {}
     symtable = clstemp.get_inner_symtable()
+
     for name, entry in symtable._func_defs.items():  # type: ignore
         entry: 'fake_fun_entry'
         assert isinstance(entry, fake_fun_entry)
-        func_temp = eval_func_type(entry.defnode, symtable).temp
+        func_node = entry.defnode
+        func_temp = eval_func_type(func_node, symtable).temp
         assert isinstance(func_temp, TypeFuncTemp)
         new_fun_defs[name] = func_temp
-        symtb = func_temp.get_inner_symtable()
-        method_uri = '.'.join([uri, name])
-        targets.append(MethodTarget(method_uri, symtb, clstemp, entry.defnode))
+        func_ins = func_temp.get_default_ins()
+
+        # TODO: warning when classmethod and staticmethod appear together
+        is_classmethod = False
+        is_staticmethod = False
+        for dec_node in func_node.decorator_list:
+            if isinstance(dec_node, ast.Name):
+                if dec_node.id == 'classmethod':
+                    is_classmethod = True
+                    # modify the first parameter's type
+                    assert func_temp.argument.args, "error not handled yet"
+                    func_temp.argument.args[0].ann = clstemp.get_default_type()
+                    symtable.add_entry(name, Entry(func_ins, entry.defnode))
+
+                elif dec_node.id == 'staticmethod':
+                    is_staticmethod = True
+                    symtable.add_entry(name, Entry(func_ins, entry.defnode))
+
+                else:
+                    assert False, "not handled yet"
+
+        if not is_classmethod and not is_staticmethod:
+            # TODO: warning name collision
+            # modify the first parameter's type
+            assert func_temp.argument.args, "error not handled yet"
+            func_temp.argument.args[0].ann = clstemp.get_default_ins()
+            symtable.add_entry(name, Entry(func_ins, entry.defnode))
+
+        if not is_staticmethod:
+            # get attribute because of assignment of self
+            symtb = func_temp.get_inner_symtable()
+            method_uri = '.'.join([uri, name])
+            targets.append(
+                MethodTarget(method_uri, symtb, clstemp, entry.defnode))
+
+    symtable._func_defs = new_fun_defs
+
     return targets
 
 
