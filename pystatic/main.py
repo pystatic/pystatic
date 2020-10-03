@@ -14,9 +14,12 @@ def cmdline_parse():
     parser.add_argument('-p',
                         '--package',
                         action='append',
-                        metavar='package',
+                        metavar='package path',
                         help='package path',
                         type=str)
+    parser.add_argument('--stubgen',
+                        action='store_true',
+                        help='generate stub files')
     parse_res = parser.parse_args()
     return parse_res
 
@@ -28,7 +31,10 @@ def cmdline(stdout: TextIO, stderr: TextIO):
     if not cmd_res.package:
         cmd_res.package = []
     manager = Manager(cmd_res, cmd_res.module, cmd_res.package, stdout, stderr)
-    manager.start_check()
+    if cmd_res.stubgen:
+        manager.stubgen()
+    else:
+        manager.start_check()
 
 
 def test_pystatic(config: dict, src: List[str]):
