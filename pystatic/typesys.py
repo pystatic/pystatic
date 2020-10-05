@@ -178,6 +178,13 @@ class TypeIns(BaseType):
         assert isinstance(self.temp, TypeFuncTemp)
         return self.temp.ret
 
+    def lookup_local_var(self, name):
+        return self.temp.lookup_local_var(name)
+
+    def lookup_var(self, name):
+        return self.temp.lookup_var(name)
+
+
 
 class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
@@ -197,6 +204,12 @@ class TypeType(TypeIns):
 
     def __str__(self):
         return self.temp.get_str_expr([])
+
+    def lookup_local_var(self, name):
+        return self.temp.lookup_local_var(name)
+
+    def lookup_var(self, name):
+        return self.temp.lookup_var(name)
 
 
 class TypeClassTemp(TypeTemp):
@@ -334,6 +347,12 @@ class TypeFuncTemp(TypeTemp):
                      bindlist: BindList,
                      context: Optional[TypeContext] = None) -> str:
         return self.name + str(self.argument) + ' -> ' + str(self.ret)
+
+    def lookup_local_var(self, name):
+        return self._inner_symtable.lookup_local(name)
+
+    def lookup_var(self, name):
+        return self._inner_symtable.egb_lookup(name)
 
 
 class TypeModuleTemp(TypeClassTemp):

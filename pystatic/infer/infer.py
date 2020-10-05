@@ -46,6 +46,7 @@ class InferVisitor(BaseVisitor):
             if isinstance(target, ast.Name):
                 ltype = self.handle_name_node_of_assign(target, rtype)
                 self.check_type_consistent(ltype, rtype, target)
+            elif isinstance(target, Tuple):
 
     def handle_name_node_of_assign(self, target, rtype) -> TypeIns:
         if self.recorder.is_defined(target.id):
@@ -66,6 +67,8 @@ class InferVisitor(BaseVisitor):
         if isinstance(target, ast.Name):
             ltype = self.handle_name_node_of_ann_assign(target)
             self.check_type_consistent(ltype, rtype, target)
+
+
 
     def handle_name_node_of_ann_assign(self, target) -> TypeIns:
         if not self.recorder.is_defined(target.id):  # var appear first time
@@ -129,10 +132,7 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            tp=target.module_temp.lookup_local_var('f1')
+            # tp = target.module_temp.lookup_local_var('f1')
             # print(tp.temp.ret)
             infer_visitor = InferVisitor(target.ast, target.module_temp, self.mbox)
             infer_visitor.infer()
-
-    def get_external_symbol(self, module: TypeModuleTemp):
-        builtin = module.get_inner_symtable().builtins
