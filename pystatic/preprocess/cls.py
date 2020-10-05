@@ -4,14 +4,20 @@ Resolve class related type information.
 
 import ast
 import logging
-from pystatic import symtable
+import copy
 from pystatic.target import MethodTarget
-from pystatic.preprocess.type_expr import eval_type_expr
+from pystatic.preprocess.type_expr import (eval_argument_type,
+                                           eval_return_type, eval_type_expr,
+                                           eval_func_type,
+                                           template_resolve_fun)
 from typing import List, TYPE_CHECKING, Optional
 from pystatic.typesys import (TypeClassTemp, TypeFuncTemp, TypeModuleTemp,
-                              TypeVar, TpState, TypeTemp, any_ins)
+                              TypeVar, TpState, TypeTemp, any_ins, TypeIns)
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
+from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
+from pystatic.preprocess.sym_util import fake_fun_entry
+from pystatic.arg import Argument, copy_argument
 
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
@@ -169,7 +175,7 @@ class _TypeVarVisitor(BaseVisitor):
 def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
     # uri here is not set correctly
     for tp_temp in symtable._cls_defs.values():
-        mt = _resolve_cls_method(uri, tp_temp.get_inner_symtable(), tp_temp)
+        mt = _resolve_cls_method(uri, tp_temp)
         if mt:
             worker.process_block(mt, False)
 
@@ -178,18 +184,68 @@ def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
         resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker)
 
 
-def _resolve_cls_method(uri: str, symtable: 'SymTable',
-                        clstemp: 'TypeClassTemp'):
+def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
     targets = []
-    for method_name in symtable._functions:
-        entry = symtable.lookup_local_entry(method_name)
-        func = symtable.lookup_local(method_name).temp
-        assert isinstance(func, TypeFuncTemp)
-        symtb = func.get_inner_symtable()
-        ast_node = entry.get_defnode()
-        assert isinstance(ast_node, ast.FunctionDef)
-        method_uri = '.'.join([uri, method_name])
-        targets.append(MethodTarget(method_uri, symtb, clstemp, ast_node))
+    new_fun_defs = {}
+    symtable = clstemp.get_inner_symtable()
+
+    def get_method_kind(node: ast.FunctionDef):
+        """classmethod or staticmethod"""
+        is_classmethod = False
+        is_staticmethod = False
+        for dec_node in node.decorator_list:
+            if isinstance(dec_node, ast.Name):
+                if dec_node.id == 'classmethod':
+                    is_classmethod = True
+
+                elif dec_node.id == 'staticmethod':
+                    is_staticmethod = True
+        return is_classmethod, is_staticmethod
+
+    def modify_argument(argument: Argument, is_classmethod: bool,
+                        is_staticmethod: bool):
+        if is_classmethod:
+            argument.args[0].ann = clstemp.get_default_type()
+        elif not is_staticmethod:
+            argument.args[0].ann = clstemp.get_default_ins()
+
+    def add_def(node: ast.FunctionDef) -> TypeFuncTemp:
+        nonlocal symtable, new_fun_defs
+        argument = eval_argument_type(node.args, symtable)
+        assert argument
+        ret_ins = eval_return_type(node.returns, symtable).getins()
+        name = node.name
+
+        is_classmethod, is_staticmethod = get_method_kind(node)
+        modify_argument(argument, is_classmethod, is_staticmethod)
+
+        inner_symtable = symtable.new_symtable(name, TableScope.FUNC)
+        func_temp = TypeFuncTemp(name, symtable.glob_uri, inner_symtable,
+                                 argument, ret_ins)
+        func_ins = func_temp.getins([])
+        symtable.add_entry(name, Entry(func_ins, node))
+        new_fun_defs[name] = func_temp
+
+        # get attribute because of assignment of self
+        if not is_staticmethod:
+            symtb = func_temp.get_inner_symtable()
+            method_uri = '.'.join([uri, name])
+            targets.append(MethodTarget(method_uri, symtb, clstemp, node))
+
+        logger.debug(f'({symtable.uri}) {name}: {func_ins}')
+        return func_temp
+
+    def add_overload(temp: TypeFuncTemp, args: Argument, ret: TypeIns,
+                     node: ast.FunctionDef):
+        is_classmethod, is_staticmethod = get_method_kind(node)
+        modify_argument(args, is_classmethod, is_staticmethod)
+        temp.add_overload(args, ret)
+        logger.debug(
+            f'overload ({symtable.uri}) {node.name}: {temp.get_str_expr([])}')
+
+    template_resolve_fun(symtable, add_def, add_overload)
+    symtable._func_defs = new_fun_defs
+
     return targets
 
 

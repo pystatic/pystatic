@@ -1,3 +1,4 @@
+import copy
 from pystatic.typesys import TypeAnyTemp, TypeIns, any_ins
 from typing import Optional, List
 
@@ -42,3 +43,13 @@ class Argument(object):
             arg_list.append(str(self.kwarg))
 
         return '(' + ', '.join(arg_list) + ')'
+
+
+def copy_argument(argument: Argument):
+    new_argument = Argument()
+    new_argument.posonlyargs = copy.copy(argument.posonlyargs)
+    new_argument.args = copy.copy(argument.args)
+    new_argument.kwonlyargs = copy.copy(argument.kwonlyargs)
+    new_argument.vararg = argument.vararg
+    new_argument.kwarg = argument.kwarg
+    return new_argument

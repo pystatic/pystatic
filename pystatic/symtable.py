@@ -1,11 +1,10 @@
 import ast
 import enum
-from collections import OrderedDict
 from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
 
 if TYPE_CHECKING:
     from pystatic.typesys import (TypeIns, TypeClassTemp, TypeTemp,
-                                  TypePackageIns)
+                                  TypeFuncTemp)
     from pystatic.uri import Uri
 
 
@@ -54,13 +53,14 @@ class SymTable:
 
         self.scope = scope
 
-        self._cls_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
+        # inner data structure to store important information about this
+        # symtable, used heavily in the preprocess stage.
+        self._cls_defs: Dict[str, 'TypeClassTemp'] = {}
         self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
+        self._func_defs: Dict[str, 'TypeFuncTemp'] = {}
 
         self._import_nodes: List[ImportNode] = []
         self._import_tree: Dict[str, 'TypeIns'] = {}
-
-        self._functions = set()
 
     @property
     def glob_uri(self):

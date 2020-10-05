@@ -13,9 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class fake_fun_entry:
-    def __init__(self, name: str, defnode: ast.AST) -> None:
+    def __init__(self, name: str, defnode: ast.FunctionDef) -> None:
         self.name = name
-        self.defnode = defnode
+        self.defnodes = [defnode]
+
+    def add_defnode(self, defnode: ast.FunctionDef):
+        self.defnodes.append(defnode)
 
 
 class fake_local_entry:
@@ -42,9 +45,8 @@ def add_spt_def(symtable: SymTable, name: str, temp: TypeTemp):
 
 def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
                     origin_name: str, defnode: 'ImportNode'):
-    """
-    Add import information to the symtable, this will add fake_imp_entry to the
-    local scope.
+    """Add import information to the symtable, this will add fake_imp_entry to
+    the local scope.
     """
     symtable._import_nodes.append(defnode)
 
@@ -56,8 +58,13 @@ def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
 
 
 def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
-    symtable._functions.add(name)
-    symtable.local[name] = fake_fun_entry(name, node)  # type: ignore
+    """Add function definition information to the symtable, this will add
+    fake_fun_entry to the _func_defs of the symtable."""
+    if name in symtable._func_defs:
+        assert isinstance(symtable._func_defs[name], fake_fun_entry)
+        symtable._func_defs[name].add_defnode(node)  # type: ignore
+    else:
+        symtable._func_defs[name] = fake_fun_entry(name, node)  # type: ignore
 
 
 def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
@@ -67,9 +74,11 @@ def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
 
 def add_uri_symtable(symtable: 'SymTable', uri: str,
                      worker: 'Preprocessor') -> Optional[TypeIns]:
+    """Update symtable's import tree with uri"""
     urilist = absolute_urilist(symtable.glob_uri, uri)
     assert urilist
 
+    # get the initial module ins or package ins
     cur_uri = urilist[0]
     cur_ins: TypeIns
     if urilist[0] in symtable._import_tree:
@@ -82,7 +91,8 @@ def add_uri_symtable(symtable: 'SymTable', uri: str,
         if isinstance(temp, TypePackageTemp):
             cur_ins = TypePackageIns(temp)
         else:
-            cur_ins = TypeIns(temp, [])
+            assert isinstance(temp, TypeModuleTemp)
+            cur_ins = temp.get_default_ins()
 
         symtable._import_tree[urilist[0]] = cur_ins
 
@@ -104,7 +114,7 @@ def add_uri_symtable(symtable: 'SymTable', uri: str,
             else:
                 if i != len(urilist) - 1:
                     return None
-                res_ins = TypeIns(temp, [])
+                res_ins = temp.get_default_ins()
                 cur_ins.add_submodule(urilist[i], res_ins)
                 return res_ins
 

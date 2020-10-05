@@ -77,6 +77,12 @@ class TypeTemp:
         assert bind_err.empty(), "Get default type should always succeed"
         return bind_type
 
+    def get_default_ins(self) -> 'TypeIns':
+        return TypeIns(self, [])
+
+    def getins(self, bindlist: BindList) -> 'TypeIns':
+        return TypeIns(self, bindlist)
+
     def getattribute(
             self,
             name: str,
@@ -96,6 +102,7 @@ class TypeTemp:
     def get_str_expr(self,
                      bindlist: BindList,
                      context: Optional[TypeContext] = None) -> str:
+        """__str__ with bindlist and context"""
         return self.name
 
     def __str__(self):
@@ -178,7 +185,7 @@ class TypeType(TypeIns):
         super().__init__(temp, bindlist)
 
     def getins(self) -> 'TypeIns':
-        return TypeIns(self.temp, self.bindlist)
+        return self.temp.getins(self.bindlist)
 
     def call(self) -> 'TypeIns':
         return self.getins()
@@ -306,13 +313,14 @@ class TypeClassTemp(TypeTemp):
 class TypeFuncTemp(TypeTemp):
     def __init__(self, name: str, module_uri: str, inner_symtable: 'SymTable',
                  argument: 'Argument', ret: TypeIns) -> None:
+        self.overloads: List[Tuple['Argument', TypeIns]] = [(argument, ret)]
         self.name = name
         self.module_uri = module_uri
 
-        self.argument = argument
-        self.ret = ret
-
         self._inner_symtable = inner_symtable
+
+    def add_overload(self, argument: 'Argument', ret: TypeIns):
+        self.overloads.append((argument, ret))
 
     def get_inner_symtable(self) -> 'SymTable':
         return self._inner_symtable
@@ -320,7 +328,15 @@ class TypeFuncTemp(TypeTemp):
     def get_str_expr(self,
                      bindlist: BindList,
                      context: Optional[TypeContext] = None) -> str:
-        return self.name + str(self.argument) + ' -> ' + str(self.ret)
+        if len(self.overloads) == 1:
+            fun_fmt = "{}{} -> {}"
+        else:
+            fun_fmt = "@overload {}{} -> {}"
+        lst = [
+            fun_fmt.format(self.name, argument, ret)
+            for argument, ret in self.overloads
+        ]
+        return '\n'.join(lst)
 
 
 class TypeModuleTemp(TypeClassTemp):
@@ -351,6 +367,12 @@ class TypeAnyTemp(TypeTemp):
 
     def get_default_type(self) -> 'TypeType':
         return any_type
+
+    def get_default_ins(self) -> 'TypeIns':
+        return any_ins
+
+    def getins(self, bindlist: BindList) -> 'TypeIns':
+        return any_ins
 
     def has_method(self, name: str) -> bool:
         return True
@@ -399,6 +421,12 @@ class TypeEllipsisTemp(TypeTemp):
 
     def get_default_type(self) -> 'TypeType':
         return ellipsis_type
+
+    def get_default_ins(self) -> 'TypeIns':
+        return ellipsis_ins
+
+    def getins(self, bindlist: BindList) -> 'TypeIns':
+        return ellipsis_ins
 
 
 class TypeCallableTemp(TypeTemp):
@@ -512,5 +540,5 @@ ellipsis_type, _ = ellipsis_temp.generate_typetype([])
 none_type, _ = none_temp.generate_typetype([])
 any_type, _ = any_temp.generate_typetype([])
 
-any_ins = any_type.call()
-ellipsis_ins = ellipsis_type.call()
+any_ins = TypeIns(any_temp, [])
+ellipsis_ins = TypeIns(ellipsis_temp, [])
