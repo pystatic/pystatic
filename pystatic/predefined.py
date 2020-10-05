@@ -10,7 +10,7 @@ from pystatic.typesys import *
 # bool_temp = TypeClassTemp('bool', TpState.OVER)
 # func_temp = TypeClassTemp('function', TpState.OVER)
 
-builtin_symtable = SymTable(None, None, None, TableScope.GLOB)  # type: ignore
+builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
 builtin_symtable.glob = builtin_symtable
 builtin_symtable.builtins = builtin_symtable
 
@@ -20,7 +20,7 @@ builtin_symtable.builtins = builtin_symtable
 # builtin_symtable.add_entry('bool', Entry(bool_temp.get_default_type()))
 # builtin_symtable.add_entry('...', Entry(ellipsis_type))
 
-typing_symtable = SymTable(None, None, None, TableScope.GLOB)  # type: ignore
+typing_symtable = SymTable('typings', None, None, None, TableScope.GLOB)
 typing_symtable.glob = typing_symtable
 typing_symtable.builtins = builtin_symtable
 
@@ -52,10 +52,12 @@ def get_typing_symtable() -> SymTable:
     return typing_symtable
 
 
-def get_init_symtable() -> SymTable:
+def get_init_module_symtable(uri: str) -> SymTable:
     new_symtable = SymTable(
+        uri,
         None,  # type: ignore
         None,
         builtin_symtable,
         TableScope.GLOB)
+    new_symtable.glob = new_symtable
     return new_symtable

@@ -1,14 +1,16 @@
 import ast
 from collections import deque
-from typing import Optional, TYPE_CHECKING, Deque, List, Dict
-from pystatic.typesys import TypeModuleTemp
+from pystatic.uri import uri2list
+from typing import Optional, TYPE_CHECKING, Deque, List, Dict, Tuple
+from pystatic.typesys import TpState, TypeModuleTemp, TypePackageTemp
 from pystatic.modfinder import ModuleFinder
-from pystatic import preprocess
-from pystatic.predefined import get_init_symtable
-from pystatic.preprocess.definition import get_definition, get_definition_in_method
-from pystatic.preprocess.impt import resolve_import_type
-from pystatic.preprocess.cls import resolve_cls_def, resolve_cls_method, resolve_cls_attr
-from pystatic.preprocess.typeins import resolve_local_typeins
+from pystatic.predefined import get_init_module_symtable
+from pystatic.preprocess.definition import (get_definition,
+                                            get_definition_in_method)
+from pystatic.preprocess.impt import resolve_import_type, resolve_import_ins
+from pystatic.preprocess.cls import (resolve_cls_def, resolve_cls_method,
+                                     resolve_cls_attr)
+from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
 from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 from pystatic.modfinder import ModuleFinder, ModuleFindRes
 
@@ -51,10 +53,11 @@ class Preprocessor:
     def process_module(self, targets: List[Target]):
         fresh_targets = []
         for target in targets:
-            assert isinstance(target, Target)
-            if self.add_cache_target(target):
-                # this is a new target
-                fresh_targets.append(target)
+            if target.stage < Stage.Processed:
+                assert isinstance(target, Target)
+                if self.add_cache_target(target):
+                    # this is a new target
+                    fresh_targets.append(target)
 
         self.process_block(fresh_targets, True)  # type: ignore
 
@@ -62,14 +65,23 @@ class Preprocessor:
         if uri in self.targets:
             return self.targets[uri].module_temp
 
-    def add_cache_target_uri(self, uri: 'Uri'):
-        """Add and cache target through its uri"""
+    def _add_cache_target_uri(self, uri: 'Uri'):
         if uri not in self.targets:
-            new_target = Target(uri, get_init_symtable())
+            new_target = Target(uri, get_init_module_symtable(uri))
             self.targets[uri] = new_target
             self.q_parse.append(new_target)
             return True
         return False
+
+    def add_cache_target_uri(self, uri: 'Uri'):
+        """Add and cache target through its uri"""
+        urilist = uri2list(uri)
+        assert urilist
+        cur_uri = urilist[0]
+        self._add_cache_target_uri(cur_uri)
+        for i in range(1, len(urilist)):
+            cur_uri += f'.{urilist[i]}'
+            self._add_cache_target_uri(cur_uri)
 
     def add_cache_target(self, target: 'Target'):
         """Add and cache target"""
@@ -108,42 +120,48 @@ class Preprocessor:
         # identified because possible type(class) information is collected
         for target in to_check:
             resolve_local_typeins(target.symtable)
+            resolve_local_func(target.symtable)
+
+        for target in to_check:
+            resolve_import_ins(target.symtable, self)
 
         for target in to_check:
             resolve_cls_method(target.symtable, target.uri, self)
             resolve_cls_attr(target.symtable)
 
-    def uri2ast(self, uri: 'Uri') -> ast.AST:
-        """Return the ast tree corresponding to uri.
+            if isinstance(target, Target):
+                target.stage = Stage.Processed
 
-        May throw SyntaxError or FileNotFoundError or ReadNsAst exception.
-        """
-        find_res = self.finder.find(uri)
+    def parse_target(self, target: Target):
+        # TODO: error handling
+        assert target.stage == Stage.PreParse
+        find_res = self.finder.find(target.uri)
+
         if not find_res:
             raise FileNotFoundError
+
         if find_res.res_type == ModuleFindRes.Module:
             assert len(find_res.paths) == 1
             assert find_res.target_file
-            return path2ast(find_res.target_file)
+            target.ast = path2ast(find_res.target_file)
+
         elif find_res.res_type == ModuleFindRes.Package:
             assert len(find_res.paths) == 1
             assert find_res.target_file
-            return path2ast(find_res.target_file)
+            target.ast = path2ast(find_res.target_file)
+            target.module_temp = TypePackageTemp(find_res.paths,
+                                                 target.symtable, target.uri)
+
         elif find_res.res_type == ModuleFindRes.Namespace:
             raise ReadNsAst()
+
         else:
             assert False
-
-    def parse(self, target: BlockTarget) -> ast.AST:
-        # TODO: error handling
-        assert target.stage == Stage.PreParse
-        target.ast = self.uri2ast(target.uri)
-        return target.ast
 
     def assert_parse(self, target: BlockTarget):
         if target.stage <= Stage.PreParse:
             if isinstance(target, Target):
-                self.parse(target)
+                self.parse_target(target)
             else:
                 assert target.ast
         target.stage = Stage.PreSymtable

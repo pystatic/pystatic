@@ -1,10 +1,10 @@
 import ast
 import enum
-from collections import OrderedDict
 from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
 
 if TYPE_CHECKING:
-    from pystatic.typesys import TypeIns, TypeClassTemp, TypeTemp
+    from pystatic.typesys import (TypeIns, TypeClassTemp, TypeTemp,
+                                  TypeFuncTemp)
     from pystatic.uri import Uri
 
 
@@ -23,13 +23,9 @@ TypeDefNode = Union[str, ast.AST]
 
 
 class Entry:
-    def __init__(self,
-                 tp: 'TypeIns',
-                 defnode: Optional[ast.AST] = None,
-                 tpnode: Optional[TypeDefNode] = None):
+    def __init__(self, tp: 'TypeIns', defnode: Optional[ast.AST] = None):
         self._tp = tp
         self._defnode = defnode
-        self._typenode = tpnode
 
     def set_type(self, tp: 'TypeIns'):
         self._tp = tp
@@ -43,16 +39,13 @@ class Entry:
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
 
-    def set_typenode(self, tpnode: ast.AST):
-        self._typenode = tpnode
-
-    def get_typenode(self) -> Optional[TypeDefNode]:
-        return self._typenode or self._defnode
-
 
 class SymTable:
-    def __init__(self, glob: 'SymTable', non_local: Optional['SymTable'],
-                 builtins: 'SymTable', scope: 'TableScope') -> None:
+    def __init__(self, uri: 'Uri', glob: 'SymTable',
+                 non_local: Optional['SymTable'], builtins: 'SymTable',
+                 scope: 'TableScope') -> None:
+        self.uri = uri
+
         self.local: Dict[str, Entry] = {}
         self.non_local = non_local
         self.glob = glob
@@ -60,12 +53,18 @@ class SymTable:
 
         self.scope = scope
 
-        self._cls_defs: Dict[str, 'TypeClassTemp'] = OrderedDict()
+        # inner data structure to store important information about this
+        # symtable, used heavily in the preprocess stage.
+        self._cls_defs: Dict[str, 'TypeClassTemp'] = {}
         self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
+        self._func_defs: Dict[str, 'TypeFuncTemp'] = {}
 
-        self._import_info: Dict['Uri', List[ImportItem]] = {}
+        self._import_nodes: List[ImportNode] = []
+        self._import_tree: Dict[str, 'TypeIns'] = {}
 
-        self._functions = set()
+    @property
+    def glob_uri(self):
+        return self.glob.uri
 
     def _legb_lookup(self, name: str, find):
         curtable = self
@@ -124,15 +123,18 @@ class SymTable:
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
 
-    def new_symtable(self, new_scope: 'TableScope') -> 'SymTable':
+    def new_symtable(self, name: str, new_scope: 'TableScope') -> 'SymTable':
         builtins = self.builtins
         if self.scope == TableScope.CLASS:
             non_local = self.non_local
         else:
             non_local = self
         glob = self.glob
-        return SymTable(glob, non_local, builtins, new_scope)
+        new_uri = self.uri + '.' + name
+        return SymTable(new_uri, glob, non_local, builtins, new_scope)
+
     """add by hj"""
+
     def egb_lookup(self, name):
         curtable = self.non_local
         while curtable:
@@ -151,4 +153,3 @@ class SymTable:
         res = self.local.get(name)
         assert res
         res.set_type(tp)
-

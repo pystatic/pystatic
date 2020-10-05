@@ -1,26 +1,24 @@
 import os
-import ast
 import logging
-from collections import deque
 from pystatic.message import MessageBox
-from typing import Optional, List, TextIO, Set, Dict, Deque
+from typing import Optional, List, TextIO, Set, Dict
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
-                                 get_init_symtable)
-from pystatic.symtable import SymTable
-from pystatic.typesys import TypeModuleTemp, TpState
+                                 get_init_module_symtable)
 from pystatic.config import Config
 from pystatic.modfinder import ModuleFinder
 from pystatic.uri import Uri, relpath2uri
 from pystatic.target import Target, Stage
 from pystatic.infer.infer import InferStarter
+from pystatic.stubgen import stubgen
 
 logger = logging.getLogger(__name__)
 
 
 class Manager:
     def __init__(self, config, module_files: List[str],
-                 package_files: List[str], stdout: TextIO, stderr: TextIO):
+                 package_files: List[str], stdout: TextIO, stderr: TextIO,
+                 load_typeshed: bool):
         self.check_targets: Dict[Uri, Target] = {}
 
         self.config = Config(config)
@@ -31,7 +29,7 @@ class Manager:
         finder = ModuleFinder(self.config.manual_path, list(self.user_path),
                               self.config.sitepkg, self.config.typeshed,
                               self.config.python_version)
-        self.preprocessor = Preprocessor(self, finder)
+        self.pre_proc = Preprocessor(self, finder)
 
         self.stdout = stdout
         self.stderr = stderr
@@ -41,12 +39,21 @@ class Manager:
 
         self.mbox = MessageBox('test')  # TODO: refactor this
 
-        self.init_typeshed()
+        if load_typeshed:
+            self.init_typeshed()
 
     def init_typeshed(self):
         builtins_target = Target('builtins', get_builtin_symtable())
         typing_target = Target('typing', get_typing_symtable())
         self.preprocess([typing_target, builtins_target])
+
+    def stubgen(self, rt_dir: Optional[str] = None):
+        check_list = list(self.check_targets.values())
+        self.preprocess(check_list)
+        if rt_dir:
+            stubgen(check_list, rt_dir)
+        else:
+            stubgen(check_list)
 
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
@@ -58,7 +65,7 @@ class Manager:
         InferStarter(self.check_targets, self.mbox).start_infer()
 
     def preprocess(self, targets):
-        self.preprocessor.process_module(targets)
+        self.pre_proc.process_module(targets)
 
     def set_user_path(self, srcfiles: List[str]):
         """Set user path according to sources"""
@@ -81,7 +88,9 @@ class Manager:
                 continue
             rt_path = crawl_path(os.path.dirname(srcfile))
             uri = relpath2uri(rt_path, srcfile)
-            target = Target(uri, get_init_symtable(), stage=Stage.PreParse)
+            target = Target(uri,
+                            get_init_module_symtable(uri),
+                            stage=Stage.PreParse)
             self.check_targets[uri] = target
 
 
