@@ -7,8 +7,8 @@ from pystatic.infer.op_map import *
 from pystatic.infer.checker import TypeChecker
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.message import MessageBox
-from pystatic.infer.value_parser import RValueParser
 from pystatic.infer.recorder import SymbolRecorder
+from pystatic.infer.exprparse import ExprParse
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +39,7 @@ class InferVisitor(BaseVisitor):
         self.checker.check(ltype, rtype, node)
 
     def visit_Assign(self, node: ast.Assign):
-        rtype: Optional[TypeIns] = RValueParser(self.mbox, self.recorder).accept(node.value)
+        rtype: Optional[TypeIns] = ExprParse(self.mbox, self.recorder).parse_expr(node.value)
         if rtype is None:  # some wrong with rvalue
             return
         for target in node.targets:
@@ -60,7 +60,7 @@ class InferVisitor(BaseVisitor):
             return tp
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        rtype: Optional[TypeIns] = RValueParser(self.mbox, self.recorder).accept(node.value)
+        rtype: Optional[TypeIns] = ExprParse(self.mbox, self.recorder).parse_expr(node.value)
         if rtype is None:
             return
         target = node.target
@@ -107,7 +107,7 @@ class InferVisitor(BaseVisitor):
             func_type.ret_type = rtype
 
     def visit_Return(self, node: ast.Return):
-        tp = RValueParser(self.mbox, self.recorder).accept(node.value)
+        tp = ExprParse(self.mbox, self.recorder).parse_expr(node.value)
         self.checker.check(self.ret_annotation, tp, node.value)
         if tp not in self.ret_value:
             self.ret_value.append(tp)
