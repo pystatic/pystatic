@@ -1,10 +1,11 @@
 import ast
 from pystatic.symtable import SymTable, TableScope, TypeDefNode
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeFuncTemp, TypeIns, ellipsis_type, TypeType,
-                              any_type, none_type)
+                              any_type, none_type, any_ins)
 from pystatic.arg import Argument, Arg
+from pystatic.preprocess.sym_util import fake_fun_entry
 
 
 def eval_type_expr(node: TypeDefNode,
@@ -61,6 +62,18 @@ def eval_func_type(node: ast.FunctionDef,
 
     return TypeFuncTemp(node.name, symtable.glob_uri, inner_sym, argument,
                         ret_type).get_default_type()
+
+
+def eval_return_type(node: Optional[TypeDefNode],
+                     symtable: SymTable) -> TypeType:
+    if node:
+        res_type = eval_type_expr(node, symtable)
+        if res_type:
+            return res_type
+        else:
+            return any_type
+    else:
+        return any_type
 
 
 def eval_argument_type(node: ast.arguments,
@@ -131,6 +144,50 @@ def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
         else:
             new_arg.ann = ann
     return new_arg
+
+
+TAddFunDef = Callable[[ast.FunctionDef], TypeFuncTemp]
+TAddFunOverload = Callable[[TypeFuncTemp, Argument, TypeIns, ast.FunctionDef],
+                           None]
+
+
+def template_resolve_fun(symtable: 'SymTable', add_func_define: TAddFunDef,
+                         add_func_overload: TAddFunOverload):
+    """Template to resolve functions"""
+    def get_arg_ret(node: ast.FunctionDef):
+        """Get the argument and return type of the function"""
+        argument = eval_argument_type(node.args, symtable)
+        ret_ins = eval_return_type(node.returns, symtable).getins()
+        return argument, ret_ins
+
+    for name, entry in symtable._func_defs.items():  # type: ignore
+        entry: 'fake_fun_entry'
+        assert isinstance(entry, fake_fun_entry)
+
+        overload_list = []
+        not_overload = None  # function def that's not decorated by overload
+        for astnode in entry.defnodes:
+            is_overload = False
+            for decs in astnode.decorator_list:
+                if isinstance(decs, ast.Name) and decs.id == 'overload':
+                    # TODO: add warning here if defined is already true before
+                    is_overload = True
+                    break
+            if is_overload:
+                overload_list.append((astnode, *get_arg_ret(astnode)))
+            else:
+                not_overload = astnode
+
+        # TODO: name collision check
+        if len(overload_list) > 0:
+            func_temp = add_func_define(overload_list[0][0])
+
+            for node, argument, ret_ins in overload_list[1:]:
+                add_func_overload(func_temp, argument, ret_ins, node)
+
+        else:
+            assert not_overload
+            add_func_define(not_overload)
 
 
 class NotType(Exception):

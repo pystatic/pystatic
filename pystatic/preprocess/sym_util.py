@@ -15,7 +15,10 @@ logger = logging.getLogger(__name__)
 class fake_fun_entry:
     def __init__(self, name: str, defnode: ast.FunctionDef) -> None:
         self.name = name
-        self.defnode = defnode
+        self.defnodes = [defnode]
+
+    def add_defnode(self, defnode: ast.FunctionDef):
+        self.defnodes.append(defnode)
 
 
 class fake_local_entry:
@@ -57,7 +60,11 @@ def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
 def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
     """Add function definition information to the symtable, this will add
     fake_fun_entry to the _func_defs of the symtable."""
-    symtable._func_defs[name] = fake_fun_entry(name, node)  # type: ignore
+    if name in symtable._func_defs:
+        assert isinstance(symtable._func_defs[name], fake_fun_entry)
+        symtable._func_defs[name].add_defnode(node)  # type: ignore
+    else:
+        symtable._func_defs[name] = fake_fun_entry(name, node)  # type: ignore
 
 
 def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):

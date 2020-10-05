@@ -102,6 +102,7 @@ class TypeTemp:
     def get_str_expr(self,
                      bindlist: BindList,
                      context: Optional[TypeContext] = None) -> str:
+        """__str__ with bindlist and context"""
         return self.name
 
     def __str__(self):
@@ -312,13 +313,14 @@ class TypeClassTemp(TypeTemp):
 class TypeFuncTemp(TypeTemp):
     def __init__(self, name: str, module_uri: str, inner_symtable: 'SymTable',
                  argument: 'Argument', ret: TypeIns) -> None:
+        self.overloads: List[Tuple['Argument', TypeIns]] = [(argument, ret)]
         self.name = name
         self.module_uri = module_uri
 
-        self.argument = argument
-        self.ret = ret
-
         self._inner_symtable = inner_symtable
+
+    def add_overload(self, argument: 'Argument', ret: TypeIns):
+        self.overloads.append((argument, ret))
 
     def get_inner_symtable(self) -> 'SymTable':
         return self._inner_symtable
@@ -326,7 +328,15 @@ class TypeFuncTemp(TypeTemp):
     def get_str_expr(self,
                      bindlist: BindList,
                      context: Optional[TypeContext] = None) -> str:
-        return self.name + str(self.argument) + ' -> ' + str(self.ret)
+        if len(self.overloads) == 1:
+            fun_fmt = "{}{} -> {}"
+        else:
+            fun_fmt = "@overload {}{} -> {}"
+        lst = [
+            fun_fmt.format(self.name, argument, ret)
+            for argument, ret in self.overloads
+        ]
+        return '\n'.join(lst)
 
 
 class TypeModuleTemp(TypeClassTemp):
