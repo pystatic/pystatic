@@ -307,6 +307,11 @@ class TypeClassTemp(TypeTemp):
                      context: Optional[TypeContext]) -> Optional['TypeIns']:
         # FIXME: current implementation doesn't cope bindlist, context and baseclasses
         res = self.get_local_attr(name)
+        if not res:
+            for basecls in self.baseclass:
+                res = basecls.getattribute(name, context)
+                if res:
+                    return res
         return res
 
 
