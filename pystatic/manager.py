@@ -58,8 +58,7 @@ class Manager:
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
         self.start_infer()
-        for err in self.mbox.error:
-            print(err)
+        self.mbox.report()
 
     def start_infer(self):
         InferStarter(self.check_targets, self.mbox).start_infer()

@@ -2,18 +2,15 @@ from pystatic.typesys import *
 
 
 class TypeChecker:
-    def __init__(self, env):
-        self.env = env
+    # TODO: just a temp checker
+    def __init__(self, mbox):
+        self.mbox = mbox
 
-    def check(self, tp1, tp2, node):
-        # TODO: just a temp checker
+    def check(self, tp1, tp2):
         if tp1.__str__() == "Any":
             return True
         res = tp1.__str__() == tp2.__str__()
-        if not res:
-            self.env.add_err(node, f"expected type \'{tp1}\', got \'{tp2}\' instead")
+        return res
 
-    def check_two_type(self, tp1, tp2):
-        if tp1 == tp2:
-            return True
-        return False
+    def is_any(self, tp):
+        return tp.__str__() == "Any"

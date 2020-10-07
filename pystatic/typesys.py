@@ -179,16 +179,15 @@ class TypeIns:
     def __str__(self) -> str:
         return self.temp.get_str_expr(self.bindlist)
 
-    def call(self):
+    def call(self, args):
         assert isinstance(self.temp, TypeFuncTemp)
-        return self.temp.ret
+        return self.temp.call(args)
 
     def lookup_local_var(self, name):
         return self.temp.lookup_local_var(name)
 
     def lookup_var(self, name):
         return self.temp.lookup_var(name)
-
 
 
 class TypeType(TypeIns):
@@ -366,6 +365,10 @@ class TypeFuncTemp(TypeTemp):
             for argument, ret in self.overloads
         ]
         return '\n'.join(lst)
+
+    def call(self, args):
+        # TODO: just a temp realization
+        return self.overloads[0][0]
 
     def lookup_local_var(self, name):
         return self._inner_symtable.lookup_local(name)

@@ -1,10 +1,10 @@
 from pystatic.infer.visitor import BaseVisitor
-from pystatic.typesys import TypeClassTemp
 from pystatic.typesys import TypeModuleTemp
 from pystatic.message import MessageBox
 from pystatic.infer.checker import TypeChecker
 from pystatic.typesys import TypeType, TypeIns
 import ast
+
 
 class ExprParse(BaseVisitor):
     def __init__(self, mbox: MessageBox, recorder):
@@ -32,7 +32,7 @@ class ExprParse(BaseVisitor):
 
     def visit_BinOp(self, node: ast.BinOp):
         lefttype = super().visit(node.left)
-        if lefttype == None: # here 'None', I want a type to represent the error type
+        if lefttype == None:  # here 'None', I want a type to represent the error type
             # during processing, a type mismatch is encountered.
             return lefttype
         righttype = super().visit(node.right)
@@ -43,7 +43,6 @@ class ExprParse(BaseVisitor):
         # else return 
         raise Exception(f"todo")
 
-
     def visit_Call(self, node: ast.Call):
         if isinstance(node.func, ast.Name):
             # get the type by the name
@@ -51,8 +50,10 @@ class ExprParse(BaseVisitor):
             if not call_type:
                 self.mbox.add_err(node, f"unresolved reference '{name}'")
                 return
-            if isinstance(call_type, (TypeType, TypeIns)):
+            if isinstance(call_type, TypeType):
                 return call_type.call()
+            elif isinstance(call_type, TypeIns):
+                return call_type.call(None)
             else:
                 raise Exception(f"todo {type(call_type)} of {call_type}")
         # check the args' type in the call
@@ -66,8 +67,9 @@ class ExprParse(BaseVisitor):
     def visit_Constant(self, node: ast.Constant):
         # what does node.kind mean?
         # this type is builtin's type, so how to build this class
-        if type(node.value) is not None:
-            return TypeClassTemp(type(node.value).__name__)
+        assert type(node.value) is not None
+        name = type(node.value).__name__
+        return self.lookup_var(name)
 
     def visit_List(self, node: ast.List):
         type_list = []
@@ -88,7 +90,6 @@ class ExprParse(BaseVisitor):
             type_list.append(super().visit(elt))
         return tuple(type_list)
 
-
 class DisplayVar(BaseVisitor):
     def __init__(self, module: TypeModuleTemp, ast_rt: ast.AST):
         self.curscope = module
@@ -96,11 +97,11 @@ class DisplayVar(BaseVisitor):
         self.tab = 0
 
     def accept(self):
-        print(" "*self.tab, self.curscope.name)
+        print(" " * self.tab, self.curscope.name)
         self.tab += 4
-        print(" "*self.tab, "attribute in this scope")
+        print(" " * self.tab, "attribute in this scope")
         for var in self.curscope.var_attr.keys():
-            print(" "*self.tab, var, self.curscope.var_attr[var])
+            print(" " * self.tab, var, self.curscope.var_attr[var])
         super().visit(self.ast_rt)
         self.tab -= 4
 
@@ -113,14 +114,14 @@ class DisplayVar(BaseVisitor):
     def displayscopeattribute(self, whichtype, node):
         curscopetmp = self.curscope
         self.curscope = self.curscope.getattr(node.name, None)
-        print(" "*self.tab, "below is {} scope".format(whichtype))
+        print(" " * self.tab, "below is {} scope".format(whichtype))
         if isinstance(node, ast.ClassDef):
-            print(" "*self.tab, self.curscope.name)
+            print(" " * self.tab, self.curscope.name)
         else:
-            print(" "*self.tab, node.name, self.curscope)
+            print(" " * self.tab, node.name, self.curscope)
         self.tab += 4
         for var in self.curscope.temp.var_attr.keys():
-            print(" "*self.tab, var, self.curscope.temp.var_attr[var])       
+            print(" " * self.tab, var, self.curscope.temp.var_attr[var])
         for bodynode in node.body:
             super().visit(bodynode)
         self.tab -= 4
