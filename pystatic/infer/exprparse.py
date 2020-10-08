@@ -52,7 +52,8 @@ class ExprParse(BaseVisitor):
             if isinstance(call_type, TypeType):
                 return call_type.call()
             elif isinstance(call_type, TypeIns):
-                return call_type.call(None)
+                arg, ret = call_type.call(None)
+                return ret
             else:
                 raise Exception(f"todo {type(call_type)} of {call_type}")
         # check the args' type in the call

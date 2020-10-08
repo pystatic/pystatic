@@ -3,6 +3,8 @@ from typing import Optional, List
 
 INCOMPATIBLE_TYPE_IN_ASSIGN = "Incompatible type in assignment"
 SYMBOL_UNDEFINED = 'Cannot determine type of "{}"'
+NO_ATTRIBUTE = 'Type "{}" has no attribute "{}"'
+UNSUPPORTED_OPERAND = 'Unsupported operand types for "{}"'
 # tuple
 NEED_MORE_VALUES_TO_UNPACK = "Need more values to unpack"
 TOO_MORE_VALUES_TO_UNPACK = "Too more values to unpack"
@@ -69,6 +71,15 @@ class MessageBox(object):
 
     def return_value_expected(self, node):
         self.add_err(node, RETURN_VALUE_EXPECTED)
+
+    def no_attribute(self, node, tp, attr_name):
+        msg = NO_ATTRIBUTE.format(tp, attr_name)
+        self.add_err(node, msg)
+
+    def unsupported_operand(self, node, operand, tp1, tp2):
+        review = UNSUPPORTED_OPERAND.format(operand)
+        details = f"'{tp1}' and {tp2}"
+        self.make(node, review, details)
 
     def make(self, node, review, detail):
         msg = review + "(" + detail + ")"

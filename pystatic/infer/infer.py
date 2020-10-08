@@ -110,10 +110,18 @@ class InferVisitor(BaseVisitor):
         ltype = self.get_type(node.target)
         rtype = self.get_type(node.value)
         func_name = op_map.binop_map[type(node.op)]
-        func_type=ltype.getattribute(func_name)
+        func_type = ltype.getattribute(func_name)
+        operand = op_map.binop_char_map[type(node.op)]
+        if func_type is None:
+            self.mbox.unsupported_operand(node.target, operand, ltype, rtype)
+        self.check_operand(node.value, func_type, operand, ltype, rtype)
 
-    def check_magic_method(self, func_type, rtype):
-        pass
+    def check_operand(self, node, func_type, operand, ltype, rtype):
+        # TODO:revise call
+        argument, ret = func_type.call(None)
+        assert len(argument.args) == 2
+        if not self.type_consistent(argument.args[0].ann, rtype):
+            self.mbox.unsupported_operand(node, operand, ltype, rtype)
 
     def visit_ClassDef(self, node: ast.ClassDef):
         self.recorder.add_symbol(node.name)
@@ -126,7 +134,7 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.recorder.add_symbol(node.name)
         func_type: TypeIns = self.cur_module.lookup_local_var(node.name)
-        self.ret_annotation = func_type.call(None)  # TODO: need modify on overload func
+        args, self.ret_annotation = func_type.call(None)  # TODO: need modify on overload func
         self.recorder.enter_scope(func_type)
         for subnode in node.body:
             self.visit(subnode)
@@ -182,7 +190,8 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            # tp = target.module_temp.lookup_local_var('f1')
+            tp = target.module_temp.lookup_local_var('b')
             # print(tp.temp.ret)
+            print(tp)
             infer_visitor = InferVisitor(target.ast, target.module_temp, self.mbox)
             infer_visitor.infer()

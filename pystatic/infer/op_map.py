@@ -11,3 +11,19 @@ binop_map = {
     ast.Sub: "__sub__",
     ast.Mult: "__mul__",
 }
+
+binop_char_map = {
+    ast.Add: '+',
+    ast.Sub: '-',
+    ast.Mult: '*',
+    ast.MatMult: '@',
+    ast.Div: '/',
+    ast.Mod: '%',
+    ast.Pow: '**',
+    ast.LShift: '<<',
+    ast.RShift: '>>',
+    ast.BitOr: '|',
+    ast.BitXor: '^',
+    ast.BitAnd: '&',
+    ast.FloorDiv: '//'
+}

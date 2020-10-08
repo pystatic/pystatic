@@ -374,8 +374,8 @@ class TypeFuncTemp(TypeTemp):
     def call(self, args):
         # TODO: just a temp realization
         if len(self.overloads) == 1:
-            return self.overloads[0][1]
-        return self.overloads[0][1]
+            return self.overloads[0]
+        # return self.overloads[0]
 
     def lookup_local_var(self, name):
         return self._inner_symtable.lookup_local(name)
