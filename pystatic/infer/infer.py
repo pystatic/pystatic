@@ -9,6 +9,7 @@ from pystatic.infer.visitor import BaseVisitor
 from pystatic.message import MessageBox
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.exprparse import ExprParse
+from pystatic.infer import op_map
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +40,9 @@ class InferVisitor(BaseVisitor):
     def type_consistent(self, ltype, rtype):
         return self.checker.check(ltype, rtype)
 
+    def get_type(self, node):
+        return ExprParse(self.mbox, self.recorder).parse_expr(node)
+
     def visit_Assign(self, node: ast.Assign):
         rtype = ExprParse(self.mbox, self.recorder).parse_expr(node.value)
         if rtype is None:  # some wrong with rvalue
@@ -63,7 +67,7 @@ class InferVisitor(BaseVisitor):
             self.mbox.incompatible_type_in_assign(rnode, ltype, rtype)
 
     def check_composed_node_of_assign(self, target, rnode, rtype):
-        ltype = ExprParse(self.mbox, self.recorder).parse_expr(target)
+        ltype = self.get_type(target)
         if not ltype:
             return
         if not self.type_consistent(ltype, rtype):
@@ -83,7 +87,7 @@ class InferVisitor(BaseVisitor):
                 self.check_composed_node_of_assign(lvalue, node, rtype)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        rtype: Optional[TypeIns] = ExprParse(self.mbox, self.recorder).parse_expr(node.value)
+        rtype: Optional[TypeIns] = self.get_type(node.value)
         if rtype is None:
             return
         target = node.target
@@ -102,8 +106,13 @@ class InferVisitor(BaseVisitor):
     def check_composed_node_of_annassign(self, target, rnode, rtype):
         self.check_composed_node_of_assign(target, rnode, rtype)
 
-    def visit_AugAssign(self):
+    def visit_AugAssign(self, node: ast.AugAssign):
+        ltype = self.get_type(node.target)
+        rtype = self.get_type(node.value)
+        func_name = op_map.binop_map[type(node.op)]
+        func_type=ltype.getattribute(func_name)
 
+    def check_magic_method(self, func_type, rtype):
 
 
     def visit_ClassDef(self, node: ast.ClassDef):
@@ -142,7 +151,7 @@ class InferVisitor(BaseVisitor):
             func_type.ret_type = rtype
 
     def visit_Return(self, node: ast.Return):
-        ret_type = ExprParse(self.mbox, self.recorder).parse_expr(node.value)
+        ret_type = self.get_type(node.value)
         self.check_ret_type(self.ret_annotation, node, ret_type)
         self.ret_list.append(ret_type)
 
@@ -150,7 +159,7 @@ class InferVisitor(BaseVisitor):
         if ret_type is None:
             self.mbox.return_value_expected(ret_node)
             return
-        if not self.checker.check(annotation, ret_type):
+        if not self.type_consistent(annotation, ret_type):
             self.mbox.incompatible_return_type(ret_node.value, annotation, ret_type)
 
     def visit_While(self, node: ast.While):
