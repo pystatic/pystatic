@@ -167,6 +167,9 @@ class StubGen:
         self.cur_uri = old_uri
         self.in_class = old_in_class
 
+    def indent_prefix(self, level: int) -> str:
+        return _indent_unit * level
+
     def stubgen_symtable(self, symtable: 'SymTable', level: int):
         results: List[Tuple[str, int]] = []
         impt_stmt = self.stubgen_import(symtable, level)
@@ -303,11 +306,8 @@ class StubGen:
                             level: int) -> str:
         return _indent_unit * level + 'class ' + clsname + ': '
 
-    def stub_fun_def(self,
-                     funname: str,
-                     temp: TypeFuncTemp,
-                     level: int,
-                     is_method=False) -> str:
+    def _stub_single_fun(self, name: str, argument: Argument, ret: TypeIns):
+        """generate single function type annotations in pyi file"""
         def get_arg_str(arg: Arg):
             cur_str = arg.name
             cur_str += ': ' + str(arg.ann)
@@ -316,22 +316,45 @@ class StubGen:
             return cur_str
 
         arg_strlist = []
-        for arg in temp.argument.args:
+        for arg in argument.args:
             cur_str = get_arg_str(arg)
             arg_strlist.append(cur_str)
 
-        if temp.argument.vararg:
-            cur_str = get_arg_str(temp.argument.vararg)
+        if argument.vararg:
+            cur_str = get_arg_str(argument.vararg)
             arg_strlist.append(cur_str)
 
-        for arg in temp.argument.kwonlyargs:
+        for arg in argument.kwonlyargs:
             cur_str = get_arg_str(arg)
             arg_strlist.append(cur_str)
 
-        if temp.argument.kwarg:
-            cur_str = get_arg_str(temp.argument.kwarg)
+        if argument.kwarg:
+            cur_str = get_arg_str(argument.kwarg)
             arg_strlist.append(cur_str)
 
         param = '(' + ', '.join(arg_strlist) + ')'
 
-        return _indent_unit * level + 'def ' + funname + param + ': ...\n'
+        return 'def ' + name + param + ': ...\n'
+
+    def stub_fun_def(self,
+                     funname: str,
+                     temp: TypeFuncTemp,
+                     level: int,
+                     is_method=False) -> str:
+        is_overload = len(temp.overloads) > 1
+        if is_overload:
+            self.from_typing.add('overload')  # import overload from typing
+
+        indent_prefix = self.indent_prefix(level)
+
+        fun_pyi = []
+        for argument, ret in temp.overloads:
+            fun_res = self._stub_single_fun(funname, argument, ret)
+            if is_overload:
+                cur_fun_pyi = indent_prefix + '@overload\n'
+            else:
+                cur_fun_pyi = ''
+            cur_fun_pyi += indent_prefix + fun_res
+            fun_pyi.append(cur_fun_pyi)
+
+        return ''.join(fun_pyi)
