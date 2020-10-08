@@ -46,9 +46,8 @@ class ExprParse(BaseVisitor):
     def visit_Call(self, node: ast.Call):
         if isinstance(node.func, ast.Name):
             # get the type by the name
-            call_type = self.lookup_var(super().visit(node.func))
+            call_type = self.visit(node.func)
             if not call_type:
-                self.mbox.add_err(node, f"unresolved reference '{name}'")
                 return
             if isinstance(call_type, TypeType):
                 return call_type.call()
@@ -78,10 +77,9 @@ class ExprParse(BaseVisitor):
         return type_list
 
     def visit_Name(self, node: ast.Name):
-        return node.id
-
-    def visit_Return(self, node: ast.Return):
-        tp = super().visit(node.value)
+        tp = self.lookup_var(node.id)
+        if not tp:
+            self.mbox.symbol_undefined(node, node.id)
         return tp
 
     def visit_Tuple(self, node: ast.Tuple):
@@ -89,6 +87,7 @@ class ExprParse(BaseVisitor):
         for elt in node.elts:
             type_list.append(super().visit(elt))
         return tuple(type_list)
+
 
 class DisplayVar(BaseVisitor):
     def __init__(self, module: TypeModuleTemp, ast_rt: ast.AST):

@@ -113,7 +113,7 @@ class InferVisitor(BaseVisitor):
         func_type=ltype.getattribute(func_name)
 
     def check_magic_method(self, func_type, rtype):
-
+        pass
 
     def visit_ClassDef(self, node: ast.ClassDef):
         self.recorder.add_symbol(node.name)
