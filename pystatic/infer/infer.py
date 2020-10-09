@@ -135,11 +135,11 @@ class InferVisitor(BaseVisitor):
         self.recorder.add_symbol(node.name)
         func_type: TypeIns = self.cur_module.lookup_local_var(node.name)
         args, self.ret_annotation = func_type.call(None)  # TODO: need modify on overload func
-        self.recorder.enter_scope(func_type)
+        self.recorder.enter_func(func_type)
         for subnode in node.body:
             self.visit(subnode)
         self.infer_ret_value_of_func(func_type, node.returns)
-        self.recorder.leave_scope()
+        self.recorder.leave_func()
 
     def infer_ret_value_of_func(self, func_type, type_comment):
         if len(self.ret_list) == 0:
