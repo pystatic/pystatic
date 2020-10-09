@@ -10,22 +10,7 @@ if TYPE_CHECKING:
 
 TypeContext = Dict['TypeVar', 'TypeType']
 TypeVarList = List['TypeVar']
-BindList = List[Union['TypeType', List['TypeType'], 'TypeIns']]
-
-
-class GetItemError(Exception):
-    def __init__(self) -> None:
-        self.msg: str = ''
-        self.errors: List[Tuple[int, str]] = []
-
-    def empty(self) -> bool:
-        return not self.msg and not self.errors
-
-    def add_error(self, index: int, msg: str):
-        self.errors.append((index, msg))
-
-    def set_msg(self, msg: str):
-        self.msg = msg
+BindList = Optional[List[Union['TypeType', List['TypeType'], 'TypeIns']]]
 
 
 class TpState(enum.IntEnum):
@@ -59,26 +44,16 @@ class TypeTemp:
     def get_state(self) -> TpState:
         return self._resolve_state
 
-    def _bind_placeholders(self,
-                           bindlist: BindList) -> Tuple[list, 'GetItemError']:
-        binderr: GetItemError = GetItemError()
-        if len(bindlist) == 0:
-            return [], binderr
-        binderr.set_msg(f'No binding is allowed in {self.basename}')
-        return [], binderr
-
-    def generate_typetype(
-            self, bindlist: BindList) -> Tuple['TypeType', 'GetItemError']:
-        new_bind, bind_err = self._bind_placeholders(bindlist)
-        return TypeType(self, new_bind), bind_err
+    def generate_typetype(self, bindlist: BindList) -> 'TypeType':
+        new_bind = None  # TODO: rename this
+        return TypeType(self, new_bind)
 
     def get_default_type(self) -> 'TypeType':
-        bind_type, bind_err = self.generate_typetype([])
-        assert bind_err.empty(), "Get default type should always succeed"
+        bind_type = self.generate_typetype(None)
         return bind_type
 
     def get_default_ins(self) -> 'TypeIns':
-        return TypeIns(self, [])
+        return TypeIns(self, None)
 
     def getins(self, bindlist: BindList) -> 'TypeIns':
         return TypeIns(self, bindlist)
@@ -140,7 +115,8 @@ class TypeIns:
     def substitute(self, context: TypeContext) -> list:
         context = context or {}
         new_bindlist = []
-        for item in self.bindlist:
+        bindlist = self.bindlist or []
+        for item in bindlist:
             if isinstance(item, TypeVar) and item in context:
                 # TODO: check consistence here
                 new_bindlist.append(context[item])
@@ -150,7 +126,8 @@ class TypeIns:
 
     def shadow(self, context: TypeContext) -> TypeContext:
         new_context = {**context}
-        for i, item in enumerate(self.bindlist):
+        bindlist = self.bindlist or []
+        for i, item in enumerate(bindlist):
             if len(self.temp.placeholders) > i:
                 old_slot = self.temp.placeholders[i]
                 if isinstance(old_slot, TypeVar) and old_slot in new_context:
@@ -171,10 +148,8 @@ class TypeIns:
                 context: Optional[TypeContext] = None) -> Optional['TypeIns']:
         return self.getattribute(name, context)
 
-    def getitem(self, items) -> Tuple['TypeIns', 'GetItemError']:
-        getitem_err = GetItemError()
-        getitem_err.set_msg(f"{self.temp.name} doesn't support __getitem__")
-        return (any_ins, getitem_err)
+    def getitem(self, items) -> 'TypeIns':
+        assert False, "TODO"
 
     def __str__(self) -> str:
         return self.temp.get_str_expr(self.bindlist)
@@ -200,14 +175,14 @@ class TypeType(TypeIns):
     def call(self) -> 'TypeIns':
         return self.getins()
 
-    def getitem(self, bindlist: BindList) -> Tuple['TypeType', 'GetItemError']:
-        return self.temp.generate_typetype(bindlist)
+    def getitem(self, bindlist: BindList) -> 'TypeIns':
+        assert False, "TODO"
 
     def setattr(self, name, tp):
         self.temp.setattr(name, tp)
 
     def __str__(self):
-        return self.temp.get_str_expr([])
+        return self.temp.get_str_expr(None)
 
 
 class TypeClassTemp(TypeTemp):
@@ -269,36 +244,6 @@ class TypeClassTemp(TypeTemp):
     def add_base(self, basetype: 'TypeType'):
         if basetype not in self.baseclass:
             self.baseclass.append(basetype)
-
-    def _bind_placeholders(self,
-                           bindlist) -> Tuple[TypeContext, 'GetItemError']:
-        binderr: GetItemError = GetItemError()
-        binds: TypeContext = {}
-        if not bindlist:  # empty bindlist implies each is Any
-            return binds, binderr  # NOTE: this may be wrong
-        else:
-            supply = []
-            if len(bindlist) != len(self.placeholders):
-                binderr.set_msg(
-                    f'{self.basename} require {len(self.placeholders)} but {len(bindlist)} given'
-                )
-                # error recovery:
-                # if bindlist is shorter than.placeholders, then extend bindlist with Any.
-                # if bindlist is longer than.placeholders, then truncate it(through zip).
-                if len(bindlist) < len(self.placeholders):
-                    supply = [any_type
-                              ] * (len(self.placeholders) - len(bindlist))
-
-            cnt = 0
-            for tpvar, tpbind in zip(self.placeholders, bindlist + supply):
-                if not isinstance(tpbind, TypeType):
-                    binderr.add_error(cnt, f'require a type')
-                    tpbind = any_type
-
-                binds[tpvar] = tpbind
-                cnt += 1
-
-            return binds, binderr
 
     def add_var(self, name: str, var_type: 'TypeIns'):
         self.var_attr[name] = var_type
@@ -472,69 +417,10 @@ class TypeCallableTemp(TypeTemp):
     def __init__(self):
         super().__init__('Callable', 'typing')
 
-    def _bind_placeholders(self,
-                           bindlist: BindList) -> Tuple[list, 'GetItemError']:
-        binderr = GetItemError()
-        new_bindlist: BindList = []
-        if not bindlist:
-            return [], binderr
-
-        # argument part
-        if isinstance(bindlist[0], list):
-            param_list: List[TypeType] = []
-            for i, item in enumerate(bindlist[0]):  # type: ignore
-                if not isinstance(item, TypeType):
-                    assert isinstance(item, TypeIns)
-                    # binderr.add_error(i, f'{item.basename} is not a type')
-                    param_list.append(any_type)
-                else:
-                    param_list.append(item)
-            new_bindlist.append(param_list)
-        else:
-            is_ellipsis = False
-            if isinstance(bindlist[0], TypeType):
-                temp = bindlist[0].temp  # type: ignore
-                if isinstance(temp, TypeEllipsisTemp):
-                    new_bindlist.append(bindlist[0])
-                    is_ellipsis = True
-            if not is_ellipsis:
-                binderr.add_error(
-                    0, f'the first argument should be a list or ...')
-                new_bindlist.append(ellipsis_type)  # default: ellipsis
-
-        # return type part
-        if len(bindlist) >= 2:
-            if isinstance(bindlist[1], TypeType):
-                new_bindlist.append(bindlist[1])
-            else:
-                binderr.add_error(1, f'a type is required')
-                new_bindlist.append(any_type)  # default return type: Any
-
-            if len(bindlist) > 2:
-                binderr.set_msg('only two arguments are required')
-        else:
-            binderr.set_msg('require two arguments')
-            new_bindlist.append(any_type)
-
-        return new_bindlist, binderr
-
 
 class TypeGenericTemp(TypeTemp):
     def __init__(self):
         super().__init__('Generic', 'typing')
-
-    def _bind_placeholders(self,
-                           bindlist: BindList) -> Tuple[list, 'GetItemError']:
-        binderr: GetItemError = GetItemError()
-        new_bindlist = []
-        for i, bind_item in enumerate(bindlist):
-            if isinstance(bind_item, TypeType) and isinstance(
-                    bind_item.temp, TypeVar):
-                new_bindlist.append(bind_item)
-            else:
-                assert False, "For temporary test"
-                binderr.add_error(i, f'a type is required')
-        return new_bindlist, binderr
 
 
 class TypeLiteralTemp(TypeTemp):
@@ -544,7 +430,7 @@ class TypeLiteralTemp(TypeTemp):
 
 class TypePackageType(TypeType):
     def __init__(self, temp: TypePackageTemp) -> None:
-        super().__init__(temp, [])
+        super().__init__(temp, None)
 
     def getins(self) -> 'TypeIns':
         assert isinstance(self.temp, TypePackageTemp)
@@ -553,7 +439,7 @@ class TypePackageType(TypeType):
 
 class TypePackageIns(TypeIns):
     def __init__(self, pkgtemp: TypePackageTemp) -> None:
-        super().__init__(pkgtemp, [])
+        super().__init__(pkgtemp, None)
         self.submodule: Dict[str, TypeIns] = {}  # submodule
 
     def add_submodule(self, name: str, ins: TypeIns):
@@ -575,9 +461,9 @@ literal_temp = TypeLiteralTemp()
 union_temp = TypeUnionTemp()
 
 # these typetype are shared to save memory
-ellipsis_type, _ = ellipsis_temp.generate_typetype([])
-none_type, _ = none_temp.generate_typetype([])
-any_type, _ = any_temp.generate_typetype([])
+ellipsis_type = ellipsis_temp.generate_typetype(None)
+none_type = none_temp.generate_typetype(None)
+any_type = any_temp.generate_typetype(None)
 
-any_ins = TypeIns(any_temp, [])
-ellipsis_ins = TypeIns(ellipsis_temp, [])
+any_ins = TypeIns(any_temp, None)
+ellipsis_ins = TypeIns(ellipsis_temp, None)

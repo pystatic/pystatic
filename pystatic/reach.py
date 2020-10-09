@@ -10,7 +10,7 @@ class Reach(enum.Enum):
     RUNTIME_FALSE = 4  # false on runtime
     ALWAYS_TRUE = 5  # always true
     ALWAYS_FALSE = 6  # always wrong
-    CLS_REDEF = 7  # class redefined(usually ommit this)
+    CLS_REDEF = 7  # class redefined(usually omit this)
     NEVER = 8  # node that will never be visited
     UNKNOWN = 9  # uncertain about its reachability
 

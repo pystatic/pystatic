@@ -12,5 +12,5 @@ class TypeChecker:
         res = tp1.__str__() == tp2.__str__()
         return res
 
-    def is_any(self, tp):
-        return tp.__str__() == "Any"
+def is_any(tp):
+    return tp.__str__() == "Any"

@@ -19,6 +19,9 @@ class ExprParser(BaseVisitor):
         return self.checker.check(tp1, tp2)
 
     def lookup_var(self, name):
+        tp = self.recorder.lookup_local(name)
+        if tp:
+            return tp
         cur_type = self.recorder.cur_type
         if self.recorder.is_defined(name):
             return cur_type.lookup_local_var(name)
@@ -72,9 +75,6 @@ class ExprParser(BaseVisitor):
             args_type.append(self.visit(arg))
         # TODO: here is according to the class of the type, check the args
 
-    def check_argument_in_call(self, argument, params):
-        pass
-
     def visit_Constant(self, node: ast.Constant):
         assert type(node.value) is not None
         name = type(node.value).__name__
@@ -97,25 +97,6 @@ class ExprParser(BaseVisitor):
         for elt in node.elts:
             type_list.append(super().visit(elt))
         return tuple(type_list)
-
-    def visit_Subscript(self, node: ast.Subscript):
-        pass
-
-    def visit_Slice(self, node: ast.Slice):
-        pass
-
-    def visit_Compare(self, node: ast.Compare):
-        left = self.visit(node.left)
-        comparators: List[TypeIns] = []
-        for op, com in zip(node.ops, node.comparators):
-            right=self.visit()
-            func_name = op_map.cmpop_map[type(op)]
-            # TODO: revise
-            ret_type = self.handle(left.call(func_name))
-            left = com
-
-    def handle(self):
-        pass
 
 
 class DisplayVar(BaseVisitor):

@@ -11,9 +11,9 @@ class Scope:
 
 
 class FuncScope(Scope):
-    def __init__(self, tp, args):
+    def __init__(self, tp, argument):
         super().__init__(tp)
-        self.args = args
+        self.args = argument
 
 
 class SymbolRecorder:
@@ -47,3 +47,8 @@ class SymbolRecorder:
 
     def add_symbol(self, name):
         self.cur_scope.add_symbol(name)
+
+    def lookup_local(self, name):
+        cur_scope = self.cur_scope
+        if isinstance(cur_scope, FuncScope):
+            return cur_scope.args.get(name)

@@ -45,6 +45,21 @@ class Message(object):
         return f'line {self.lineno} col {self.col_offset}: ' + self.msg
 
 
+class ErrorNode:
+    def __init__(self, err_name, params):
+        self.err_name: str = err_name
+        self.params: List = params
+
+
+class ErrorPack:
+    def __init__(self, ret_type=None):
+        self.errs: List[ErrorNode] = []
+        self.ret_type = ret_type
+
+    def set_ret(self, ret_type):
+        self.ret_type = ret_type
+
+
 class MessageBox(object):
     def __init__(self, module_uri: str):
         self.filename = module_uri
@@ -88,9 +103,17 @@ class MessageBox(object):
         detail = f"argument has type '{real_type}', expected '{annotation}'"
         self.make(node, review, detail)
 
+    def unknown_error(self):
+        raise Exception("Unknown error name!")
+
     def make(self, node, review, detail):
         msg = review + "(" + detail + ")"
         self.add_err(node, msg)
+
+    def unpack_error(self, pack: ErrorPack):
+        for err_node in pack.errs:
+            handler = getattr(self, err_node.err_name, self.unknown_error)
+            handler(*err_node.params)
 
     def add_err(self, node: ast.AST, msg: str):
         self.error.append(Message.from_node(node, msg))

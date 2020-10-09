@@ -2,23 +2,20 @@ import ast
 import logging
 from typing import Optional
 from pystatic.typesys import *
-from pystatic.typesys import TypeModuleTemp
-from pystatic.infer.op_map import *
-from pystatic.infer.checker import TypeChecker
-from pystatic.infer.visitor import BaseVisitor
 from pystatic.message import MessageBox
+from pystatic.arg import Argument
+from pystatic.infer.op_map import *
+from pystatic.infer.checker import TypeChecker, is_any
+from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.exprparse import ExprParser
 from pystatic.infer import op_map
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 
 class InferVisitor(BaseVisitor):
-    def __init__(self,
-                 node: ast.AST,
-                 module: TypeModuleTemp,
+    def __init__(self, node: ast.AST, module: TypeModuleTemp,
                  mbox: MessageBox):
         self.cur_module: TypeModuleTemp = module
         self.root = node
@@ -61,7 +58,7 @@ class InferVisitor(BaseVisitor):
         else:  # var appear first time
             self.recorder.add_symbol(target.id)
             ltype = self.cur_type.lookup_local_var(target.id)
-            if ltype.__str__() == "Any":  # var with no annotation
+            if is_any(ltype):  # var with no annotation
                 self.cur_type.setattr(target.id, rtype)
         if not self.type_consistent(ltype, rtype):
             self.mbox.incompatible_type_in_assign(rnode, ltype, rtype)
@@ -134,17 +131,36 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.recorder.add_symbol(node.name)
         func_type: TypeIns = self.cur_module.lookup_local_var(node.name)
-        args, self.ret_annotation = func_type.call(None)  # TODO: need modify on overload func
-        self.recorder.enter_func(func_type)
+        argument, self.ret_annotation = func_type.call(
+            None)  # TODO: need modify on overload func
+
+        self.recorder.enter_func(func_type, self.infer_argument(argument))
         for subnode in node.body:
             self.visit(subnode)
         self.infer_ret_value_of_func(func_type, node.returns)
         self.recorder.leave_func()
 
+    def infer_argument(self, argument: Argument):
+        # TODO: default value
+        args = {}
+        for arg in argument.posonlyargs:
+            args[arg.name] = arg.ann
+        for arg in argument.args:
+            args[arg.name] = arg.ann
+        for arg in argument.kwonlyargs:
+            args[arg.name] = arg.ann
+        kwargs = argument.kwarg
+        if kwargs:
+            args[kwargs.name] = kwargs.ann
+        vararg = argument.vararg
+        if vararg:
+            args[vararg.name] = vararg.ann
+        return args
+
     def infer_ret_value_of_func(self, func_type, type_comment):
         if len(self.ret_list) == 0:
             rtype = none_type
-            if not self.checker.is_any(self.ret_annotation):
+            if not is_any(self.ret_annotation):
                 self.mbox.return_value_expected(type_comment)
         elif len(self.ret_list) == 1:
             # TODO
@@ -155,7 +171,7 @@ class InferVisitor(BaseVisitor):
             # TODO
             pass
         self.ret_list = []
-        if not self.checker.is_any(self.ret_annotation):
+        if not is_any(self.ret_annotation):
             func_type.ret_type = rtype
 
     def visit_Return(self, node: ast.Return):
@@ -168,7 +184,8 @@ class InferVisitor(BaseVisitor):
             self.mbox.return_value_expected(ret_node)
             return
         if not self.type_consistent(annotation, ret_type):
-            self.mbox.incompatible_return_type(ret_node.value, annotation, ret_type)
+            self.mbox.incompatible_return_type(ret_node.value, annotation,
+                                               ret_type)
 
     def visit_While(self, node: ast.While):
         pass
@@ -189,6 +206,7 @@ class InferStarter:
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
             tp = target.module_temp.lookup_local_var('a')
-            print(tp)
-            infer_visitor = InferVisitor(target.ast, target.module_temp, self.mbox)
+            # print(tp)
+            infer_visitor = InferVisitor(target.ast, target.module_temp,
+                                         self.mbox)
             infer_visitor.infer()
