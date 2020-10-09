@@ -2,7 +2,7 @@ import ast
 from pystatic.symtable import SymTable, TableScope, TypeDefNode
 from typing import Callable, List, Optional, Union
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import (TypeFuncTemp, TypeIns, ellipsis_type, TypeType,
+from pystatic.typesys import (TypeFuncIns, TypeIns, ellipsis_type, TypeType,
                               any_type, none_type, any_ins)
 from pystatic.arg import Argument, Arg
 from pystatic.preprocess.sym_util import fake_fun_entry
@@ -15,7 +15,7 @@ def eval_type_expr(node: TypeDefNode,
     elif isinstance(node, ast.Assign) or isinstance(node, ast.AnnAssign):
         return eval_assign_type(node, symtable)
     elif isinstance(node, ast.FunctionDef):
-        return eval_func_type(node, symtable)
+        assert False, "Shouldn't reach here"
     else:
         return TypeExprVisitor(symtable).accept(node)
 
@@ -46,7 +46,7 @@ def eval_assign_type(node: Union[ast.Assign, ast.AnnAssign],
 
 
 def eval_func_type(node: ast.FunctionDef,
-                   symtable: SymTable) -> Optional[TypeType]:
+                   symtable: SymTable) -> Optional[TypeIns]:
     """Get a function's type according to a ast.FunctionDef node"""
     argument = eval_argument_type(node.args, symtable)
     if not argument:
@@ -60,8 +60,8 @@ def eval_func_type(node: ast.FunctionDef,
     func_name = node.name
     inner_sym = symtable.new_symtable(func_name, TableScope.FUNC)
 
-    return TypeFuncTemp(node.name, symtable.glob_uri, inner_sym, argument,
-                        ret_type).get_default_type()
+    return TypeFuncIns(node.name, symtable.glob_uri, inner_sym, argument,
+                       ret_type)
 
 
 def eval_return_type(node: Optional[TypeDefNode],
@@ -146,8 +146,8 @@ def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
     return new_arg
 
 
-TAddFunDef = Callable[[ast.FunctionDef], TypeFuncTemp]
-TAddFunOverload = Callable[[TypeFuncTemp, Argument, TypeIns, ast.FunctionDef],
+TAddFunDef = Callable[[ast.FunctionDef], TypeFuncIns]
+TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef],
                            None]
 
 

@@ -155,8 +155,7 @@ class TypeIns:
         return self.temp.get_str_expr(self.bindlist)
 
     def call(self, args):
-        assert isinstance(self.temp, TypeFuncTemp)
-        return self.temp.call(args)
+        assert False, "TODO"
 
     def lookup_local_var(self, name):
         return self.temp.lookup_local_var(name)
@@ -289,44 +288,8 @@ class TypeClassTemp(TypeTemp):
 
 
 class TypeFuncTemp(TypeTemp):
-    def __init__(self, name: str, module_uri: str, inner_symtable: 'SymTable',
-                 argument: 'Argument', ret: TypeIns) -> None:
-        self.overloads: List[Tuple['Argument', TypeIns]] = [(argument, ret)]
-        self.name = name
-        self.module_uri = module_uri
-
-        self._inner_symtable = inner_symtable
-
-    def add_overload(self, argument: 'Argument', ret: TypeIns):
-        self.overloads.append((argument, ret))
-
-    def get_inner_symtable(self) -> 'SymTable':
-        return self._inner_symtable
-
-    def get_str_expr(self,
-                     bindlist: BindList,
-                     context: Optional[TypeContext] = None) -> str:
-        if len(self.overloads) == 1:
-            fun_fmt = "{}{} -> {}"
-        else:
-            fun_fmt = "@overload {}{} -> {}"
-        lst = [
-            fun_fmt.format(self.name, argument, ret)
-            for argument, ret in self.overloads
-        ]
-        return '\n'.join(lst)
-
-    def call(self, args):
-        # TODO: just a temp realization
-        if len(self.overloads) == 1:
-            return self.overloads[0]
-        # return self.overloads[0]
-
-    def lookup_local_var(self, name):
-        return self._inner_symtable.lookup_local(name)
-
-    def lookup_var(self, name):
-        return self._inner_symtable.egb_lookup(name)
+    def __init__(self):
+        super().__init__('function', 'builtins', TpState.OVER)
 
 
 class TypeModuleTemp(TypeClassTemp):
@@ -455,7 +418,41 @@ class TypePackageIns(TypeIns):
         inner_sym.add_entry(name, Entry(ins))
 
 
-# special types
+class TypeFuncIns(TypeIns):
+    def __init__(self, funname: str, module_uri: str,
+                 inner_symtable: 'SymTable', argument: 'Argument',
+                 ret: TypeIns) -> None:
+        super().__init__(func_temp, None)
+        self.overloads: List[Tuple['Argument', TypeIns]] = [(argument, ret)]
+        self.funname = funname
+        self.module_uri = module_uri
+
+        self._inner_symtable = inner_symtable
+
+    def add_overload(self, argument: 'Argument', ret: TypeIns):
+        self.overloads.append((argument, ret))
+
+    def get_inner_symtable(self) -> 'SymTable':
+        return self._inner_symtable
+
+    def get_str_expr(self,
+                     bindlist: BindList,
+                     context: Optional[TypeContext] = None) -> str:
+        if len(self.overloads) == 1:
+            fun_fmt = "{}{} -> {}"
+        else:
+            fun_fmt = "@overload {}{} -> {}"
+        lst = [
+            fun_fmt.format(self.funname, argument, ret)
+            for argument, ret in self.overloads
+        ]
+        return '\n'.join(lst)
+
+    def call(self, args):
+        assert False, "TODO"
+
+
+# special types (typing.py)
 any_temp = TypeAnyTemp()
 none_temp = TypeNoneTemp()
 generic_temp = TypeGenericTemp()
@@ -465,6 +462,9 @@ tuple_temp = TypeTupleTemp()
 optional_temp = TypeOptionalTemp()
 literal_temp = TypeLiteralTemp()
 union_temp = TypeUnionTemp()
+
+# builtins.py
+func_temp = TypeFuncTemp()
 
 # these typetype are shared to save memory
 ellipsis_type = ellipsis_temp.generate_typetype(None)
