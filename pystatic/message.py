@@ -11,6 +11,8 @@ TOO_MORE_VALUES_TO_UNPACK = "Too more values to unpack"
 # ret
 RETURN_VALUE_EXPECTED = "Return value expected"
 INCOMPATIBLE_RETURN_TYPE = "Incompatible return value type"
+# call
+INCOMPATIBLE_ARGUMENT = "Incompatible argument type for '{}'"
 
 
 class Message(object):
@@ -78,8 +80,13 @@ class MessageBox(object):
 
     def unsupported_operand(self, node, operand, tp1, tp2):
         review = UNSUPPORTED_OPERAND.format(operand)
-        details = f"'{tp1}' and {tp2}"
-        self.make(node, review, details)
+        detail = f"'{tp1}' and {tp2}"
+        self.make(node, review, detail)
+
+    def incompatible_argument(self, node, func_name, annotation, real_type):
+        review = INCOMPATIBLE_ARGUMENT.format(func_name)
+        detail = f"argument has type '{real_type}', expected '{annotation}'"
+        self.make(node, review, detail)
 
     def make(self, node, review, detail):
         msg = review + "(" + detail + ")"

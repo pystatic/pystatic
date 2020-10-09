@@ -1,21 +1,22 @@
-from pystatic.infer.visitor import BaseVisitor
-from pystatic.typesys import TypeModuleTemp
+import ast
+from pystatic.typesys import *
 from pystatic.message import MessageBox
 from pystatic.infer.checker import TypeChecker
-from pystatic.typesys import TypeType, TypeIns
-import ast
+from pystatic.infer.visitor import BaseVisitor
+from pystatic.infer import op_map
 
 
-class ExprParse(BaseVisitor):
+class ExprParser(BaseVisitor):
     def __init__(self, mbox: MessageBox, recorder):
         self.mbox = mbox
         self.recorder = recorder
-        self.type_check = TypeChecker(self.mbox)
+        self.checker = TypeChecker(self.mbox)
 
     def parse_expr(self, node):
-        # print('parse_expr')
-        # print(ast.dump(node))
-        return super().visit(node)
+        return self.visit(node)
+
+    def type_consistent(self, tp1, tp2):
+        return self.checker.check(tp1, tp2)
 
     def lookup_var(self, name):
         cur_type = self.recorder.cur_type
@@ -25,30 +26,39 @@ class ExprParse(BaseVisitor):
             return cur_type.lookup_var(name)
 
     def visit_Attribute(self, node: ast.Attribute):
-        attr_type = super().visit(node)
-
-        attr_type = attr_type.temp.getattr(node.attr)
-        return attr_type
+        attr: str = node.attr
+        value = self.visit(node.value)
+        if value is not None:
+            tp = value.getattribute(attr)
+            if tp is None:
+                self.mbox.no_attribute(node, value, attr)
+            return tp
+        return value
 
     def visit_BinOp(self, node: ast.BinOp):
-        lefttype = super().visit(node.left)
-        if lefttype == None:  # here 'None', I want a type to represent the error type
-            # during processing, a type mismatch is encountered.
-            return lefttype
-        righttype = super().visit(node.right)
-        if righttype == None:
-            return righttype
-        # xj's handler is used to determine whether these two types can perform this operation
-        # if ok, return type
-        # else return 
-        raise Exception(f"todo")
+        left_type = self.visit(node.left)
+        if left_type is None:
+            return None
+        right_type = self.visit(node.right)
+        if right_type is None:
+            return None
+        func_name = op_map.binop_map[type(node.op)]
+        func_type = left_type.getattribute(func_name)
+        operand = op_map.binop_char_map[type(node.op)]
+        if not func_type:
+            self.mbox.unsupported_operand(node, operand, left_type, right_type)
+        argument, ret = func_type.call()
+        ann = argument.args[1].ann
+        if not self.type_consistent(ann, right_type):
+            self.mbox.unsupported_operand(node, operand, left_type, right_type)
+        return ret
 
     def visit_Call(self, node: ast.Call):
         if isinstance(node.func, ast.Name):
             # get the type by the name
             call_type = self.visit(node.func)
             if not call_type:
-                return
+                return None
             if isinstance(call_type, TypeType):
                 return call_type.call()
             elif isinstance(call_type, TypeIns):
@@ -59,14 +69,13 @@ class ExprParse(BaseVisitor):
         # check the args' type in the call
         args_type = []
         for arg in node.args:
-            args_type.append(super().visit(arg))
+            args_type.append(self.visit(arg))
         # TODO: here is according to the class of the type, check the args
 
-        return call_type
+    def check_argument_in_call(self, argument, params):
+        pass
 
     def visit_Constant(self, node: ast.Constant):
-        # what does node.kind mean?
-        # this type is builtin's type, so how to build this class
         assert type(node.value) is not None
         name = type(node.value).__name__
         return self.lookup_var(name)
@@ -88,6 +97,25 @@ class ExprParse(BaseVisitor):
         for elt in node.elts:
             type_list.append(super().visit(elt))
         return tuple(type_list)
+
+    def visit_Subscript(self, node: ast.Subscript):
+        pass
+
+    def visit_Slice(self, node: ast.Slice):
+        pass
+
+    def visit_Compare(self, node: ast.Compare):
+        left = self.visit(node.left)
+        comparators: List[TypeIns] = []
+        for op, com in zip(node.ops, node.comparators):
+            right=self.visit()
+            func_name = op_map.cmpop_map[type(op)]
+            # TODO: revise
+            ret_type = self.handle(left.call(func_name))
+            left = com
+
+    def handle(self):
+        pass
 
 
 class DisplayVar(BaseVisitor):

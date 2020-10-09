@@ -8,7 +8,7 @@ from pystatic.infer.checker import TypeChecker
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.message import MessageBox
 from pystatic.infer.recorder import SymbolRecorder
-from pystatic.infer.exprparse import ExprParse
+from pystatic.infer.exprparse import ExprParser
 from pystatic.infer import op_map
 
 logger = logging.getLogger(__name__)
@@ -41,10 +41,10 @@ class InferVisitor(BaseVisitor):
         return self.checker.check(ltype, rtype)
 
     def get_type(self, node):
-        return ExprParse(self.mbox, self.recorder).parse_expr(node)
+        return ExprParser(self.mbox, self.recorder).parse_expr(node)
 
     def visit_Assign(self, node: ast.Assign):
-        rtype = ExprParse(self.mbox, self.recorder).parse_expr(node.value)
+        rtype = self.get_type(node.value)
         if rtype is None:  # some wrong with rvalue
             return
         for target in node.targets:
@@ -120,7 +120,7 @@ class InferVisitor(BaseVisitor):
         # TODO:revise call
         argument, ret = func_type.call(None)
         assert len(argument.args) == 2
-        if not self.type_consistent(argument.args[0].ann, rtype):
+        if not self.type_consistent(argument.args[1].ann, rtype):
             self.mbox.unsupported_operand(node, operand, ltype, rtype)
 
     def visit_ClassDef(self, node: ast.ClassDef):
@@ -171,15 +171,13 @@ class InferVisitor(BaseVisitor):
             self.mbox.incompatible_return_type(ret_node.value, annotation, ret_type)
 
     def visit_While(self, node: ast.While):
-        k = 0
-        self.visit(node.test)
+        pass
+
+    def visit_If(self, node: ast.If):
+        cond = self.get_type(node.test)
         for subnode in node.body:
-            k += 1
-            if isinstance(subnode, ast.Break):
-                break
             self.visit(subnode)
-        if k < len(node.body):
-            self.mbox.add_err(node.body[k], f"This code is unreachable")
+        self.visit(node.orelse)
 
 
 class InferStarter:
@@ -190,8 +188,7 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            tp = target.module_temp.lookup_local_var('b')
-            # print(tp.temp.ret)
+            tp = target.module_temp.lookup_local_var('a')
             print(tp)
             infer_visitor = InferVisitor(target.ast, target.module_temp, self.mbox)
             infer_visitor.infer()

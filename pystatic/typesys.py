@@ -209,12 +209,6 @@ class TypeType(TypeIns):
     def __str__(self):
         return self.temp.get_str_expr([])
 
-    def lookup_local_var(self, name):
-        return self.temp.lookup_local_var(name)
-
-    def lookup_var(self, name):
-        return self.temp.lookup_var(name)
-
 
 class TypeClassTemp(TypeTemp):
     # FIXME: remove None of symtable and defnode

@@ -12,6 +12,19 @@ binop_map = {
     ast.Mult: "__mul__",
 }
 
+cmpop_map = {
+    ast.Gt: '>',
+    ast.Lt: '<',
+    ast.Eq: '==',
+    ast.GtE: '>=',
+    ast.LtE: '<=',
+    ast.NotEq: '!=',
+    ast.Is: 'is',
+    ast.IsNot: 'is not',
+    ast.In: 'in',
+    ast.NotIn: 'not in'
+}
+
 binop_char_map = {
     ast.Add: '+',
     ast.Sub: '-',
