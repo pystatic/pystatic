@@ -12,13 +12,10 @@ from pystatic.infer.exprparse import ExprParse
 from pystatic.infer import op_map
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 
 class InferVisitor(BaseVisitor):
-    def __init__(self,
-                 node: ast.AST,
-                 module: TypeModuleTemp,
+    def __init__(self, node: ast.AST, module: TypeModuleTemp,
                  mbox: MessageBox):
         self.cur_module: TypeModuleTemp = module
         self.root = node
@@ -134,7 +131,8 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.recorder.add_symbol(node.name)
         func_type: TypeIns = self.cur_module.lookup_local_var(node.name)
-        args, self.ret_annotation = func_type.call(None)  # TODO: need modify on overload func
+        args, self.ret_annotation = func_type.call(
+            None)  # TODO: need modify on overload func
         self.recorder.enter_scope(func_type)
         for subnode in node.body:
             self.visit(subnode)
@@ -168,7 +166,8 @@ class InferVisitor(BaseVisitor):
             self.mbox.return_value_expected(ret_node)
             return
         if not self.type_consistent(annotation, ret_type):
-            self.mbox.incompatible_return_type(ret_node.value, annotation, ret_type)
+            self.mbox.incompatible_return_type(ret_node.value, annotation,
+                                               ret_type)
 
     def visit_While(self, node: ast.While):
         k = 0
@@ -193,5 +192,6 @@ class InferStarter:
             tp = target.module_temp.lookup_local_var('b')
             # print(tp.temp.ret)
             print(tp)
-            infer_visitor = InferVisitor(target.ast, target.module_temp, self.mbox)
+            infer_visitor = InferVisitor(target.ast, target.module_temp,
+                                         self.mbox)
             infer_visitor.infer()

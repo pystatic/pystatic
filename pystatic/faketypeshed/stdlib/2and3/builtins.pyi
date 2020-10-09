@@ -1,5 +1,5 @@
 # import sys
-from typing import (Optional, Literal, Tuple, Any)
+from typing import (Optional, Literal, Any)
 
 # class _SupportsIndex(Protocol):
 #     def __index__(self) -> int:
@@ -88,8 +88,8 @@ class int:
     def __mod__(self, x: int) -> int:
         ...
 
-    def __divmod__(self, x: int) -> Tuple[int, int]:
-        ...
+    # def __divmod__(self, x: int) -> Tuple[int, int]:
+    #     ...
 
     def __radd__(self, x: int) -> int:
         ...
@@ -114,19 +114,19 @@ class int:
     def __rmod__(self, x: int) -> int:
         ...
 
-    def __rdivmod__(self, x: int) -> Tuple[int, int]:
-        ...
+    # def __rdivmod__(self, x: int) -> Tuple[int, int]:
+    #     ...
 
-    @overload
-    def __pow__(self, __x: Literal[2], __modulo: Optional[int] = ...) -> int:
-        ...
+    # @overload
+    # def __pow__(self, __x: Literal[2], __modulo: Optional[int] = ...) -> int:
+    #     ...
 
-    @overload
-    def __pow__(self, __x: int, __modulo: Optional[int] = ...) -> Any:
-        ...  # Return type can be int or float, depending on x.
+    # @overload
+    # def __pow__(self, __x: int, __modulo: Optional[int] = ...) -> Any:
+    #     ...  # Return type can be int or float, depending on x.
 
-    def __rpow__(self, x: int, mod: Optional[int] = ...) -> Any:
-        ...
+    # def __rpow__(self, x: int, mod: Optional[int] = ...) -> Any:
+    #     ...
 
     def __and__(self, n: int) -> int:
         ...
@@ -178,11 +178,11 @@ class int:
         def __floor__(self) -> int:
             ...
 
-        def __round__(self, ndigits: Optional[int] = ...) -> int:
-            ...
+        # def __round__(self, ndigits: Optional[int] = ...) -> int:
+        #     ...
 
-    def __getnewargs__(self) -> Tuple[int]:
-        ...
+    # def __getnewargs__(self) -> Tuple[int]:
+    #     ...
 
     def __eq__(self, x: object) -> bool:
         ...
