@@ -8,7 +8,7 @@ from pystatic.arg import Argument
 from typing import Any, Optional, overload
 from pystatic.preprocess.sym_util import fake_fun_entry, fake_local_entry
 from pystatic.symtable import SymTable
-from pystatic.typesys import (TypeClassTemp, TypeFuncTemp, any_ins, TypeIns,
+from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns,
                               any_type)
 from pystatic.symtable import Entry
 from pystatic.preprocess.type_expr import (eval_func_type, eval_type_expr,
@@ -52,22 +52,21 @@ def resolve_local_func(symtable: 'SymTable'):
 
     def add_func_define(node: ast.FunctionDef):
         nonlocal symtable, new_func_defs
-        func_temp = eval_func_type(node, symtable).temp
-        assert isinstance(func_temp, TypeFuncTemp)
+        func_ins = eval_func_type(node, symtable)
+        assert isinstance(func_ins, TypeFuncIns)
         name = node.name
 
-        new_func_defs[name] = func_temp
+        new_func_defs[name] = func_ins
 
-        func_ins = func_temp.get_default_ins()
         symtable.local[name] = Entry(func_ins, node)
         logger.debug(f'({symtable.uri}) {name}: {func_ins}')
-        return func_temp
+        return func_ins
 
-    def add_func_overload(func_temp: TypeFuncTemp, argument: Argument,
+    def add_func_overload(func_ins: TypeFuncIns, argument: Argument,
                           ret: TypeIns, node: ast.FunctionDef):
-        func_temp.add_overload(argument, ret)
+        func_ins.add_overload(argument, ret)
         logger.debug(
-            f'overload ({symtable.uri}) {node.name}: {func_temp.get_str_expr([])}'
+            f'overload ({symtable.uri}) {node.name}: {func_ins.get_str_expr(None)}'
         )
 
     template_resolve_fun(symtable, add_func_define, add_func_overload)
