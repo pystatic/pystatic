@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleTemp,
                  mbox: MessageBox):
-        self.cur_module: TypeModuleTemp = module
+        # self.cur_module: TypeModuleTemp = module
         self.root = node
         self.mbox: MessageBox = mbox
         self.checker = TypeChecker(self.mbox)
@@ -123,14 +123,14 @@ class InferVisitor(BaseVisitor):
     def visit_ClassDef(self, node: ast.ClassDef):
         self.recorder.add_symbol(node.name)
         class_type = self.cur_type.lookup_local_var(node.name)
-        self.recorder.enter_scope(class_type)
+        self.recorder.enter_cls(class_type)
         for subnode in node.body:
             self.visit(subnode)
-        self.recorder.leave_scope()
+        self.recorder.leave_cls()
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.recorder.add_symbol(node.name)
-        func_type: TypeIns = self.cur_module.lookup_local_var(node.name)
+        func_type: TypeIns = self.cur_type.lookup_local_var(node.name)
         argument, self.ret_annotation = func_type.call(
             None)  # TODO: need modify on overload func
 

@@ -16,6 +16,11 @@ class FuncScope(Scope):
         self.args = argument
 
 
+class ClassScope(Scope):
+    def __init__(self, tp):
+        super().__init__(tp)
+
+
 class SymbolRecorder:
     def __init__(self, module):
         # record the appeared symbol in cur scope
@@ -45,6 +50,12 @@ class SymbolRecorder:
     def leave_func(self):
         self.leave_scope()
 
+    def enter_cls(self, tp):
+        self.stack.append(ClassScope(tp))
+
+    def leave_cls(self):
+        self.leave_scope()
+
     def add_symbol(self, name):
         self.cur_scope.add_symbol(name)
 
@@ -52,3 +63,10 @@ class SymbolRecorder:
         cur_scope = self.cur_scope
         if isinstance(cur_scope, FuncScope):
             return cur_scope.args.get(name)
+
+    @property
+    def upper_class(self):
+        for scope in self.stack[::-1]:
+            if isinstance(scope, ClassScope):
+                return scope.tp
+        return None

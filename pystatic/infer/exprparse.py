@@ -13,6 +13,7 @@ class ExprParser(BaseVisitor):
         self.checker = TypeChecker(self.mbox)
 
     def parse_expr(self, node):
+        print(self.recorder.upper_class)
         return self.visit(node)
 
     def type_consistent(self, tp1, tp2):
