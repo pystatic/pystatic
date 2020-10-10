@@ -4,6 +4,7 @@ from pystatic.message import MessageBox
 from pystatic.infer.checker import TypeChecker
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer import op_map
+from pystatic.arg import Argument, Arg
 
 
 class ExprParser(BaseVisitor):
@@ -13,7 +14,7 @@ class ExprParser(BaseVisitor):
         self.checker = TypeChecker(self.mbox)
 
     def parse_expr(self, node):
-        print(self.recorder.upper_class)
+        print(ast.dump(node))
         return self.visit(node)
 
     def type_consistent(self, tp1, tp2):
@@ -40,6 +41,7 @@ class ExprParser(BaseVisitor):
         return value
 
     def visit_BinOp(self, node: ast.BinOp):
+        print(ast.dump(node))
         left_type = self.visit(node.left)
         if left_type is None:
             return None
@@ -51,8 +53,12 @@ class ExprParser(BaseVisitor):
         operand = op_map.binop_char_map[type(node.op)]
         if not func_type:
             self.mbox.unsupported_operand(node, operand, left_type, right_type)
-        argument, ret = func_type.call()
+        
+        args = Argument()
+        args.args.append(Arg(None, right_type))
+        argument, ret = func_type.call(args)
         ann = argument.args[1].ann
+        
         if not self.type_consistent(ann, right_type):
             self.mbox.unsupported_operand(node, operand, left_type, right_type)
         return ret
@@ -88,6 +94,8 @@ class ExprParser(BaseVisitor):
         return type_list
 
     def visit_Name(self, node: ast.Name):
+        if node.id == 'self':
+            return self.recorder.upper_class
         tp = self.lookup_var(node.id)
         if not tp:
             self.mbox.symbol_undefined(node, node.id)
@@ -101,38 +109,38 @@ class ExprParser(BaseVisitor):
 
 
 class DisplayVar(BaseVisitor):
-    def __init__(self, module: TypeModuleTemp, ast_rt: ast.AST):
-        self.curscope = module
-        self.ast_rt = ast_rt
-        self.tab = 0
+    def __init__(self, recorder):
+        self.recorder = recorder
 
-    def accept(self):
-        print(" " * self.tab, self.curscope.name)
-        self.tab += 4
-        print(" " * self.tab, "attribute in this scope")
-        for var in self.curscope.var_attr.keys():
-            print(" " * self.tab, var, self.curscope.var_attr[var])
-        super().visit(self.ast_rt)
-        self.tab -= 4
+    @property
+    def cur_type(self):
+        return self.recorder.cur_type
+
+    def accept(self, root):
+        for var in self.cur_type.get_inner_symtable().local.keys():
+            print(var, self.cur_type.get_inner_symtable().local[var].get_type())
+        super().visit(root)
 
     def visit_ClassDef(self, node: ast.ClassDef):
-        self.displayscopeattribute('class', node)
+        class_type = self.cur_type.lookup_local_var(node.name)
+        self.recorder.enter_cls(class_type)
+        print("class", self.cur_type)
+        for var in self.cur_type.temp.var_attr.keys():
+            print(var, self.cur_type.temp.var_attr[var])
+        for var in self.cur_type.temp.get_inner_symtable().local.keys():
+            print(var, self.cur_type.temp.get_inner_symtable().local[var].get_type())
+        for subnode in node.body:
+            self.visit(subnode)
+        self.recorder.leave_cls()
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.displayscopeattribute('function', node)
+        func_type: TypeIns = self.cur_type.lookup_local_var(node.name)
+        self.recorder.enter_func(func_type, None)
+        print("function", self.cur_type)
+        for var in self.cur_type.temp.get_inner_symtable().local.keys():
+            print(var, self.cur_type.temp.get_inner_symtable().local[var].get_type())
+        for subnode in node.body:
+            self.visit(subnode)
+        self.recorder.leave_func()
 
-    def displayscopeattribute(self, whichtype, node):
-        curscopetmp = self.curscope
-        self.curscope = self.curscope.getattr(node.name, None)
-        print(" " * self.tab, "below is {} scope".format(whichtype))
-        if isinstance(node, ast.ClassDef):
-            print(" " * self.tab, self.curscope.name)
-        else:
-            print(" " * self.tab, node.name, self.curscope)
-        self.tab += 4
-        for var in self.curscope.temp.var_attr.keys():
-            print(" " * self.tab, var, self.curscope.temp.var_attr[var])
-        for bodynode in node.body:
-            super().visit(bodynode)
-        self.tab -= 4
-        self.curscope = curscopetmp
+        

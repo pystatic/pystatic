@@ -8,7 +8,8 @@ from pystatic.infer.op_map import *
 from pystatic.infer.checker import TypeChecker, is_any
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
-from pystatic.infer.exprparse import ExprParser
+from pystatic.exprparse import ExprParser
+from pystatic.infer.displayvar import DisplayVar
 from pystatic.infer import op_map
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class InferVisitor(BaseVisitor):
 
     def infer(self):
         self.visit(self.root)
+        DisplayVar(self.recorder).accept(self.root)
 
     @property
     def cur_type(self):
