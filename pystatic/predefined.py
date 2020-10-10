@@ -1,24 +1,10 @@
 import typing
-from pystatic.env import Environment
 from pystatic.symtable import SymTable, TableScope, Entry
 from pystatic.typesys import *
-
-# int_temp = TypeClassTemp('int', TpState.OVER)
-# float_temp = TypeClassTemp('float', TpState.OVER)
-# complex_temp = TypeClassTemp('complex', TpState.OVER)
-# str_temp = TypeClassTemp('str', TpState.OVER)
-# bool_temp = TypeClassTemp('bool', TpState.OVER)
-# func_temp = TypeClassTemp('function', TpState.OVER)
 
 builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
 builtin_symtable.glob = builtin_symtable
 builtin_symtable.builtins = builtin_symtable
-
-# builtin_symtable.add_entry('float', Entry(float_temp.get_default_type()))
-# builtin_symtable.add_entry('int', Entry(int_temp.get_default_type()))
-# builtin_symtable.add_entry('str', Entry(str_temp.get_default_type()))
-# builtin_symtable.add_entry('bool', Entry(bool_temp.get_default_type()))
-# builtin_symtable.add_entry('...', Entry(ellipsis_type))
 
 typing_symtable = SymTable('typings', None, None, None, TableScope.GLOB)
 typing_symtable.glob = typing_symtable
@@ -31,7 +17,7 @@ def add_spt_def(name, temp, ins=None):
     if ins:
         entry = Entry(ins)
     else:
-        entry = Entry(temp.get_default_type())
+        entry = Entry(temp.get_default_typetype())
     typing_symtable.add_entry(name, entry)
 
 

@@ -225,7 +225,7 @@ class TypeExprVisitor(BaseVisitor):
         left_type = self.visit(node.value)
         assert isinstance(left_type, TypeIns)
 
-        res_type = left_type.getattribute(node.attr)
+        res_type = left_type.getattribute(node.attr, node, None)
         # TODO: report error when res_type is not TypeIns
         assert isinstance(res_type, TypeIns)
         return res_type

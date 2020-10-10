@@ -16,7 +16,7 @@ from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeModuleTemp,
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
-from pystatic.preprocess.sym_util import fake_fun_entry
+from pystatic.preprocess.sym_util import add_baseclass, get_cls_defnode
 from pystatic.arg import Argument, copy_argument
 
 if TYPE_CHECKING:
@@ -72,7 +72,7 @@ def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
         graph.add_typetemp(clstemp)
         assert isinstance(
             clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
-        defnode = clstemp.get_defnode()
+        defnode = get_cls_defnode(clstemp)
 
         def_sym = clstemp.get_def_symtable()
         visitor = _FirstClassTempVisitor(def_sym)
@@ -96,7 +96,7 @@ def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
     assert _check_cls_state(clstemp)
     symtable = clstemp.get_def_symtable()
     visitor = _TypeVarVisitor(symtable, [])
-    defnode = clstemp.get_defnode()
+    defnode = get_cls_defnode(clstemp)
     for base_node in defnode.bases:
         visitor.accept(base_node)
 
@@ -107,12 +107,12 @@ def _resolve_cls_inh(clstemp: 'TypeClassTemp'):
     """Resolve baseclasses of a class"""
     assert _check_cls_state(clstemp)
     symtable = clstemp.get_def_symtable()
-    defnode = clstemp.get_defnode()
+    defnode = get_cls_defnode(clstemp)
 
     for base_node in defnode.bases:
         res_type = eval_type_expr(base_node, symtable)
         if res_type:
-            clstemp.add_base(res_type)
+            add_baseclass(clstemp, res_type)
 
 
 class _FirstClassTempVisitor(NoGenVisitor):
@@ -140,7 +140,7 @@ class _FirstClassTempVisitor(NoGenVisitor):
     def visit_Attribute(self, node: ast.Attribute):
         res = self.visit(node.value)
         if isinstance(res.temp, TypeModuleTemp):
-            return res.temp.get_inner_typedef(node.attr).get_default_type()
+            return res.temp.get_inner_typedef(node.attr).get_default_typetype()
         else:
             return res
 
@@ -205,7 +205,7 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
     def modify_argument(argument: Argument, is_classmethod: bool,
                         is_staticmethod: bool):
         if is_classmethod:
-            argument.args[0].ann = clstemp.get_default_type()
+            argument.args[0].ann = clstemp.get_default_typetype()
         elif not is_staticmethod:
             argument.args[0].ann = clstemp.get_default_ins()
 

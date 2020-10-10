@@ -3,7 +3,8 @@ import logging
 from pystatic.uri import absolute_urilist, Uri, uri2list, rel2absuri
 from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
-                              TypePackageIns, TypeTemp, TypePackageTemp)
+                              TypePackageIns, TypeTemp, TypePackageTemp,
+                              TypeType)
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:
@@ -162,3 +163,12 @@ def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
         raise TypeError("node doesn't stand for an import statement")
 
     return res
+
+
+def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):
+    if basecls not in temp.baseclass:
+        temp.baseclass.append(basecls)
+
+
+def get_cls_defnode(temp: TypeClassTemp):
+    return temp._defnode

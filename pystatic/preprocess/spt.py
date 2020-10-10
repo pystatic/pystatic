@@ -34,7 +34,7 @@ def record_stp(module_uri: str, node: Union[ast.Assign, ast.AnnAssign]):
             name = get_typevar_name(node.value)
             # FIXME: the defnode given here is incorrect
             entry = Entry(
-                TypeVar(module_uri, name).get_default_type(), node.value)
+                TypeVar(module_uri, name).get_default_typetype(), node.value)
             return name, entry
         else:
             assert 0, "not implemented yet"

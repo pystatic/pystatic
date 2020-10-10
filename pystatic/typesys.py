@@ -1,8 +1,9 @@
 import ast
 import enum
 import copy
-from pystatic.symtable import Entry, SymTable
 from typing import Optional, Dict, List, Tuple, Union, TYPE_CHECKING
+from pystatic.symtable import Entry, SymTable
+from pystatic.message import MessageBox
 from pystatic.uri import Uri
 
 if TYPE_CHECKING:
@@ -44,39 +45,41 @@ class TypeTemp:
     def get_state(self) -> TpState:
         return self._resolve_state
 
-    def generate_typetype(self, bindlist: BindList) -> 'TypeType':
+    def get_typetype(self, bindlist: BindList) -> 'TypeType':
         new_bind = None  # TODO: rename this
         return TypeType(self, new_bind)
 
-    def get_default_type(self) -> 'TypeType':
-        bind_type = self.generate_typetype(None)
-        return bind_type
-
-    def get_default_ins(self) -> 'TypeIns':
-        return TypeIns(self, None)
+    def get_default_typetype(self) -> 'TypeType':
+        return self.get_typetype(None)
 
     def getins(self, bindlist: BindList) -> 'TypeIns':
         return TypeIns(self, bindlist)
 
-    def getattribute(
-            self,
-            name: str,
-            bindlist: BindList,
-            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        return None
+    def get_default_ins(self) -> 'TypeIns':
+        return self.getins(None)
+
+    def getattribute(self,
+                     name: str,
+                     node: ast.AST,
+                     mbox: MessageBox,
+                     bindlist: BindList,
+                     context: Optional[TypeContext] = None) -> 'TypeIns':
+        return any_ins
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
         assert 0, "This function should be avoided because TypeClassTemp doesn't support it"
 
     def getattr(self,
                 name: str,
+                node: ast.AST,
+                mbox: MessageBox,
                 bindlist: BindList,
                 context: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        return self.getattribute(name, bindlist, context)
+        return self.getattribute(name, node, mbox, bindlist, context)
 
-    def get_str_expr(self,
-                     bindlist: BindList,
-                     context: Optional[TypeContext] = None) -> str:
+    def str_expr(self,
+                 bindlist: BindList,
+                 context: Optional[TypeContext] = None) -> str:
         """__str__ with bindlist and context"""
         return self.name
 
@@ -138,30 +141,29 @@ class TypeIns:
     def getattribute(
             self,
             name: str,
+            node: ast.AST,
+            mbox: MessageBox,
             context: Optional[TypeContext] = None) -> Optional['TypeIns']:
         context = context or {}
         context = self.shadow(context)
-        return self.temp.getattribute(name, self.substitute(context), context)
+        return self.temp.getattribute(name, node, mbox,
+                                      self.substitute(context), context)
 
     def getattr(self,
                 name: str,
+                node: ast.AST,
+                mbox: MessageBox,
                 context: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        return self.getattribute(name, context)
+        return self.getattribute(name, node, mbox, context)
 
     def getitem(self, items) -> 'TypeIns':
         assert False, "TODO"
 
     def __str__(self) -> str:
-        return self.temp.get_str_expr(self.bindlist)
+        return self.temp.str_expr(self.bindlist)
 
     def call(self, args):
         assert False, "TODO"
-
-    def lookup_local_var(self, name):
-        return self.temp.lookup_local_var(name)
-
-    def lookup_var(self, name):
-        return self.temp.lookup_var(name)
 
 
 class TypeType(TypeIns):
@@ -181,7 +183,7 @@ class TypeType(TypeIns):
         self.temp.setattr(name, tp)
 
     def __str__(self):
-        return self.temp.get_str_expr(None)
+        return self.temp.str_expr(None)
 
 
 class TypeClassTemp(TypeTemp):
@@ -223,29 +225,12 @@ class TypeClassTemp(TypeTemp):
         else:
             return None
 
-    def set_inner_symtable(self, symtable: 'SymTable'):
-        self._inner_symtable = symtable
-
     def get_inner_symtable(self) -> 'SymTable':
         return self._inner_symtable
 
     def get_def_symtable(self) -> 'SymTable':
         assert self._def_symtable
         return self._def_symtable
-
-    def get_defnode(self) -> ast.ClassDef:
-        assert self._defnode
-        return self._defnode
-
-    def add_typevar(self, typevar: TypeVar):
-        self.placeholders.append(typevar)
-
-    def add_base(self, basetype: 'TypeType'):
-        if basetype not in self.baseclass:
-            self.baseclass.append(basetype)
-
-    def add_var(self, name: str, var_type: 'TypeIns'):
-        self.var_attr[name] = var_type
 
     def get_local_attr(
             self,
@@ -257,28 +242,23 @@ class TypeClassTemp(TypeTemp):
             return self._inner_symtable.lookup_local(name)
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
-        """Same as add_var in TypeClassTemp"""
         if name in self.var_attr:
-            self.add_var(name, attr_type)
+            self.var_attr[name] = attr_type
         else:
             self._inner_symtable.set_local_type(name, attr_type)
 
-    def getattribute(self, name: str, bindlist: BindList,
-                     context: Optional[TypeContext]) -> Optional['TypeIns']:
-        # FIXME: current implementation doesn't cope bindlist, context and baseclasses
+    def getattribute(self, name: str, node: ast.AST, mbox: MessageBox,
+                     bindlist: BindList,
+                     context: Optional[TypeContext]) -> 'TypeIns':
         res = self.get_local_attr(name)
         if not res:
             for basecls in self.baseclass:
-                res = basecls.getattribute(name, context)
+                res = basecls.getattribute(name, node, mbox)
                 if res:
                     return res
-        return res
 
-    def lookup_local_var(self, name):
-        return self._inner_symtable.lookup_local(name)
-
-    def lookup_var(self, name):
-        return self._inner_symtable.egb_lookup(name)
+        # TODO: output error if res is None
+        return res or any_ins
 
 
 class TypeFuncTemp(TypeTemp):
@@ -304,7 +284,7 @@ class TypePackageTemp(TypeModuleTemp):
         super().__init__(uri, symtable)
         self.paths = paths
 
-    def get_default_type(self) -> 'TypeType':
+    def get_default_typetype(self) -> 'TypeType':
         return TypePackageType(self)
 
 
@@ -312,7 +292,7 @@ class TypeAnyTemp(TypeTemp):
     def __init__(self):
         super().__init__('Any', 'typing')
 
-    def get_default_type(self) -> 'TypeType':
+    def get_default_typetype(self) -> 'TypeType':
         return any_type
 
     def get_default_ins(self) -> 'TypeIns':
@@ -321,18 +301,12 @@ class TypeAnyTemp(TypeTemp):
     def getins(self, bindlist: BindList) -> 'TypeIns':
         return any_ins
 
-    def has_method(self, name: str) -> bool:
-        return True
-
-    def has_attribute(self, name: str) -> bool:
-        return True
-
 
 class TypeNoneTemp(TypeTemp):
     def __init__(self):
         super().__init__('None', 'typing')
 
-    def get_default_type(self) -> 'TypeType':
+    def get_default_typetype(self) -> 'TypeType':
         return none_type
 
     def has_method(self, name: str) -> bool:
@@ -366,13 +340,10 @@ class TypeEllipsisTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__('ellipsis', 'typing')
 
-    def get_default_type(self) -> 'TypeType':
+    def get_default_typetype(self) -> 'TypeType':
         return ellipsis_type
 
     def get_default_ins(self) -> 'TypeIns':
-        return ellipsis_ins
-
-    def getins(self, bindlist: BindList) -> 'TypeIns':
         return ellipsis_ins
 
 
@@ -461,9 +432,9 @@ union_temp = TypeUnionTemp()
 func_temp = TypeFuncTemp()
 
 # these typetype are shared to save memory
-ellipsis_type = ellipsis_temp.generate_typetype(None)
-none_type = none_temp.generate_typetype(None)
-any_type = any_temp.generate_typetype(None)
+ellipsis_type = TypeType(ellipsis_temp, None)
+none_type = TypeType(none_temp, None)
+any_type = TypeType(any_temp, None)
 
 any_ins = TypeIns(any_temp, None)
 ellipsis_ins = TypeIns(ellipsis_temp, None)
