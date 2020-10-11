@@ -138,12 +138,11 @@ class TypeIns:
                     new_context[old_slot] = item
         return new_context
 
-    def getattribute(
-            self,
-            name: str,
-            node: ast.AST,
-            mbox: MessageBox,
-            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+    def getattribute(self,
+                     name: str,
+                     node: ast.AST,
+                     mbox: MessageBox,
+                     context: Optional[TypeContext] = None) -> 'TypeIns':
         context = context or {}
         context = self.shadow(context)
         return self.temp.getattribute(name, node, mbox,
@@ -153,7 +152,7 @@ class TypeIns:
                 name: str,
                 node: ast.AST,
                 mbox: MessageBox,
-                context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+                context: Optional[TypeContext] = None) -> 'TypeIns':
         return self.getattribute(name, node, mbox, context)
 
     def getitem(self, items) -> 'TypeIns':
