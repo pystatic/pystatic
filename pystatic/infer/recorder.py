@@ -1,4 +1,7 @@
+import ast
 from typing import List
+from pystatic.errorcode import SymbolUndefined, NoError, ErrorCode
+from pystatic.typesys import any_type
 
 
 class Scope:
@@ -26,10 +29,6 @@ class SymbolRecorder:
         # record the appeared symbol in cur scope
         self.stack: List[Scope] = []
         self.stack.append(Scope(module))
-
-    @property
-    def cur_type(self):
-        return self.cur_scope.tp
 
     @property
     def cur_scope(self) -> Scope:
@@ -66,11 +65,9 @@ class SymbolRecorder:
                 return scope.tp
         return None
 
-    def getattribute(self, name, tp=None):
-        if tp:
-            return tp
-        cur_type = self.cur_type
-        if self.is_defined(name):
-            return cur_type.lookup_local_var(name)
-        else:
-            return cur_type.lookup_var(name)
+    def getattribute(self, name, node: ast.AST = None) -> ErrorCode:
+        for scope in self.stack[::-1]:
+            tp = scope.type_map.get(name)
+            if tp:
+                return NoError(tp)
+        return SymbolUndefined(any_type, node, name)

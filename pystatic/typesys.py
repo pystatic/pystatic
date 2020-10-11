@@ -165,10 +165,6 @@ class TypeIns:
     def call(self, args):
         assert False, "TODO"
 
-    def get_local_symbol(self, name: str) -> 'TypeIns':
-        return self.temp.get_local_symbol(name)
-
-
 class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
         super().__init__(temp, bindlist)
@@ -186,7 +182,7 @@ class TypeType(TypeIns):
                      context: Optional[TypeContext] = None) -> Optional['TypeIns']:
         context = context or {}
         context = self.shadow(context)
-        return self.temp.get_local_symbol
+        return self.temp.get_local_symbol(name)
 
     def getitem(self, bindlist: BindList) -> 'TypeIns':
         assert False, "TODO"

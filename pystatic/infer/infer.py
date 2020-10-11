@@ -4,6 +4,7 @@ from typing import Optional
 from pystatic.typesys import *
 from pystatic.message import MessageBox
 from pystatic.arg import Argument
+from pystatic.errorcode import *
 from pystatic.infer.op_map import *
 from pystatic.infer.checker import TypeChecker, is_any
 from pystatic.infer.visitor import BaseVisitor

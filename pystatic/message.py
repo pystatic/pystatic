@@ -1,6 +1,6 @@
 import ast
 from typing import Optional, List
-from pystatic.errorcode import ErrorCode
+from pystatic.errorcode import ErrorCode, NoError
 
 
 class Message(object):
@@ -42,6 +42,8 @@ class MessageBox(object):
         self.error.append(Message.from_node(node, msg))
 
     def make(self, error: ErrorCode):
+        if isinstance(error, NoError):
+            return
         node, msg = error.make()
         self.add_err(node, msg)
 
