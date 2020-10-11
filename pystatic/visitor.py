@@ -1,7 +1,19 @@
 import ast
 from typing import Optional
 from pystatic.reach import Reach
-from pystatic.util import ParseException
+
+
+class VisitException(Exception):
+    """VisitException is used when working on the ast tree however the tree
+    doesn't match the structure and the process failed.
+
+    Node points to the position where the process failed.
+    Msg is used to describe why it failed(it can be omitted by set it to '').
+    """
+    def __init__(self, node: ast.AST, msg: str):
+        super().__init__(msg)
+        self.node = node
+        self.msg = msg
 
 
 class BaseVisitor(object):
@@ -63,7 +75,7 @@ class ValueUnParser(BaseVisitor):
         method = 'visit_' + node.__class__.__name__
         next_visitor = getattr(self, method, None)
         if not next_visitor:
-            raise ParseException(node, '')
+            raise VisitException(node, '')
         return next_visitor(node, *args, **kwargs)
 
     def visit_Tuple(self, node: ast.Tuple):
@@ -76,7 +88,7 @@ class ValueUnParser(BaseVisitor):
         if self.context and node.id in self.context:
             return self.context[node.id]
         else:
-            raise ParseException(node, f'{node.id} not found')
+            raise VisitException(node, f'{node.id} not found')
 
     def visit_Constant(self, node: ast.Constant):
         return node.value
@@ -98,7 +110,7 @@ class LiterUnParser(BaseVisitor):
         method = 'visit_' + node.__class__.__name__
         next_visitor = getattr(self, method, None)
         if not next_visitor:
-            raise ParseException(node, f'{method} not implemented')
+            raise VisitException(node, f'{method} not implemented')
         return next_visitor(node, *args, **kwargs)
 
     def visit_Name(self, node: ast.Name):
@@ -114,7 +126,7 @@ class LiterUnParser(BaseVisitor):
             else:
                 return str(node.value)
         except ValueError:
-            raise ParseException(node, "can't convert to str")
+            raise VisitException(node, "can't convert to str")
 
     def visit_Tuple(self, node: ast.Tuple):
         items = []
@@ -175,6 +187,6 @@ class LiterUnParser(BaseVisitor):
 def liter_unparse(node: ast.AST):
     """Tries to change the ast to the str format
 
-    May throw ParseException
+    May throw VisitException
     """
     return LiterUnParser().accept(node)

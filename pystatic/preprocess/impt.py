@@ -9,11 +9,11 @@ import ast
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType
 from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
 from pystatic.uri import rel2absuri, Uri, uri2list
-from pystatic.util import split_import_stmt
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
 from pystatic.preprocess.sym_util import (fake_imp_entry, add_uri_symtable,
-                                          search_uri_symtable)
+                                          search_uri_symtable,
+                                          split_import_stmt)
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor

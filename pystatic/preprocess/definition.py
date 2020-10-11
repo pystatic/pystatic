@@ -7,11 +7,10 @@ from pystatic.typesys import (TypeClassTemp, TpState)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
-from pystatic.util import split_import_stmt
 from pystatic.preprocess.spt import record_stp
 from pystatic.preprocess.sym_util import (add_import_item, add_fun_def,
                                           add_local_var, add_cls_def,
-                                          add_local_var)
+                                          add_local_var, split_import_stmt)
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -161,7 +160,7 @@ class TypeDefVisitor(BaseVisitor):
                                                       TableScope.CLASS)
             clstemp = TypeClassTemp(abs_clsname, self.glob_uri, TpState.FRESH,
                                     self.symtable, new_symtable, node)
-            clstype = clstemp.get_default_type()
+            clstype = clstemp.get_default_typetype()
             entry = Entry(clstype, node)
             self.symtable.add_entry(clsname, entry)
             add_cls_def(self.symtable, clsname, clstemp)
