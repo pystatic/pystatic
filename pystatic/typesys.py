@@ -165,6 +165,10 @@ class TypeIns:
     def call(self, args):
         assert False, "TODO"
 
+    def get_local_symbol(self, name: str):
+        return self.temp.get_local_symbol(name)
+
+
 class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
         super().__init__(temp, bindlist)

@@ -1,5 +1,5 @@
 import ast
-from typing import Tuple
+from typing import Tuple, Optional
 from pystatic.typesys import TypeIns
 
 INCOMPATIBLE_TYPE_IN_ASSIGN = "Incompatible type in assignment"
@@ -17,7 +17,7 @@ INCOMPATIBLE_ARGUMENT = "Incompatible argument type for '{}'"
 
 
 class ErrorCode:
-    def __init__(self, res: TypeIns):
+    def __init__(self, res: Optional[TypeIns]):
         self.res = res
 
     def make(self) -> Tuple[ast.AST, str]:
@@ -39,10 +39,10 @@ class NoError(ErrorCode):
 
 class IncompatibleTypeInAssign(ErrorCode):
     def __init__(self,
-                 res: TypeIns,
                  node: ast.AST,
                  expect_type: TypeIns,
-                 expr_type: TypeIns):
+                 expr_type: TypeIns,
+                 res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
         self.expect_type = expect_type
@@ -56,9 +56,9 @@ class IncompatibleTypeInAssign(ErrorCode):
 
 class SymbolUndefined(ErrorCode):
     def __init__(self,
-                 res: TypeIns,
                  node: ast.AST,
-                 name: str):
+                 name: str,
+                 res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
         self.name = name
@@ -70,10 +70,10 @@ class SymbolUndefined(ErrorCode):
 
 class IncompatibleReturnType(ErrorCode):
     def __init__(self,
-                 res: TypeIns,
                  node: ast.AST,
                  expect_type: TypeIns,
-                 ret_type: TypeIns):
+                 ret_type: TypeIns,
+                 res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
         self.expect_type = expect_type
@@ -87,11 +87,11 @@ class IncompatibleReturnType(ErrorCode):
 
 class IncompatibleArgument(ErrorCode):
     def __init__(self,
-                 res: TypeIns,
                  node: ast.AST,
                  func_name: str,
                  annotation: TypeIns,
-                 real_type: TypeIns):
+                 real_type: TypeIns,
+                 res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
         self.func_name = func_name
@@ -105,7 +105,7 @@ class IncompatibleArgument(ErrorCode):
 
 
 class TooMoreValuesToUnpack(ErrorCode):
-    def __init__(self, res: TypeIns, node: ast.AST):
+    def __init__(self, node: ast.AST, res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
 
@@ -114,7 +114,7 @@ class TooMoreValuesToUnpack(ErrorCode):
 
 
 class NeedMoreValuesToUnpack(ErrorCode):
-    def __init__(self, res: TypeIns, node: ast.AST):
+    def __init__(self, node: ast.AST, res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
 
@@ -123,7 +123,7 @@ class NeedMoreValuesToUnpack(ErrorCode):
 
 
 class ReturnValueExpected(ErrorCode):
-    def __init__(self, res: TypeIns, node: ast.AST):
+    def __init__(self, node: ast.AST, res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
 
@@ -133,10 +133,10 @@ class ReturnValueExpected(ErrorCode):
 
 class NoAttribute(ErrorCode):
     def __init__(self,
-                 res: TypeIns,
                  node: ast.AST,
                  target_type: TypeIns,
-                 attr_name: str):
+                 attr_name: str,
+                 res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
         self.target_type = target_type
@@ -149,11 +149,11 @@ class NoAttribute(ErrorCode):
 
 class UnsupportedBinOperand(ErrorCode):
     def __init__(self,
-                 res: TypeIns,
                  node: ast.AST,
                  operand: str,
                  left_type: TypeIns,
-                 right_type: TypeIns):
+                 right_type: TypeIns,
+                 res: Optional[TypeIns] = None):
         super().__init__(res)
         self.node = node
         self.operand = operand

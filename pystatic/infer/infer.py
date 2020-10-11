@@ -33,10 +33,6 @@ class InferVisitor(BaseVisitor):
         self.visit(self.root)
         DisplayVar(self.recorder).accept(self.root)
 
-    @property
-    def cur_type(self):
-        return self.recorder.cur_type
-
     def type_consistent(self, ltype, rtype):
         return self.checker.check(ltype, rtype)
 
@@ -59,25 +55,25 @@ class InferVisitor(BaseVisitor):
         if self.recorder.is_defined(target.id):
             ltype = self.cur_type.lookup_local_var(target.id)
         else:  # var appear first time
-            self.recorder.add_symbol(target.id)
+            self.recorder.set_type(target.id, rtype)
             ltype = self.cur_type.lookup_local_var(target.id)
             if is_any(ltype):  # var with no annotation
                 self.cur_type.setattr(target.id, rtype)
         if not self.type_consistent(ltype, rtype):
-            self.mbox.incompatible_type_in_assign(rnode, ltype, rtype)
+            self.mbox.make(INCOMPATIBLE_TYPE_IN_ASSIGN(any_type, rnode, ltype, rtype))
 
     def check_composed_node_of_assign(self, target, rnode, rtype):
         ltype = self.get_type(target)
         if not ltype:
             return
         if not self.type_consistent(ltype, rtype):
-            self.mbox.incompatible_type_in_assign(rnode, ltype, rtype)
+            self.mbox.make(IncompatibleTypeInAssign(rnode, ltype, rtype))
 
     def check_multi_left_of_assign(self, target, rnode, rtypes):
         if len(target) < len(rtypes):
-            self.mbox.need_more_values_to_unpack(rnode)
+            self.mbox.make(NeedMoreValuesToUnpack(rnode))
         elif len(target) > len(rtypes):
-            self.mbox.too_more_values_to_unpack(rnode)
+            self.mbox.make(TooMoreValuesToUnpack(rnode))
         for lvalue, node, rtype in zip(target, rnode.elts, rtypes):
             if isinstance(lvalue, ast.Name):
                 self.infer_name_node_of_assign(lvalue, node, rtype)
@@ -101,7 +97,7 @@ class InferVisitor(BaseVisitor):
             self.recorder.add_symbol(target.id)
         ltype = self.cur_type.lookup_local_var(target.id)
         if not self.type_consistent(ltype, rtype):
-            self.mbox.incompatible_type_in_assign(rnode, ltype, rtype)
+            self.mbox.make(IncompatibleTypeInAssign(rnode, ltype, rtype))
 
     def check_composed_node_of_annassign(self, target, rnode, rtype):
         self.check_composed_node_of_assign(target, rnode, rtype)
@@ -113,7 +109,7 @@ class InferVisitor(BaseVisitor):
         func_type = ltype.getattribute(func_name)
         operand = op_map.binop_char_map[type(node.op)]
         if func_type is None:
-            self.mbox.unsupported_operand(node.target, operand, ltype, rtype)
+            self.mbox.make(UnsupportedBinOperand(node.target, operand, ltype, rtype))
         self.check_operand(node.value, func_type, operand, ltype, rtype)
 
     def check_operand(self, node, func_type, operand, ltype, rtype):
@@ -124,8 +120,8 @@ class InferVisitor(BaseVisitor):
             self.mbox.unsupported_operand(node, operand, ltype, rtype)
 
     def visit_ClassDef(self, node: ast.ClassDef):
-        self.recorder.add_symbol(node.name)
         class_type = self.cur_type.lookup_local_var(node.name)
+        self.recorder.add_type(node.name, class_type)
         self.recorder.enter_cls(class_type)
         for subnode in node.body:
             self.visit(subnode)
@@ -164,7 +160,7 @@ class InferVisitor(BaseVisitor):
         if len(self.ret_list) == 0:
             rtype = none_type
             if not is_any(self.ret_annotation):
-                self.mbox.return_value_expected(type_comment)
+                self.mbox.make(ReturnValueExpected(type_comment))
         elif len(self.ret_list) == 1:
             # TODO
             rtype = self.ret_list[0]
@@ -184,11 +180,11 @@ class InferVisitor(BaseVisitor):
 
     def check_ret_type(self, annotation, ret_node: ast.Return, ret_type):
         if ret_type is None:
-            self.mbox.return_value_expected(ret_node)
+            self.mbox.make(ReturnValueExpected(ret_node))
             return
         if not self.type_consistent(annotation, ret_type):
-            self.mbox.incompatible_return_type(ret_node.value, annotation,
-                                               ret_type)
+            self.mbox.make(IncompatibleReturnType(ret_node.value,
+                                                  annotation, ret_type))
 
     def visit_While(self, node: ast.While):
         pass
@@ -198,7 +194,6 @@ class InferVisitor(BaseVisitor):
         for subnode in node.body:
             self.visit(subnode)
         self.visit(node.orelse)
-
 
 
 class InferStarter:
