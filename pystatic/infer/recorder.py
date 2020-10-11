@@ -3,17 +3,17 @@ from typing import List
 
 class Scope:
     def __init__(self, tp):
-        self.symbol_set = set()
+        self.type_map = {}
         self.tp = tp
 
-    def add_symbol(self, name):
-        self.symbol_set.add(name)
+    def add_type(self, name, tp):
+        self.type_map[name] = tp
 
 
 class FuncScope(Scope):
     def __init__(self, tp, argument):
         super().__init__(tp)
-        self.args = argument
+        self.type_map = argument
 
 
 class ClassScope(Scope):
@@ -36,7 +36,7 @@ class SymbolRecorder:
         return self.stack[-1]
 
     def is_defined(self, name):
-        return name in self.cur_scope.symbol_set
+        return name in self.cur_scope.type_map
 
     def enter_scope(self, tp):
         self.stack.append(Scope(tp))
@@ -56,13 +56,8 @@ class SymbolRecorder:
     def leave_cls(self):
         self.leave_scope()
 
-    def add_symbol(self, name):
-        self.cur_scope.add_symbol(name)
-
-    def lookup_func_param(self, name):
-        cur_scope = self.cur_scope
-        if isinstance(cur_scope, FuncScope):
-            return cur_scope.args.get(name)
+    def add_type(self, name, tp):
+        self.cur_scope.add_type(name, tp)
 
     @property
     def upper_class(self):
@@ -71,8 +66,7 @@ class SymbolRecorder:
                 return scope.tp
         return None
 
-    def getttribute(self, name, tp=None):
-        tp = self.lookup_func_param(name)
+    def getattribute(self, name, tp=None):
         if tp:
             return tp
         cur_type = self.cur_type

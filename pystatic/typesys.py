@@ -165,6 +165,9 @@ class TypeIns:
     def call(self, args):
         assert False, "TODO"
 
+    def get_local_symbol(self, name: str) -> 'TypeIns':
+        return self.temp.get_local_symbol(name)
+
 
 class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
@@ -175,6 +178,15 @@ class TypeType(TypeIns):
 
     def call(self, args) -> 'TypeIns':
         return self.getins()
+
+    def getattribute(self,
+                     name: str,
+                     node: ast.AST,
+                     mbox: MessageBox,
+                     context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        context = context or {}
+        context = self.shadow(context)
+        return self.temp.get_local_symbol
 
     def getitem(self, bindlist: BindList) -> 'TypeIns':
         assert False, "TODO"
@@ -259,6 +271,9 @@ class TypeClassTemp(TypeTemp):
 
         # TODO: output error if res is None
         return res or any_ins
+
+    def get_local_symbol(self, name: str) -> 'TypeIns':
+        return self._inner_symtable.lookup_local(name)
 
 
 class TypeFuncTemp(TypeTemp):
