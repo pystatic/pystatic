@@ -129,7 +129,8 @@ def search_uri_symtable(symtable: 'SymTable', uri: str) -> Optional[TypeIns]:
     assert urilist
     cur_ins = symtable._import_tree[urilist[0]]
     for i in range(1, len(urilist)):
-        cur_ins = cur_ins.getattribute(urilist[i])
+        # TODO: warning here
+        cur_ins = cur_ins.getattribute(urilist[i], None).value
         if not cur_ins:
             return None
     return cur_ins
