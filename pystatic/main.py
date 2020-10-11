@@ -48,5 +48,9 @@ def test_stubgen(config: dict, src: List[str], load_typeshed: bool = True):
     manager.stubgen()
 
 
+def test_manager(config: dict, src: List[str], load_typeshed: bool = True):
+    return Manager(config, src, [], sys.stdout, sys.stderr, load_typeshed)
+
+
 if __name__ == '__main__':
     cmdline(sys.stdout, sys.stderr)

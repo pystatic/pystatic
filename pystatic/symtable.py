@@ -132,4 +132,3 @@ class SymTable:
         glob = self.glob
         new_uri = self.uri + '.' + name
         return SymTable(new_uri, glob, non_local, builtins, new_scope)
-

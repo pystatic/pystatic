@@ -1,6 +1,7 @@
+import ast
 import copy
 from pystatic.typesys import TypeAnyTemp, TypeIns, any_ins
-from typing import Optional, List
+from typing import Optional, List, Dict, Tuple
 
 
 class Arg(object):

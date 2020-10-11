@@ -15,7 +15,7 @@ from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 from pystatic.modfinder import ModuleFinder, ModuleFindRes
 
 if TYPE_CHECKING:
-    from pystatic.manager import Manager
+    from pystatic.message import MessageBox
     from pystatic.uri import Uri
 
 
@@ -31,8 +31,8 @@ def path2ast(path: str) -> ast.AST:
 
 
 class Preprocessor:
-    def __init__(self, manager: 'Manager', finder: 'ModuleFinder') -> None:
-        self.manager = manager  # TODO: is this necessary?
+    def __init__(self, mbox: 'MessageBox', finder: 'ModuleFinder') -> None:
+        self.mbox = mbox
         self.finder = finder
 
         self.q_parse: Deque[BlockTarget] = deque()
@@ -106,9 +106,9 @@ class Preprocessor:
 
             # get current module's class definitions
             if isinstance(current, MethodTarget):
-                get_definition_in_method(current, self, self.manager.mbox)
+                get_definition_in_method(current, self, self.mbox)
             else:
-                get_definition(current, self, self.manager.mbox)
+                get_definition(current, self, self.mbox)
 
         # get type imported from other module
         for target in to_check:

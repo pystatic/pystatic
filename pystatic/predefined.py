@@ -47,3 +47,11 @@ def get_init_module_symtable(uri: str) -> SymTable:
         TableScope.GLOB)
     new_symtable.glob = new_symtable
     return new_symtable
+
+
+def init_builtins(self):
+    pass
+
+
+def init_typeshed(self):
+    pass
