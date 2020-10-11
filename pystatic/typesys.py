@@ -4,8 +4,8 @@ import copy
 from typing import Callable, Optional, Dict, List, Tuple, Union, TYPE_CHECKING
 from pystatic.option import Option
 from pystatic.symtable import Entry, SymTable
-from pystatic.message import MessageBox
 from pystatic.uri import Uri
+from pystatic.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.arg import Argument
@@ -59,25 +59,29 @@ class TypeTemp:
     def get_default_ins(self) -> 'TypeIns':
         return self.getins(None)
 
+    def get_type_attribute(
+            self,
+            name: str,
+            bindlist: BindList,
+            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        """Get attribute that belong to the Type itself, mainly used for typetype"""
+        return self.getattribute(name, bindlist, context)
+
     def getattribute(
             self,
             name: str,
-            node: ast.AST,
-            mbox: MessageBox,
             bindlist: BindList,
-            context: Optional[TypeContext] = None) -> Option['TypeIns']:
-        return Option(False, any_ins)
+            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        return None
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
-        assert 0, "This function should be avoided because TypeClassTemp doesn't support it"
+        assert False, "This function should be avoided because TypeClassTemp doesn't support it"
 
     def getattr(self,
                 name: str,
-                node: ast.AST,
-                mbox: MessageBox,
                 bindlist: BindList,
-                context: Optional[TypeContext] = None) -> Option['TypeIns']:
-        return self.getattribute(name, node, mbox, bindlist, context)
+                context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        return self.getattribute(name, bindlist, context)
 
     def str_expr(self,
                  bindlist: BindList,
@@ -86,7 +90,7 @@ class TypeTemp:
         return self.name
 
     def __str__(self):
-        return self.name
+        assert False, "use str_expr instead"
 
 
 class TypeVar(TypeTemp):
@@ -143,20 +147,26 @@ class TypeIns:
     def getattribute(
             self,
             name: str,
-            node: ast.AST,
-            mbox: MessageBox,
+            node: Optional[ast.AST],
             context: Optional[TypeContext] = None) -> Option['TypeIns']:
         context = context or {}
         context = self.shadow(context)
-        return self.temp.getattribute(name, node, mbox,
-                                      self.substitute(context), context)
+
+        option_res = Option(any_ins)
+        ins_res = self.temp.getattribute(name, self.substitute(context),
+                                         context)
+
+        if not ins_res:
+            option_res.add_error(NoAttribute(node, self, name))
+        else:
+            option_res.set_value(ins_res)
+        return option_res
 
     def getattr(self,
                 name: str,
-                node: ast.AST,
-                mbox: MessageBox,
+                node: Optional[ast.AST],
                 context: Optional[TypeContext] = None) -> Option['TypeIns']:
-        return self.getattribute(name, node, mbox, context)
+        return self.getattribute(name, node, context)
 
     def getitem(self, items) -> 'TypeIns':
         assert False, "TODO"
@@ -166,9 +176,6 @@ class TypeIns:
 
     def call(self, args):
         assert False, "TODO"
-
-    def get_local_symbol(self, name: str) -> 'TypeIns':
-        return self.temp.get_local_symbol(name)
 
 
 class TypeType(TypeIns):
@@ -181,14 +188,20 @@ class TypeType(TypeIns):
     def call(self, args) -> 'TypeIns':
         return self.getins()
 
-    def getattribute(self,
-                     name: str,
-                     node: ast.AST,
-                     mbox: MessageBox,
-                     context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+    def getattribute(self, name: str, node: Optional[ast.AST],
+                     context: Optional[TypeContext]) -> Option['TypeIns']:
         context = context or {}
         context = self.shadow(context)
-        return self.temp.get_local_symbol
+
+        option_res = Option(any_ins)
+        ins_res = self.temp.get_type_attribute(name, self.substitute(context),
+                                               context)
+
+        if not ins_res:
+            option_res.add_error(NoAttribute(node, self, name))
+        else:
+            option_res.set_value(ins_res)
+        return option_res
 
     def getitem(self, bindlist: BindList) -> 'TypeIns':
         assert False, "TODO"
@@ -255,29 +268,18 @@ class TypeClassTemp(TypeTemp):
         else:
             return self._inner_symtable.lookup_local(name)
 
-    def setattr(self, name: str, attr_type: 'TypeIns'):
-        if name in self.var_attr:
-            self.var_attr[name] = attr_type
-        else:
-            self._inner_symtable.set_local_type(name, attr_type)
+    def get_type_attribute(
+            self, name: str, bindlist: BindList,
+            context: Optional[TypeContext]) -> Optional['TypeIns']:
+        return self._inner_symtable.lookup_local(name)
 
-    def getattribute(self, name: str, node: ast.AST, mbox: MessageBox,
-                     bindlist: BindList,
-                     context: Optional[TypeContext]) -> Option['TypeIns']:
+    def getattribute(self, name: str, bindlist: BindList,
+                     context: Optional[TypeContext]) -> Optional['TypeIns']:
         res = self.get_local_attr(name)
         if not res:
             for basecls in self.baseclass:
-                res = basecls.getattribute(name, node, mbox)
-                if res:
-                    return res
-
-        if res:
-            return Option(True, res)
-        else:
-            return Option(False, any_ins)
-
-    def get_local_symbol(self, name: str) -> 'TypeIns':
-        return self._inner_symtable.lookup_local(name)
+                res = basecls.getattribute(name, bindlist, context)
+        return res
 
 
 class TypeFuncTemp(TypeTemp):
@@ -419,9 +421,9 @@ class TypeFuncIns(TypeIns):
     def get_inner_symtable(self) -> 'SymTable':
         return self._inner_symtable
 
-    def get_str_expr(self,
-                     bindlist: BindList,
-                     context: Optional[TypeContext] = None) -> str:
+    def str_expr(self,
+                 bindlist: BindList,
+                 context: Optional[TypeContext] = None) -> str:
         if len(self.overloads) == 1:
             fun_fmt = "{}{} -> {}"
         else:
@@ -434,12 +436,6 @@ class TypeFuncIns(TypeIns):
 
     def call(self, args):
         assert False, "TODO"
-
-    def lookup_local_var(self, name):
-        return self._inner_symtable.lookup_local(name)
-
-    def lookup_var(self, name):
-        return self._inner_symtable.egb_lookup(name)
 
 
 # special types (typing.py)
