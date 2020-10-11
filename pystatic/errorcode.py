@@ -30,8 +30,8 @@ class ErrorCode:
 
 
 class IncompatibleTypeInAssign(ErrorCode):
-    def __init__(self, node: ast.AST,
-                 expect_type: TypeIns, expr_type: TypeIns):
+    def __init__(self, node: ast.AST, expect_type: TypeIns,
+                 expr_type: TypeIns):
         super().__init__(node)
         self.expect_type = expect_type
         self.expr_type = expr_type
@@ -53,8 +53,7 @@ class SymbolUndefined(ErrorCode):
 
 
 class IncompatibleReturnType(ErrorCode):
-    def __init__(self, node: ast.AST,
-                 expect_type: TypeIns, ret_type: TypeIns):
+    def __init__(self, node: ast.AST, expect_type: TypeIns, ret_type: TypeIns):
         super().__init__(node)
         self.expect_type = expect_type
         self.ret_type = ret_type
@@ -66,8 +65,8 @@ class IncompatibleReturnType(ErrorCode):
 
 
 class IncompatibleArgument(ErrorCode):
-    def __init__(self, node: ast.AST, func_name: str,
-                 annotation: TypeIns, real_type: TypeIns):
+    def __init__(self, node: ast.AST, func_name: str, annotation: TypeIns,
+                 real_type: TypeIns):
         super().__init__(node)
         self.func_name = func_name
         self.annotation = annotation
@@ -100,12 +99,11 @@ class ReturnValueExpected(ErrorCode):
         super().__init__(node)
 
     def make(self) -> Tuple[ast.AST, str]:
-        return node, RETURN_VALUE_EXPECTED
+        return self.node, RETURN_VALUE_EXPECTED
 
 
 class NoAttribute(ErrorCode):
-    def __init__(self, node: ast.AST,
-                 target_type: TypeIns, attr_name: str):
+    def __init__(self, node: ast.AST, target_type: TypeIns, attr_name: str):
         super().__init__(node)
         self.target_type = target_type
         self.attr_name = attr_name
@@ -116,8 +114,8 @@ class NoAttribute(ErrorCode):
 
 
 class UnsupportedBinOperand(ErrorCode):
-    def __init__(self, node: ast.AST, operand: str,
-                 left_type: TypeIns, right_type: TypeIns):
+    def __init__(self, node: ast.AST, operand: str, left_type: TypeIns,
+                 right_type: TypeIns):
         super().__init__(node)
         self.operand = operand
         self.left_type = left_type
