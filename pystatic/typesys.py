@@ -40,12 +40,6 @@ class TypeTemp:
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
 
-    def set_state(self, st: TpState):
-        self._resolve_state = st
-
-    def get_state(self) -> TpState:
-        return self._resolve_state
-
     def get_typetype(self, bindlist: BindList) -> 'TypeType':
         new_bind = None  # TODO: rename this
         return TypeType(self, new_bind)

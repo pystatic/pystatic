@@ -16,8 +16,10 @@ from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeModuleTemp,
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
-from pystatic.preprocess.sym_util import add_baseclass, get_cls_defnode
-from pystatic.arg import Argument, copy_argument
+from pystatic.preprocess.sym_util import (add_baseclass, get_cls_defnode,
+                                          get_temp_state, set_temp_state,
+                                          get_temp_state)
+from pystatic.arg import Argument
 
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
@@ -34,13 +36,13 @@ def resolve_cls_def(targets: List['BlockTarget']):
 
     # placeholders
     for temp in resolve_order:
-        temp.set_state(TpState.ON)
+        set_temp_state(temp, TpState.ON)
         _resolve_cls_placeholder(temp)
 
     # inheritance
     for temp in resolve_order:
         _resolve_cls_inh(temp)
-        temp.set_state(TpState.OVER)
+        set_temp_state(temp, TpState.OVER)
 
 
 def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
@@ -87,7 +89,7 @@ def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
 
 def _check_cls_state(temp: 'TypeTemp'):
-    state = temp.get_state()
+    state = get_temp_state(temp)
     return state != TpState.OVER
 
 
@@ -240,7 +242,7 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
         modify_argument(args, is_classmethod, is_staticmethod)
         ins.add_overload(args, ret)
         logger.debug(
-            f'overload ({symtable.uri}) {node.name}: {ins.get_str_expr(None)}')
+            f'overload ({symtable.uri}) {node.name}: {ins.str_expr(None)}')
 
     template_resolve_fun(symtable, add_def, add_overload)
     symtable._func_defs = new_fun_defs

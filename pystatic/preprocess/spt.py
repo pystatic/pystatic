@@ -5,6 +5,7 @@ Special type resolution module.
 import ast
 import enum
 import logging
+from pystatic.preprocess.sym_util import set_temp_state
 from typing import Optional, Union, TYPE_CHECKING, List, Dict, Tuple
 from pystatic.symtable import Entry, SymTable
 from pystatic.typesys import TypeIns, TypeVar
@@ -183,4 +184,4 @@ def get_typevar_name(call_expr: ast.Call) -> str:
 def resolve_typevar_ins(tpvar: TypeVar, node: ast.AST, symtable: 'SymTable'):
     assert isinstance(node, ast.Call)
     collect_typevar_info(tpvar, node, symtable)
-    tpvar.set_state(TpState.OVER)
+    set_temp_state(tpvar, TpState.OVER)

@@ -4,7 +4,7 @@ from pystatic.uri import absolute_urilist, Uri, uri2list, rel2absuri
 from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
                               TypePackageIns, TypeTemp, TypePackageTemp,
-                              TypeType)
+                              TypeType, TpState)
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:
@@ -172,3 +172,11 @@ def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):
 
 def get_cls_defnode(temp: TypeClassTemp):
     return temp._defnode
+
+
+def set_temp_state(temp: TypeTemp, st: TpState):
+    temp._resolve_state = st
+
+
+def get_temp_state(temp: TypeTemp) -> TpState:
+    return temp._resolve_state
