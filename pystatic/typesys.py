@@ -171,7 +171,7 @@ class TypeType(TypeIns):
     def getins(self) -> 'TypeIns':
         return self.temp.getins(self.bindlist)
 
-    def call(self) -> 'TypeIns':
+    def call(self, args) -> 'TypeIns':
         return self.getins()
 
     def getitem(self, bindlist: BindList) -> 'TypeIns':
@@ -444,6 +444,12 @@ class TypeFuncIns(TypeIns):
 
     def call(self, args):
         assert False, "TODO"
+
+    def lookup_local_var(self, name):
+        return self._inner_symtable.lookup_local(name)
+
+    def lookup_var(self, name):
+        return self._inner_symtable.egb_lookup(name)
 
 
 # special types (typing.py)

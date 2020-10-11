@@ -59,7 +59,7 @@ class SymbolRecorder:
     def add_symbol(self, name):
         self.cur_scope.add_symbol(name)
 
-    def lookup_local(self, name):
+    def lookup_func_param(self, name):
         cur_scope = self.cur_scope
         if isinstance(cur_scope, FuncScope):
             return cur_scope.args.get(name)
@@ -70,3 +70,13 @@ class SymbolRecorder:
             if isinstance(scope, ClassScope):
                 return scope.tp
         return None
+
+    def getttribute(self, name, tp=None):
+        tp = self.lookup_func_param(name)
+        if tp:
+            return tp
+        cur_type = self.cur_type
+        if self.is_defined(name):
+            return cur_type.lookup_local_var(name)
+        else:
+            return cur_type.lookup_var(name)

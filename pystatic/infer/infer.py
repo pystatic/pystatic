@@ -199,6 +199,7 @@ class InferVisitor(BaseVisitor):
         self.visit(node.orelse)
 
 
+
 class InferStarter:
     def __init__(self, sources, mbox):
         self.sources = sources
@@ -207,8 +208,8 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            tp = target.module_temp.lookup_local_var('a')
-            # print(tp)
+            tp = target.module_temp.lookup_local_var('f1')
+            print(type(tp))
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          self.mbox)
             infer_visitor.infer()
