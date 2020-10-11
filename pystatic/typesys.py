@@ -1,7 +1,8 @@
 import ast
 import enum
 import copy
-from typing import Optional, Dict, List, Tuple, Union, TYPE_CHECKING
+from typing import Callable, Optional, Dict, List, Tuple, Union, TYPE_CHECKING
+from pystatic.option import Option
 from pystatic.symtable import Entry, SymTable
 from pystatic.message import MessageBox
 from pystatic.uri import Uri
@@ -58,13 +59,14 @@ class TypeTemp:
     def get_default_ins(self) -> 'TypeIns':
         return self.getins(None)
 
-    def getattribute(self,
-                     name: str,
-                     node: ast.AST,
-                     mbox: MessageBox,
-                     bindlist: BindList,
-                     context: Optional[TypeContext] = None) -> 'TypeIns':
-        return any_ins
+    def getattribute(
+            self,
+            name: str,
+            node: ast.AST,
+            mbox: MessageBox,
+            bindlist: BindList,
+            context: Optional[TypeContext] = None) -> Option['TypeIns']:
+        return Option(False, any_ins)
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
         assert 0, "This function should be avoided because TypeClassTemp doesn't support it"
@@ -74,7 +76,7 @@ class TypeTemp:
                 node: ast.AST,
                 mbox: MessageBox,
                 bindlist: BindList,
-                context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+                context: Optional[TypeContext] = None) -> Option['TypeIns']:
         return self.getattribute(name, node, mbox, bindlist, context)
 
     def str_expr(self,
@@ -138,11 +140,12 @@ class TypeIns:
                     new_context[old_slot] = item
         return new_context
 
-    def getattribute(self,
-                     name: str,
-                     node: ast.AST,
-                     mbox: MessageBox,
-                     context: Optional[TypeContext] = None) -> 'TypeIns':
+    def getattribute(
+            self,
+            name: str,
+            node: ast.AST,
+            mbox: MessageBox,
+            context: Optional[TypeContext] = None) -> Option['TypeIns']:
         context = context or {}
         context = self.shadow(context)
         return self.temp.getattribute(name, node, mbox,
@@ -152,7 +155,7 @@ class TypeIns:
                 name: str,
                 node: ast.AST,
                 mbox: MessageBox,
-                context: Optional[TypeContext] = None) -> 'TypeIns':
+                context: Optional[TypeContext] = None) -> Option['TypeIns']:
         return self.getattribute(name, node, mbox, context)
 
     def getitem(self, items) -> 'TypeIns':
@@ -248,7 +251,7 @@ class TypeClassTemp(TypeTemp):
 
     def getattribute(self, name: str, node: ast.AST, mbox: MessageBox,
                      bindlist: BindList,
-                     context: Optional[TypeContext]) -> 'TypeIns':
+                     context: Optional[TypeContext]) -> Option['TypeIns']:
         res = self.get_local_attr(name)
         if not res:
             for basecls in self.baseclass:
@@ -256,8 +259,10 @@ class TypeClassTemp(TypeTemp):
                 if res:
                     return res
 
-        # TODO: output error if res is None
-        return res or any_ins
+        if res:
+            return Option(True, res)
+        else:
+            return Option(False, any_ins)
 
 
 class TypeFuncTemp(TypeTemp):
