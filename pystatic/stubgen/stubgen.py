@@ -6,7 +6,7 @@ from pystatic.arg import Arg, Argument
 from typing import List, Tuple
 from pystatic.target import Target
 from pystatic.uri import uri2list
-from pystatic.util import split_import_stmt
+# from pystatic.util import split_import_stmt
 from pystatic.typesys import TypeClassTemp, TypeFuncTemp, TypeIns, TypeTemp, TypeType
 from pystatic.symtable import SymTable
 

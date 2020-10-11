@@ -8,9 +8,8 @@ import logging
 from typing import Optional, Union, TYPE_CHECKING, List, Dict, Tuple
 from pystatic.symtable import Entry, SymTable
 from pystatic.typesys import TypeIns, TypeVar
-from pystatic.visitor import val_unparse, liter_unparse
+from pystatic.visitor import val_unparse, liter_unparse, VisitException
 from pystatic.preprocess.type_expr import eval_type_expr
-from pystatic.util import ParseException
 from pystatic.typesys import TpState
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ def record_stp(module_uri: str, node: Union[ast.Assign, ast.AnnAssign]):
             name = get_typevar_name(node.value)
             # FIXME: the defnode given here is incorrect
             entry = Entry(
-                TypeVar(module_uri, name).get_default_type(), node.value)
+                TypeVar(module_uri, name).get_default_typetype(), node.value)
             return name, entry
         else:
             assert 0, "not implemented yet"
@@ -67,7 +66,7 @@ def collect_typevar_info(tpvar: TypeVar, call_expr: ast.Call,
                 assert 0
                 # mbox.add_err(cons_node, 'failed to get type')
                 pass  # TODO: warning information
-        except ParseException as e:
+        except VisitException as e:
             assert 0
             # mbox.add_err(e.node, e.msg or 'failed to get type')
             pass  # TODO: warning information
@@ -89,7 +88,7 @@ def collect_typevar_info(tpvar: TypeVar, call_expr: ast.Call,
             else:
                 try:
                     bound_ins = eval_type_expr(kwarg.value, symtable)
-                except ParseException as e:
+                except VisitException as e:
                     assert 0
                     # mbox.add_err(e.node, e.msg or f'broken type')
                     pass
@@ -113,7 +112,7 @@ def collect_typevar_info(tpvar: TypeVar, call_expr: ast.Call,
                         assert 0
                         # mbox.add_err(kwarg, 'bool type expected')
                         pass
-                except ParseException as e:
+                except VisitException as e:
                     assert 0
                     # mbox.add_err(kwarg, e.msg or 'broken type')
                     pass
@@ -131,7 +130,7 @@ def collect_typevar_info(tpvar: TypeVar, call_expr: ast.Call,
                         assert 0
                         # mbox.add_err(kwarg, 'bool type expected')
                         pass
-                except ParseException as e:
+                except VisitException as e:
                     assert 0
                     # mbox.add_err(kwarg, e.msg or 'broken type')
                     pass
@@ -172,12 +171,12 @@ def collect_typevar_info(tpvar: TypeVar, call_expr: ast.Call,
 
 def get_typevar_name(call_expr: ast.Call) -> str:
     if len(call_expr.args) <= 0:
-        raise ParseException(call_expr,
+        raise VisitException(call_expr,
                              f'TypeVar needs at least one parameter')
 
     tpvar_name = liter_unparse(call_expr.args[0])
     if not tpvar_name:
-        raise ParseException(call_expr.args[0], f'invalid syntax')
+        raise VisitException(call_expr.args[0], f'invalid syntax')
     return tpvar_name
 
 
