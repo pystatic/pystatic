@@ -20,15 +20,7 @@ class ExprParser(BaseVisitor):
     def type_consistent(self, tp1, tp2):
         return self.checker.check(tp1, tp2)
 
-    def lookup_var(self, name):
-        tp = self.recorder.lookup_local(name)
-        if tp:
-            return tp
-        cur_type = self.recorder.cur_type
-        if self.recorder.is_defined(name):
-            return cur_type.lookup_local_var(name)
-        else:
-            return cur_type.lookup_var(name)
+
 
     def visit_Attribute(self, node: ast.Attribute):
         attr: str = node.attr

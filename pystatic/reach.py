@@ -15,6 +15,7 @@ class Reach(enum.Enum):
     UNKNOWN = 9  # uncertain about its reachability
 
 
+
 def cal_neg(res: Reach) -> Reach:
     if res == Reach.TYPE_TRUE:
         return Reach.TYPE_FALSE

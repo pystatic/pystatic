@@ -133,23 +133,3 @@ class SymTable:
         new_uri = self.uri + '.' + name
         return SymTable(new_uri, glob, non_local, builtins, new_scope)
 
-    """add by hj"""
-
-    def egb_lookup(self, name):
-        curtable = self.non_local
-        while curtable:
-            res = curtable.lookup_local(name)
-            if res:
-                return res
-            curtable = curtable.non_local
-        curtable = self.glob
-        if curtable:
-            res = curtable.lookup_local(name)
-            if res:
-                return res
-        return self.builtins.lookup_local(name)
-
-    def set_local_type(self, name, tp):
-        res = self.local.get(name)
-        assert res
-        res.set_type(tp)

@@ -167,6 +167,9 @@ class TypeIns:
     def call(self, args):
         assert False, "TODO"
 
+    def get_local_symbol(self, name: str) -> 'TypeIns':
+        return self.temp.get_local_symbol(name)
+
 
 class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
@@ -175,8 +178,17 @@ class TypeType(TypeIns):
     def getins(self) -> 'TypeIns':
         return self.temp.getins(self.bindlist)
 
-    def call(self) -> 'TypeIns':
+    def call(self, args) -> 'TypeIns':
         return self.getins()
+
+    def getattribute(self,
+                     name: str,
+                     node: ast.AST,
+                     mbox: MessageBox,
+                     context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        context = context or {}
+        context = self.shadow(context)
+        return self.temp.get_local_symbol
 
     def getitem(self, bindlist: BindList) -> 'TypeIns':
         assert False, "TODO"
@@ -263,6 +275,9 @@ class TypeClassTemp(TypeTemp):
             return Option(True, res)
         else:
             return Option(False, any_ins)
+
+    def get_local_symbol(self, name: str) -> 'TypeIns':
+        return self._inner_symtable.lookup_local(name)
 
 
 class TypeFuncTemp(TypeTemp):
@@ -419,6 +434,12 @@ class TypeFuncIns(TypeIns):
 
     def call(self, args):
         assert False, "TODO"
+
+    def lookup_local_var(self, name):
+        return self._inner_symtable.lookup_local(name)
+
+    def lookup_var(self, name):
+        return self._inner_symtable.egb_lookup(name)
 
 
 # special types (typing.py)
