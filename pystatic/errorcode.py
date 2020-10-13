@@ -1,5 +1,5 @@
 import ast
-from typing import Tuple
+from typing import Tuple, Optional
 from pystatic.typesys import TypeIns
 
 INCOMPATIBLE_TYPE_IN_ASSIGN = "Incompatible type in assignment"
@@ -17,22 +17,34 @@ INCOMPATIBLE_ARGUMENT = "Incompatible argument type for '{}'"
 
 
 class ErrorCode:
-    def __init__(self, node: ast.AST):
-        self.node = node
+    def __init__(self, res: Optional[TypeIns]):
+        self.res = res
 
     def make(self) -> Tuple[ast.AST, str]:
-        return self.node, ''
+        pass
 
     @staticmethod
     def concat_msg(review: str, detail: str):
         msg = review + "(" + detail + ")"
         return msg
 
+    def get_type(self):
+        return self.res
+
+
+class NoError(ErrorCode):
+    def __init__(self, res):
+        super().__init__(res)
+
 
 class IncompatibleTypeInAssign(ErrorCode):
-    def __init__(self, node: ast.AST, expect_type: TypeIns,
-                 expr_type: TypeIns):
-        super().__init__(node)
+    def __init__(self,
+                 node: ast.AST,
+                 expect_type: TypeIns,
+                 expr_type: TypeIns,
+                 res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
         self.expect_type = expect_type
         self.expr_type = expr_type
 
@@ -43,8 +55,12 @@ class IncompatibleTypeInAssign(ErrorCode):
 
 
 class SymbolUndefined(ErrorCode):
-    def __init__(self, node: ast.AST, name: str):
-        super().__init__(node)
+    def __init__(self,
+                 node: ast.AST,
+                 name: str,
+                 res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
         self.name = name
 
     def make(self) -> Tuple[ast.AST, str]:
@@ -53,8 +69,13 @@ class SymbolUndefined(ErrorCode):
 
 
 class IncompatibleReturnType(ErrorCode):
-    def __init__(self, node: ast.AST, expect_type: TypeIns, ret_type: TypeIns):
-        super().__init__(node)
+    def __init__(self,
+                 node: ast.AST,
+                 expect_type: TypeIns,
+                 ret_type: TypeIns,
+                 res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
         self.expect_type = expect_type
         self.ret_type = ret_type
 
@@ -65,9 +86,14 @@ class IncompatibleReturnType(ErrorCode):
 
 
 class IncompatibleArgument(ErrorCode):
-    def __init__(self, node: ast.AST, func_name: str, annotation: TypeIns,
-                 real_type: TypeIns):
-        super().__init__(node)
+    def __init__(self,
+                 node: ast.AST,
+                 func_name: str,
+                 annotation: TypeIns,
+                 real_type: TypeIns,
+                 res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
         self.func_name = func_name
         self.annotation = annotation
         self.real_type = real_type
@@ -79,32 +105,40 @@ class IncompatibleArgument(ErrorCode):
 
 
 class TooMoreValuesToUnpack(ErrorCode):
-    def __init__(self, node: ast.AST):
-        super().__init__(node)
+    def __init__(self, node: ast.AST, res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
 
     def make(self) -> Tuple[ast.AST, str]:
         return self.node, TOO_MORE_VALUES_TO_UNPACK
 
 
 class NeedMoreValuesToUnpack(ErrorCode):
-    def __init__(self, node: ast.AST):
-        super().__init__(node)
+    def __init__(self, node: ast.AST, res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
 
     def make(self) -> Tuple[ast.AST, str]:
         return self.node, NEED_MORE_VALUES_TO_UNPACK
 
 
 class ReturnValueExpected(ErrorCode):
-    def __init__(self, node: ast.AST):
-        super().__init__(node)
+    def __init__(self, node: ast.AST, res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
 
     def make(self) -> Tuple[ast.AST, str]:
         return self.node, RETURN_VALUE_EXPECTED
 
 
 class NoAttribute(ErrorCode):
-    def __init__(self, node: ast.AST, target_type: TypeIns, attr_name: str):
-        super().__init__(node)
+    def __init__(self,
+                 node: ast.AST,
+                 target_type: TypeIns,
+                 attr_name: str,
+                 res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
         self.target_type = target_type
         self.attr_name = attr_name
 
@@ -114,9 +148,14 @@ class NoAttribute(ErrorCode):
 
 
 class UnsupportedBinOperand(ErrorCode):
-    def __init__(self, node: ast.AST, operand: str, left_type: TypeIns,
-                 right_type: TypeIns):
-        super().__init__(node)
+    def __init__(self,
+                 node: ast.AST,
+                 operand: str,
+                 left_type: TypeIns,
+                 right_type: TypeIns,
+                 res: Optional[TypeIns] = None):
+        super().__init__(res)
+        self.node = node
         self.operand = operand
         self.left_type = left_type
         self.right_type = right_type

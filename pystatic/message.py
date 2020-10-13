@@ -1,6 +1,6 @@
 import ast
 from typing import Optional, List
-from pystatic.errorcode import ErrorCode
+from pystatic.errorcode import ErrorCode, NoError
 
 
 class Message(object):
@@ -8,7 +8,6 @@ class Message(object):
 
     from_node: generate an error message for the position implied by the node
     """
-
     def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
                  end_col_offset: Optional[int], msg: str):
         self.lineno = lineno
@@ -42,6 +41,8 @@ class MessageBox(object):
         self.error.append(Message.from_node(node, msg))
 
     def make(self, error: ErrorCode):
+        if isinstance(error, NoError):
+            return
         node, msg = error.make()
         self.add_err(node, msg)
 
