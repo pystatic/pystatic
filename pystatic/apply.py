@@ -32,7 +32,7 @@ ApplyResult = Tuple[Dict[str, InsWithAst], List[InsWithAst], Dict[str,
                                                                   InsWithAst]]
 
 
-def apply(param: Argument, applyargs: ApplyArgs) -> ApplyResult:
+def apply(param: 'Argument', applyargs: ApplyArgs) -> ApplyResult:
     i = 0
     arg_len = len(applyargs.args)
     origin_res = {}

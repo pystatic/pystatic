@@ -12,13 +12,13 @@ from pystatic.preprocess.type_expr import (eval_argument_type,
                                            template_resolve_fun)
 from typing import List, TYPE_CHECKING, Optional
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeModuleTemp,
-                              TypeVar, TpState, TypeTemp, any_ins, TypeIns)
+                              TypeVarTemp, TpState, TypeTemp, any_ins, TypeIns,
+                              TypeVarIns)
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
 from pystatic.preprocess.sym_util import (add_baseclass, get_cls_defnode,
-                                          get_temp_state, set_temp_state,
-                                          get_temp_state)
+                                          get_temp_state, set_temp_state)
 from pystatic.arg import Argument
 
 if TYPE_CHECKING:
@@ -156,19 +156,18 @@ class _TypeVarVisitor(BaseVisitor):
     Used to generate correct placeholders.
     """
     def __init__(self, symtable: 'SymTable',
-                 typevars: List['TypeVar']) -> None:
+                 typevars: List['TypeVarIns']) -> None:
         self.symtable = symtable
         self.typevars = typevars
 
     def visit_Name(self, node: ast.Name):
         curtype = self.symtable.lookup(node.id)
-        if curtype and isinstance(curtype.temp, TypeVar):
-            temp = curtype.temp
-            if temp not in self.typevars:
-                self.typevars.append(temp)
+        if curtype and isinstance(curtype, TypeVarIns):
+            if curtype not in self.typevars:
+                self.typevars.append(curtype)
 
     def visit_Attribute(self, node: ast.Attribute):
-        assert 0, "not implemented yet"
+        assert False, "not implemented yet"
 
     def visit_Subscript(self, node: ast.Subscript):
         self.visit(node.slice)

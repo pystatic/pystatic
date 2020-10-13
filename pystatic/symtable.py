@@ -29,14 +29,8 @@ class Entry:
         self._tp = tp
         self._defnode = defnode
 
-    def set_type(self, tp: 'TypeIns'):
-        self._tp = tp
-
     def get_type(self) -> 'TypeIns':
         return self._tp
-
-    def set_defnode(self, defnode: ast.AST):
-        self._defnode = defnode
 
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode

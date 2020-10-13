@@ -4,7 +4,7 @@ from pystatic.uri import absolute_urilist, Uri, uri2list, rel2absuri
 from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
                               TypePackageIns, TypeTemp, TypePackageTemp,
-                              TypeType, TpState)
+                              TypeType, TpState, any_ins)
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:
@@ -42,20 +42,6 @@ def add_cls_def(symtable: SymTable, name: str, temp: TypeClassTemp):
 
 def add_spt_def(symtable: SymTable, name: str, temp: TypeTemp):
     symtable._spt_types[name] = temp
-
-
-def add_import_item(symtable: 'SymTable', name: str, uri: 'Uri',
-                    origin_name: str, defnode: 'ImportNode'):
-    """Add import information to the symtable, this will add fake_imp_entry to
-    the local scope.
-    """
-    symtable._import_nodes.append(defnode)
-
-    # add fake import entry to the local scope
-    # TODO: warning if name collision happens
-    if isinstance(defnode, ast.ImportFrom):
-        tmp_entry = fake_imp_entry(uri, origin_name, defnode)
-        symtable.local[name] = tmp_entry  # type: ignore
 
 
 def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
@@ -136,18 +122,49 @@ def search_uri_symtable(symtable: 'SymTable', uri: str) -> Optional[TypeIns]:
     return cur_ins
 
 
-def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
-                      uri: Uri) -> Dict[Uri, List[Tuple[str, str]]]:
-    """Return: imported Moduri mapped to (name1, name2) where name1 is the name in the
-    current module and name2 is the name in the imported module.
+class ImportInfoItem:
+    __slots__ = ['uri', 'origin_name', 'asname']
+
+    def __init__(self, uri: str, origin_name: str, asname: str) -> None:
+        self.uri = uri
+        self.origin_name = origin_name
+        self.asname = asname
+
+    @property
+    def is_import_module(self):
+        """Import the whole module?"""
+        return self.origin_name == ''
+
+
+def add_import_item(symtable: 'SymTable', infoitem: 'ImportInfoItem',
+                    defnode: 'ImportNode'):
+    """Store import information in symtable.
+
+    def node will be simply appended to symtable's _import_nodes list.
+
+    If defnode represents a ImportFrom node, then an fake_imp_entry will be
+    added to the symtable's local scope.
     """
-    res = {}
+    symtable._import_nodes.append(defnode)
+
+    # TODO: warning if name collision happens
+    if isinstance(defnode, ast.ImportFrom):
+        tmp_entry = fake_imp_entry(infoitem.uri, infoitem.origin_name, defnode)
+        symtable.local[infoitem.asname] = tmp_entry  # type: ignore
+
+
+def analyse_import_stmt(node: Union[ast.Import, ast.ImportFrom],
+                        uri: Uri) -> List[ImportInfoItem]:
+    """Extract import information stored in import ast node.
+
+    Return an dict that maps uri to a list of ImportInfoItem.
+    """
+    info_list: List[ImportInfoItem] = []
     if isinstance(node, ast.Import):
         for alias in node.names:
             module_uri = alias.name
             as_name = alias.asname or module_uri
-            res.setdefault(module_uri, []).append(
-                (as_name, ''))  # empty string means the module itself
+            info_list.append(ImportInfoItem(module_uri, '', as_name))
 
     elif isinstance(node, ast.ImportFrom):
         imp_name = '.' * node.level
@@ -158,12 +175,12 @@ def split_import_stmt(node: Union[ast.Import, ast.ImportFrom],
             attr_name = alias.name
             as_name = alias.asname or attr_name
             imported.append((as_name, attr_name))
-        res = {module_uri: imported}
+            info_list.append(ImportInfoItem(module_uri, attr_name, as_name))
 
     else:
         raise TypeError("node doesn't stand for an import statement")
 
-    return res
+    return info_list
 
 
 def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):

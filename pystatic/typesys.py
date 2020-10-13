@@ -72,7 +72,7 @@ class TypeTemp:
         return self.getattribute(name, bindlist, context)
 
     def init_ins(self, applyargs: 'ApplyArgs',
-                 bindlist: BindList) -> Option[TypeIns]:
+                 bindlist: BindList) -> Option['TypeIns']:
         return Option(self.getins(bindlist))
 
     def getattribute(

@@ -14,7 +14,6 @@ from pystatic.symtable import Entry
 from pystatic.preprocess.type_expr import (eval_func_type, eval_type_expr,
                                            eval_argument_type,
                                            template_resolve_fun)
-from pystatic.preprocess.spt import resolve_typevar_ins
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +65,7 @@ def resolve_local_func(symtable: 'SymTable'):
                           ret: TypeIns, node: ast.FunctionDef):
         func_ins.add_overload(argument, ret)
         logger.debug(
-            f'overload ({symtable.uri}) {node.name}: {func_ins.get_str_expr(None)}'
+            f'overload ({symtable.uri}) {node.name}: {func_ins.str_expr(None)}'
         )
 
     template_resolve_fun(symtable, add_func_define, add_func_overload)

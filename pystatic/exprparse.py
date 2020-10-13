@@ -1,25 +1,42 @@
 import ast
-from copy import Error
 from typing import List, Optional
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
 from pystatic.message import MessageBox
 from pystatic.typesys import TypeIns
-from pystatic.arg import ApplyArgs
+from pystatic.apply import ApplyArgs
 from pystatic.option import Option
 
 
-def eval_expr(node: ast.AST, attr_consultant, mbox: MessageBox):
-    return ExprParser(attr_consultant, mbox).accept(node)
+def eval_expr(node: ast.AST,
+              attr_consultant,
+              mbox: MessageBox,
+              is_record: bool = True):
+    """
+    consultant:
+        support getattribute(str, ast.AST) -> Option[TypeIns]
+
+    is_record:
+        report error or not.
+    """
+    return ExprParser(attr_consultant, mbox, is_record).accept(node)
 
 
 class ExprParser(NoGenVisitor):
-    def __init__(self, consultant, mbox: MessageBox) -> None:
+    def __init__(self,
+                 consultant,
+                 mbox: MessageBox,
+                 is_record: bool = True) -> None:
+        """
+        is_record:
+            whether report error or not.
+        """
         self.consultant = consultant
         self.mbox = mbox
+        self.is_record = is_record
 
     def _add_err(self, errlist: Optional[List[ErrorCode]]):
-        if errlist:
+        if self.is_record and errlist:
             for errorcode in errlist:
                 self.mbox.make(errorcode)
 
