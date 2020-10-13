@@ -188,8 +188,11 @@ class TypeType(TypeIns):
     def call(self, args) -> 'TypeIns':
         return self.getins()
 
-    def getattribute(self, name: str, node: Optional[ast.AST],
-                     context: Optional[TypeContext]) -> Option['TypeIns']:
+    def getattribute(
+            self,
+            name: str,
+            node: Optional[ast.AST],
+            context: Optional[TypeContext] = None) -> Option['TypeIns']:
         context = context or {}
         context = self.shadow(context)
 
@@ -342,13 +345,6 @@ class TypeClassTemp(TypeTemp):
 
         self._glob_uri = module_uri  # the module uri that this class is defined
 
-    def _add_defer_var(self, name, attrs):
-        """Defer attribute type evaluation.
-
-        Never use this unless you have a good reason.
-        """
-        self.var_attr[name] = attrs
-
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         cls_defs = self._inner_symtable._cls_defs
         spt_defs = self._inner_symtable._spt_types
@@ -386,8 +382,11 @@ class TypeClassTemp(TypeTemp):
                     break
         return res
 
-    def getattribute(self, name: str, bindlist: BindList,
-                     context: Optional[TypeContext]) -> Optional['TypeIns']:
+    def getattribute(
+            self,
+            name: str,
+            bindlist: BindList,
+            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
         res = self.get_local_attr(name)
         if not res:
             for basecls in self.baseclass:

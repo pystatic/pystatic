@@ -2,6 +2,7 @@ from typing import Generic, Optional, TypeVar, Any, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from pystatic.errorcode import ErrorCode
+    from pystatic.message import MessageBox
 
 T = TypeVar('T', bound=Any, covariant=True)
 
@@ -25,3 +26,12 @@ class Option(Generic[T]):
 
     def set_value(self, value):
         self.value = value
+
+    def combine_error(self, other: 'Option'):
+        if other.errors:
+            self.add_errlist(other.errors)
+
+    def dump_to_box(self, mbox: 'MessageBox'):
+        if self.errors:
+            for error in self.errors:
+                mbox.make(error)

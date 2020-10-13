@@ -51,6 +51,10 @@ def get_fake_data(symtable: 'SymTable') -> FakeData:
     return fake_data
 
 
+def try_fake_data(symtable: 'SymTable') -> Optional[FakeData]:
+    return getattr(symtable, 'fake_data', None)
+
+
 def add_cls_def(symtable: SymTable, name: str, temp: TypeClassTemp):
     symtable._cls_defs[name] = temp
 

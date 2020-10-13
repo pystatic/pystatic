@@ -71,12 +71,19 @@ class TypeDefVisitor(BaseVisitor):
         if attr:
             # Unfortunately this is a hack to put temporary information
             # on class template's var_attr
+            assert self.clstemp
+            inner_sym = self.clstemp.get_inner_symtable()
+            fake_data = try_fake_data(inner_sym)
+            if fake_data and attr in fake_data.local:
+                return
+            if attr in inner_sym.local:
+                return
+
             tmp_attr = {
                 'node': node,
                 'symtable': self.symtable,
             }
-            assert self.clstemp
-            self.clstemp._add_defer_var(attr, tmp_attr)
+            self.clstemp.var_attr[attr] = tmp_attr  # type: ignore
 
     def accept_func(self, node: ast.FunctionDef):
         for stmt in node.body:
@@ -130,6 +137,7 @@ class TypeDefVisitor(BaseVisitor):
 
             tpvarins.tpvar_name = last_target.id
             self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
+            logger.debug(f'TypeVar {tpvarins.tpvar_name}')
 
         else:
             for target in node.targets:
@@ -151,6 +159,8 @@ class TypeDefVisitor(BaseVisitor):
 
             tpvarins.tpvar_name = last_target.id
             self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
+            logger.debug(f'TypeVar {tpvarins.tpvar_name}')
+
         else:
             name = self._is_new_def(node.target)
             if name:

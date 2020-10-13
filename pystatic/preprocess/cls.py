@@ -4,17 +4,16 @@ Resolve class related type information.
 
 import ast
 import logging
-import copy
 from pystatic.target import MethodTarget
-from pystatic.preprocess.type_expr import (eval_argument_type,
-                                           eval_return_type,
-                                           eval_type_def_expr, eval_func_type,
-                                           template_resolve_fun)
+from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
+                                          eval_type_def_expr,
+                                          template_resolve_fun)
 from typing import List, TYPE_CHECKING, Optional
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeModuleTemp,
                               TypeVarTemp, TpState, TypeTemp, any_ins, TypeIns,
-                              TypeVarIns)
+                              TypeVarIns, TypeType)
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
+from pystatic.message import MessageBox
 from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
 from pystatic.preprocess.sym_util import (add_baseclass, get_cls_defnode,
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def resolve_cls_def(targets: List['BlockTarget']):
+def resolve_cls_def(targets: List['BlockTarget'], mbox: 'MessageBox'):
     """Get class definition information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
@@ -41,7 +40,7 @@ def resolve_cls_def(targets: List['BlockTarget']):
 
     # inheritance
     for temp in resolve_order:
-        _resolve_cls_inh(temp)
+        _resolve_cls_inh(temp, mbox)
         set_temp_state(temp, TpState.OVER)
 
 
@@ -105,14 +104,17 @@ def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
     clstemp.placeholders = visitor.typevars
 
 
-def _resolve_cls_inh(clstemp: 'TypeClassTemp'):
+def _resolve_cls_inh(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
     assert _check_cls_state(clstemp)
     symtable = clstemp.get_def_symtable()
     defnode = get_cls_defnode(clstemp)
 
     for base_node in defnode.bases:
-        res_type = eval_type_def_expr(base_node, symtable)
+        option_base = eval_type_def_expr(base_node, symtable)
+        option_base.dump_to_box(mbox)
+        res_type = option_base.value
+        assert isinstance(res_type, TypeType)
         if res_type:
             add_baseclass(clstemp, res_type)
 
@@ -173,19 +175,21 @@ class _TypeVarVisitor(BaseVisitor):
         self.visit(node.slice)
 
 
-def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
+def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor',
+                       mbox: 'MessageBox'):
     # uri here is not set correctly
     for tp_temp in symtable._cls_defs.values():
-        mt = _resolve_cls_method(uri, tp_temp)
+        mt = _resolve_cls_method(uri, tp_temp, mbox)
         if mt:
             worker.process_block(mt, False)
 
     for tp_temp in symtable._cls_defs.values():
         new_uri = '.'.join([uri, tp_temp.basename])
-        resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker)
+        resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker, mbox)
 
 
-def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
+def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
+                        mbox: 'MessageBox'):
     targets = []
     new_fun_defs = {}
     symtable = clstemp.get_inner_symtable()
@@ -211,12 +215,17 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
             argument.args[0].ann = clstemp.get_default_ins()
 
     def add_def(node: ast.FunctionDef) -> TypeFuncIns:
-        nonlocal symtable, new_fun_defs
-        argument = eval_argument_type(node.args, symtable)
-        assert argument
-        ret_ins = eval_return_type(node.returns, symtable).getins()
-        name = node.name
+        nonlocal symtable, new_fun_defs, mbox
+        option_argument = eval_argument_type(node.args, symtable)
+        option_return = eval_return_type(node.returns, symtable)
 
+        option_argument.dump_to_box(mbox)
+        option_return.dump_to_box(mbox)
+
+        argument = option_argument.value
+        ret_ins = option_return.value
+
+        name = node.name
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(argument, is_classmethod, is_staticmethod)
 
@@ -243,19 +252,19 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
         logger.debug(
             f'overload ({symtable.uri}) {node.name}: {ins.str_expr(None)}')
 
-    template_resolve_fun(symtable, add_def, add_overload)
+    template_resolve_fun(symtable, add_def, add_overload, mbox)
     symtable._func_defs = new_fun_defs
 
     return targets
 
 
-def resolve_cls_attr(symtable: 'SymTable'):
+def resolve_cls_attr(symtable: 'SymTable', mbox: 'MessageBox'):
     for tp_temp in symtable._cls_defs.values():
-        _resolve_cls_attr(tp_temp)
-        resolve_cls_attr(tp_temp.get_inner_symtable())
+        _resolve_cls_attr(tp_temp, mbox)
+        resolve_cls_attr(tp_temp.get_inner_symtable(), mbox)
 
 
-def _resolve_cls_attr(clstemp: 'TypeClassTemp'):
+def _resolve_cls_attr(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     true_var_attr = {}
     for name, tp_attr in clstemp.var_attr.items():
         # tp_attr is the temporary dict set in definition.py
@@ -263,12 +272,12 @@ def _resolve_cls_attr(clstemp: 'TypeClassTemp'):
         symtb = tp_attr.get('symtable')  # type: ignore
         assert typenode
         assert symtb
-        var_type = eval_type_def_expr(typenode, symtb)
-        if var_type:
-            var_ins = var_type.getins()
-            true_var_attr[name] = var_ins
-            logger.debug(f'add attribute {name}: {var_ins} to {clstemp}')
-        else:
-            # TODO: warning here
-            true_var_attr[name] = any_ins
+        option_var = eval_type_def_expr(typenode, symtb)
+        var_ins = option_var.value
+
+        option_var.dump_to_box(mbox)
+
+        true_var_attr[name] = var_ins
+        logger.debug(
+            f'add attribute {name}: {var_ins} to {clstemp.str_expr(None)}')
     clstemp.var_attr = true_var_attr

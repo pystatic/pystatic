@@ -115,20 +115,20 @@ class Preprocessor:
         for target in to_check:
             resolve_import_type(target.symtable, self)
 
-        resolve_cls_def(to_check)
+        resolve_cls_def(to_check, self.mbox)
 
         # from now on, all valid types in the module should be correctly
         # identified because possible type(class) information is collected.
         for target in to_check:
-            resolve_local_typeins(target.symtable)
-            resolve_local_func(target.symtable)
+            resolve_local_typeins(target.symtable, self.mbox)
+            resolve_local_func(target.symtable, self.mbox)
 
         for target in to_check:
             resolve_import_ins(target.symtable, self)
 
         for target in to_check:
-            resolve_cls_method(target.symtable, target.uri, self)
-            resolve_cls_attr(target.symtable)
+            resolve_cls_method(target.symtable, target.uri, self, self.mbox)
+            resolve_cls_attr(target.symtable, self.mbox)
 
             if isinstance(target, Target):
                 target.stage = Stage.Processed
