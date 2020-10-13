@@ -359,14 +359,22 @@ class TypeClassTemp(TypeTemp):
     def get_type_attribute(
             self, name: str, bindlist: BindList,
             context: Optional[TypeContext]) -> Optional['TypeIns']:
-        return self._inner_symtable.lookup_local(name)
+        res = self._inner_symtable.lookup_local(name)
+        if not res:
+            for basecls in self.baseclass:
+                res = basecls.getattribute(name, None, None).value
+                if res:
+                    break
+        return res
 
     def getattribute(self, name: str, bindlist: BindList,
                      context: Optional[TypeContext]) -> Optional['TypeIns']:
         res = self.get_local_attr(name)
         if not res:
             for basecls in self.baseclass:
-                res = basecls.getattribute(name, bindlist, context)
+                res = basecls.getattribute(name, None, None).value
+                if res:
+                    break
         return res
 
 

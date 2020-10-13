@@ -6,13 +6,11 @@ import ast
 import logging
 from pystatic.arg import Argument
 from typing import Any, Optional, overload
-from pystatic.preprocess.sym_util import fake_fun_entry, fake_local_entry
+from pystatic.preprocess.sym_util import *
 from pystatic.symtable import SymTable
-from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns,
-                              any_type)
+from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns)
 from pystatic.symtable import Entry
 from pystatic.preprocess.type_expr import (eval_func_type, eval_type_expr,
-                                           eval_argument_type,
                                            template_resolve_fun)
 
 logger = logging.getLogger(__name__)
@@ -20,22 +18,23 @@ logger = logging.getLogger(__name__)
 
 def resolve_local_typeins(symtable: 'SymTable'):
     """Resolve local symbols' TypeIns"""
+    fake_data = get_fake_data(symtable)
+
     new_entry = {}
-    for name, entry in symtable.local.items():
-        entry: Any
-        if isinstance(entry, fake_local_entry):
-            # entry may also be temporary fake_imp_entry which should not be
-            # resolved here.
-            defnode = entry.defnode
-            assert defnode
-            var_type = eval_type_expr(defnode, symtable)
-            if var_type:
-                func_ins = var_type.getins()
-            else:
-                # TODO warning here
-                func_ins = any_ins
-            new_entry[name] = Entry(func_ins, defnode)
-            logger.debug(f'({symtable.uri}) {name}: {func_ins}')
+    for name, entry in fake_data.local.items():
+        assert isinstance(entry, fake_local_entry)
+        # entry may also be temporary fake_imp_entry which should not be
+        # resolved here.
+        defnode = entry.defnode
+
+        var_type = eval_type_expr(defnode, symtable)
+        if var_type:
+            func_ins = var_type.getins()
+        else:
+            # TODO warning here
+            func_ins = any_ins
+        new_entry[name] = Entry(func_ins, defnode)
+        logger.debug(f'({symtable.uri}) {name}: {func_ins}')
 
     symtable.local.update(new_entry)
 

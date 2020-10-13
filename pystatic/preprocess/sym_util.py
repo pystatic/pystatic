@@ -1,7 +1,7 @@
 import ast
 import logging
-from pystatic.uri import absolute_urilist, Uri, uri2list, rel2absuri
 from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
+from pystatic.uri import absolute_urilist, Uri, uri2list, rel2absuri
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
                               TypePackageIns, TypeTemp, TypePackageTemp,
                               TypeType, TpState, any_ins)
@@ -15,9 +15,8 @@ logger = logging.getLogger(__name__)
 
 class FakeData:
     def __init__(self):
-        self.fun: List['fake_fun_entry'] = []
-        self.local: List['fake_local_entry'] = []
-        self.typevar: List['fake_local_entry'] = []
+        self.fun: Dict[str, 'fake_fun_entry'] = {}
+        self.local: Dict[str, 'fake_local_entry'] = {}
         self.impt: List['fake_impt_entry'] = []
 
 
@@ -62,12 +61,16 @@ def add_spt_def(symtable: SymTable, name: str, temp: TypeTemp):
 
 def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
     fake_data = get_fake_data(symtable)
-    fake_data.fun.append(fake_fun_entry(name, node))
+    if name in fake_data.fun:
+        fake_data.fun[name].defnodes.append(node)
+    else:
+        fake_data.fun[name] = fake_fun_entry(name, node)
 
 
 def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
     fake_data = get_fake_data(symtable)
-    fake_data.local.append(fake_local_entry(name, node))
+    entry = fake_local_entry(name, node)
+    fake_data.local[name] = entry
 
 
 class ImportInfoItem:
@@ -82,25 +85,6 @@ class ImportInfoItem:
     def is_import_module(self):
         """Import the whole module?"""
         return self.origin_name == ''
-
-
-def add_import(symtable: 'SymTable', infoitem: 'ImportInfoItem',
-               defnode: 'ImportNode'):
-    """Store import information.
-
-    def node will be simply appended to symtable's _import_nodes list.
-
-    If defnode represents a ImportFrom node, then an fake_imp_entry will be
-    added to the symtable's fake_data.
-    """
-    symtable._import_nodes.append(defnode)
-
-    # TODO: warning if name collision happens
-    if isinstance(defnode, ast.ImportFrom):
-        tmp_entry = fake_impt_entry(infoitem.uri, infoitem.origin_name,
-                                    defnode)
-        fake_data = get_fake_data(symtable)
-        fake_data.impt.append(tmp_entry)
 
 
 def analyse_import_stmt(node: Union[ast.Import, ast.ImportFrom],
@@ -131,6 +115,25 @@ def analyse_import_stmt(node: Union[ast.Import, ast.ImportFrom],
         raise TypeError("node doesn't stand for an import statement")
 
     return info_list
+
+
+def add_import(symtable: 'SymTable', infoitem: 'ImportInfoItem',
+               defnode: 'ImportNode'):
+    """Store import information.
+
+    def node will be simply appended to symtable's _import_nodes list.
+
+    If defnode represents a ImportFrom node, then an fake_imp_entry will be
+    added to the symtable's fake_data.
+    """
+    symtable._import_nodes.append(defnode)
+
+    # TODO: warning if name collision happens
+    if isinstance(defnode, ast.ImportFrom):
+        tmp_entry = fake_impt_entry(infoitem.uri, infoitem.origin_name,
+                                    defnode)
+        fake_data = get_fake_data(symtable)
+        fake_data.impt.append(tmp_entry)
 
 
 def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):

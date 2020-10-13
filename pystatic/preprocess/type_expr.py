@@ -5,7 +5,7 @@ from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeFuncIns, TypeIns, ellipsis_type, TypeType,
                               any_type, none_type, any_ins)
 from pystatic.arg import Argument, Arg
-from pystatic.preprocess.sym_util import fake_fun_entry
+from pystatic.preprocess.sym_util import *
 
 
 def eval_type_expr(node: TypeDefNode,
@@ -160,8 +160,8 @@ def template_resolve_fun(symtable: 'SymTable', add_func_define: TAddFunDef,
         ret_ins = eval_return_type(node.returns, symtable).getins()
         return argument, ret_ins
 
-    for name, entry in symtable._func_defs.items():  # type: ignore
-        entry: 'fake_fun_entry'
+    fake_data = get_fake_data(symtable)
+    for name, entry in fake_data.fun.items():
         assert isinstance(entry, fake_fun_entry)
 
         overload_list = []
@@ -225,7 +225,7 @@ class TypeExprVisitor(BaseVisitor):
         left_type = self.visit(node.value)
         assert isinstance(left_type, TypeIns)
 
-        res_type = left_type.getattribute(node.attr, node, None)
+        res_type = left_type.getattribute(node.attr, node, None).value
         # TODO: report error when res_type is not TypeIns
         assert isinstance(res_type, TypeIns)
         return res_type

@@ -9,9 +9,7 @@ from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
 from pystatic.exprparse import eval_expr
-from pystatic.preprocess.sym_util import (add_import, add_fun_def,
-                                          add_local_var, add_cls_def,
-                                          analyse_import_stmt, ImportInfoItem)
+from pystatic.preprocess.sym_util import *
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -128,10 +126,11 @@ class TypeDefVisitor(BaseVisitor):
         if tpvarins:
             assert isinstance(tpvarins, TypeVarIns)
             last_target = node.targets[-1]
-            assert isinstance(last_target, ast.Name), "TODO: add error here"
+            assert isinstance(last_target, ast.Name), "TODO"
 
             tpvarins.tpvar_name = last_target.id
             self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
+
         else:
             for target in node.targets:
                 name = self._is_new_def(target)
@@ -142,13 +141,16 @@ class TypeDefVisitor(BaseVisitor):
                     self._try_attr(node, target)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        assert False, "not implemented yet"
-        name, entry = record_stp(self.glob_uri, node)
-        if entry:
-            assert name
-            self.symtable.add_entry(name, entry)
-            logger.debug(f'add type var {name}'
-                         )  # because currently only support TypeVar
+        tpvarins = None
+        if node.value:
+            tpvarins = self._is_typevar(node.value)
+        if tpvarins:
+            assert isinstance(tpvarins, TypeVarIns)
+            last_target = node.target
+            assert isinstance(last_target, ast.Name), "TODO"
+
+            tpvarins.tpvar_name = last_target.id
+            self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
         else:
             name = self._is_new_def(node.target)
             if name:
