@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TypeVar, Any, TYPE_CHECKING
+from typing import Generic, Optional, TypeVar, Any, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from pystatic.errorcode import ErrorCode
@@ -17,6 +17,11 @@ class Option(Generic[T]):
         if not self.errors:
             self.errors = []
         self.errors.append(error)
+
+    def add_errlist(self, errors: List['ErrorCode']):
+        if not self.errors:
+            self.errors = []
+        self.errors.extend(errors)
 
     def set_value(self, value):
         self.value = value

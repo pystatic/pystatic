@@ -110,7 +110,8 @@ class SymTable:
     def getattr(self, name: str) -> Optional['TypeIns']:
         return self.lookup(name)
 
-    def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
+    def getattribute(self, name: str,
+                     node: Optional[ast.AST]) -> Option['TypeIns']:
         """Getattribute from symtable
 
         support the getattribute interface.
