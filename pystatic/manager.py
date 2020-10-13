@@ -57,7 +57,7 @@ class Manager:
 
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
-        self.start_infer()
+        # self.start_infer()
         self.mbox.report()
 
     def start_infer(self):

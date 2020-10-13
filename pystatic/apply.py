@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 class InsWithAst:
-    __slots__ = ['int', 'node']
+    __slots__ = ['ins', 'node']
 
     def __init__(self, tpins: 'TypeIns', node: ast.AST) -> None:
         self.ins = tpins

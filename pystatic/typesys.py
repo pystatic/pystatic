@@ -4,13 +4,13 @@ import copy
 from typing import (Callable, Optional, Dict, List, Tuple, Union,
                     TYPE_CHECKING, Final)
 from pystatic.option import Option
-from pystatic.symtable import Entry, SymTable
 from pystatic.uri import Uri
 from pystatic.errorcode import *
 from pystatic.apply import InsWithAst, apply, ApplyArgs, ApplyResult
 
 if TYPE_CHECKING:
     from pystatic.arg import Argument
+    from pystatic.symtable import Entry, SymTable
 
 TypeContext = Dict['TypeVarIns', 'TypeType']
 TypeVarList = List['TypeVarIns']
@@ -211,16 +211,11 @@ class TypeType(TypeIns):
 
 
 class TypeVarTemp(TypeTemp):
-    def __init__(self, param: 'Argument'):
+    def __init__(self):
         super().__init__('TypeVar', 'typing')
-        self.param = param
 
     def init_ins(self, applyargs: 'ApplyArgs',
                  bindlist: BindList) -> Option[TypeIns]:
-        args, star_args, star_kwargs = apply(self.param, applyargs)
-        default_ins = TypeVarIns(DEFAULT_TYPEVAR_NAME, bound=any_ins)
-        ins_option = Option(default_ins)
-
         def extract_value(ins_ast: Optional[InsWithAst], expect_type):
             if not ins_ast:
                 return None
@@ -236,46 +231,60 @@ class TypeVarTemp(TypeTemp):
                 # TODO: add error here
                 return None
 
-        if 'name' not in args:
-            # TODO: add error for TypeVar name mismatch
-            # ins_option.add_err(...)
-            return ins_option
-        else:
-            name_ins_ast = args['name']
-            if isinstance(name_ins_ast.ins, TypeLiteralIns):
-                name = name_ins_ast.ins.value
-                if not isinstance(name, str):
-                    # TODO: add error for type mismatch
-                    return ins_option
-                else:
-                    default_ins.tpvar_name = name
-            else:
-                # TODO: add error for type mismatch
-                return ins_option
+        default_ins = TypeVarIns(DEFAULT_TYPEVAR_NAME, bound=any_ins)
+        ins_option = Option(default_ins)
+        args_rear = 0
 
-        covariant = extract_value(args.get('covariant'), bool) or False
-        contravariant = extract_value(args.get('contravariant'), bool) or False
+        if applyargs.args:
+            name = extract_value(applyargs.args[0], str)
+            if name:
+                default_ins.tpvar_name = name
+            else:
+                assert False, "TODO"
+            args_rear = 1
+        else:
+            assert False, "TODO"
+
+        if len(applyargs.args) > args_rear:
+            default_ins.bound = None
+            for rangenode in applyargs.args[args_rear:]:
+                assert isinstance(rangenode.ins, TypeType), "TODO"
+                default_ins.constrains.append(rangenode.ins)
+
+        cova = applyargs.kwargs.get('covariant')
+        if not cova:
+            covariant = False
+        else:
+            covariant = extract_value(cova, bool)
+            if not covariant:
+                assert False, "TODO"
+
+        contra = applyargs.kwargs.get('contravariant')
+        if not contra:
+            contravariant = False
+        else:
+            contravariant = extract_value(contra, bool)
+            if not contravariant:
+                assert False, "TODO"
+
+        bound_ins_ast = applyargs.kwargs.get('bound')
+        if bound_ins_ast:
+            if default_ins.constrains:
+                assert False, "TODO"
+            bound = bound_ins_ast.ins
+            assert isinstance(bound, TypeType), "TODO"
+            default_ins.bound = bound
 
         if covariant and contravariant:
-            # TODO: add error for covariant and contravariant occurs together
-            pass
+            assert False, "TODO"
 
         if covariant:
-            default_ins.attr = TpVarKind.COVARIANT
+            default_ins.kind = TpVarKind.COVARIANT
         elif contravariant:
-            default_ins.attr = TpVarKind.CONTRAVARIANT
+            default_ins.kind = TpVarKind.CONTRAVARIANT
         else:
-            default_ins.attr = TpVarKind.INVARIANT
+            default_ins.kind = TpVarKind.INVARIANT
 
-        if 'bound' in args:
-            bound = extract_value(args['bound'], TypeIns)
-            if bound:
-                default_ins.bound = bound
-            else:
-                # TODO: add error here
-                pass
-
-        # TODO: support list types in TypeVar definition
         return ins_option
 
 
@@ -284,11 +293,11 @@ class TypeVarIns(TypeIns):
                  tpvar_name: str,
                  *args: 'TypeIns',
                  bound: Optional['TypeIns'] = None,
-                 attr: TpVarKind = TpVarKind.INVARIANT):
+                 kind: TpVarKind = TpVarKind.INVARIANT):
         self.tpvar_name = tpvar_name
         self.bound = bound
-        assert attr == TpVarKind.INVARIANT or attr == TpVarKind.COVARIANT or attr == TpVarKind.CONTRAVARIANT
-        self.attr = attr
+        assert kind == TpVarKind.INVARIANT or kind == TpVarKind.COVARIANT or kind == TpVarKind.CONTRAVARIANT
+        self.kind = kind
         self.constrains: List['TypeIns'] = list(*args)
 
 
@@ -482,11 +491,11 @@ class TypePackageIns(TypeIns):
         super().__init__(pkgtemp, None)
         self.submodule: Dict[str, TypeIns] = {}  # submodule
 
-    def add_submodule(self, name: str, ins: TypeIns):
-        self.submodule[name] = ins
-        assert isinstance(self.temp, TypePackageTemp)
-        inner_sym = self.temp.get_inner_symtable()
-        inner_sym.add_entry(name, Entry(ins))
+    # def add_submodule(self, name: str, ins: TypeIns):
+    #     self.submodule[name] = ins
+    #     assert isinstance(self.temp, TypePackageTemp)
+    #     inner_sym = self.temp.get_inner_symtable()
+    #     inner_sym.add_entry(name, Entry(ins))
 
 
 class TypeFuncIns(TypeIns):
@@ -533,6 +542,7 @@ tuple_temp = TypeTupleTemp()
 optional_temp = TypeOptionalTemp()
 literal_temp = TypeLiteralTemp()
 union_temp = TypeUnionTemp()
+typevar_temp = TypeVarTemp()
 
 # builtins.py
 func_temp = TypeFuncTemp()
@@ -541,6 +551,7 @@ func_temp = TypeFuncTemp()
 ellipsis_type = TypeType(ellipsis_temp, None)
 none_type = TypeType(none_temp, None)
 any_type = TypeType(any_temp, None)
+typevar_type = TypeType(typevar_temp, None)
 
 any_ins = TypeIns(any_temp, None)
 ellipsis_ins = TypeIns(ellipsis_temp, None)

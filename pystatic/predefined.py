@@ -1,5 +1,6 @@
 import typing
 from pystatic.symtable import SymTable, TableScope, Entry
+from pystatic.arg import Argument, Arg
 from pystatic.typesys import *
 
 builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
@@ -28,6 +29,7 @@ add_spt_def('Tuple', tuple_temp)
 add_spt_def('Optional', optional_temp)
 add_spt_def('Literal', literal_temp)
 add_spt_def('Union', union_temp)
+add_spt_def('TypeVar', typevar_temp, typevar_type)
 
 
 def get_builtin_symtable() -> SymTable:

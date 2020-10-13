@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
 from pystatic.uri import rel2absuri, Uri, uri2list
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
-from pystatic.preprocess.sym_util import (fake_imp_entry, add_uri_symtable,
+from pystatic.preprocess.sym_util import (fake_impt_entry, add_uri_symtable,
                                           search_uri_symtable,
                                           analyse_import_stmt)
 
@@ -107,7 +107,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
     """
     imp_entry: Any = symtable.lookup_entry(name)
 
-    if not isinstance(imp_entry, fake_imp_entry):
+    if not isinstance(imp_entry, fake_impt_entry):
         return False
 
     cur_state = (imp_entry.uri, imp_entry.origin_name)
@@ -134,7 +134,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
 
         cur_entry: Any = cur_symtable.lookup_local_entry(name_in_mod)
         if cur_entry:
-            if isinstance(cur_entry, fake_imp_entry):
+            if isinstance(cur_entry, fake_impt_entry):
                 # indirect import
                 cur_state = (cur_entry.uri, cur_entry.origin_name)
                 buf_targets.append((cur_symtable, name_in_mod))
@@ -166,7 +166,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
             for target_symtable, target_name in buf_targets:
                 assert isinstance(target_symtable, SymTable)
                 entry: Any = target_symtable.lookup_local_entry(target_name)
-                assert isinstance(entry, fake_imp_entry)
+                assert isinstance(entry, fake_impt_entry)
                 new_entry = Entry(result, entry.defnode)
                 target_symtable.local[
                     name] = new_entry  # avoid possible name collision test
@@ -175,7 +175,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
             for target_symtable, target_name in buf_targets:
                 assert isinstance(target_symtable, SymTable)
                 entry: Any = target_symtable.lookup_local_entry(target_name)
-                assert isinstance(entry, fake_imp_entry)
+                assert isinstance(entry, fake_impt_entry)
                 new_entry = Entry(result, entry.defnode)
                 target_symtable.local[name] = new_entry
             return True
@@ -185,7 +185,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
         for target_symtable, target_name in buf_targets:
             assert isinstance(target_symtable, SymTable)
             entry: Any = target_symtable.lookup_local_entry(target_name)
-            assert isinstance(entry, fake_imp_entry)
+            assert isinstance(entry, fake_impt_entry)
             new_entry = Entry(any_ins, entry.defnode)
             target_symtable.local[name] = new_entry  # same as above
         return False

@@ -3,18 +3,17 @@ from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
 from pystatic.message import MessageBox
-from pystatic.typesys import TypeIns
+from pystatic.typesys import TypeIns, TypeLiteralIns
 from pystatic.apply import ApplyArgs
 from pystatic.option import Option
 
 
 class SupportGetAttribute(Protocol):
-    def getattribute(self, name: str,
-                     node: Optional[ast.AST]) -> Option['TypeIns']:
+    def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
         ...
 
 
-def eval_expr(node: Optional[ast.AST], attr_consultant: SupportGetAttribute):
+def eval_expr(node: ast.AST, attr_consultant: SupportGetAttribute):
     """
     consultant:
         support getattribute(str, ast.AST) -> Option[TypeIns]
@@ -38,7 +37,7 @@ class ExprParser(NoGenVisitor):
         if errlist:
             self.errors.extend(errlist)
 
-    def accept(self, node) -> Option[TypeIns]:
+    def accept(self, node: ast.AST) -> Option[TypeIns]:
         self.errors = []
         tpins = self.visit(node)
         assert isinstance(tpins, TypeIns)
@@ -53,6 +52,9 @@ class ExprParser(NoGenVisitor):
 
         self._add_err(name_option.errors)
         return name_option.value
+
+    def visit_Constant(self, node: ast.Constant) -> TypeIns:
+        return TypeLiteralIns(node.value)
 
     def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
         res = self.visit(node.value)

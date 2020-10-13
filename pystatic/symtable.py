@@ -110,8 +110,7 @@ class SymTable:
     def getattr(self, name: str) -> Optional['TypeIns']:
         return self.lookup(name)
 
-    def getattribute(self, name: str,
-                     node: Optional[ast.AST]) -> Option['TypeIns']:
+    def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
         """Getattribute from symtable
 
         support the getattribute interface.
@@ -121,6 +120,8 @@ class SymTable:
         res = self.lookup(name)
         if not res:
             option_res.add_err(SymbolUndefined(node, name))
+        else:
+            option_res.set_value(res)
         return option_res
 
     def lookup_local_entry(self, name: str) -> Optional['Entry']:

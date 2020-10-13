@@ -9,7 +9,7 @@ from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
 from pystatic.exprparse import eval_expr
-from pystatic.preprocess.sym_util import (add_import_item, add_fun_def,
+from pystatic.preprocess.sym_util import (add_import, add_fun_def,
                                           add_local_var, add_cls_def,
                                           analyse_import_stmt, ImportInfoItem)
 
@@ -85,7 +85,7 @@ class TypeDefVisitor(BaseVisitor):
             self.visit(stmt)
 
     @contextmanager
-    def enter_class(self, new_symtable, clsname: str):
+    def enter_class(self, new_symtable: 'SymTable', clsname: str):
         old_symtable = self.symtable
         old_is_method = self._is_method
 
@@ -114,11 +114,11 @@ class TypeDefVisitor(BaseVisitor):
 
     def _is_typevar(self, node: ast.expr) -> Optional[TypeVarIns]:
         if isinstance(node, ast.Call):
-            f_ins = eval_expr(node, self.symtable, self.mbox, False)
+            f_ins = eval_expr(node.func, self.symtable).value
             if isinstance(f_ins, TypeType) and isinstance(
                     f_ins.temp, TypeVarTemp):
-                res = eval_expr(node, self.symtable, self.mbox, False)
-                assert isinstance(res, TypeVarIns)
+                res = eval_expr(node, self.symtable).value
+                assert isinstance(res, TypeVarIns), "TODO"
                 return res
         return None
 
@@ -195,7 +195,7 @@ class TypeDefVisitor(BaseVisitor):
                          info_list: List[ImportInfoItem]):
         """Add import information to the symtable.
 
-        imp_dict:
+        info_list:
             import information dict returned by split_import_stmt.
         """
         read_typing = False  # flag, if True typing module has been read
@@ -224,7 +224,7 @@ class TypeDefVisitor(BaseVisitor):
                                                     Entry(tpins, node))
                             return
             self.worker.add_cache_target_uri(infoitem.uri)
-            add_import_item(self.symtable, infoitem, node)
+            add_import(self.symtable, infoitem, node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         add_fun_def(self.symtable, node.name, node)

@@ -13,6 +13,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class FakeData:
+    def __init__(self):
+        self.fun: List['fake_fun_entry'] = []
+        self.local: List['fake_local_entry'] = []
+        self.typevar: List['fake_local_entry'] = []
+        self.impt: List['fake_impt_entry'] = []
+
+
 class fake_fun_entry:
     def __init__(self, name: str, defnode: ast.FunctionDef) -> None:
         self.name = name
@@ -28,12 +36,20 @@ class fake_local_entry:
         self.defnode = defnode
 
 
-class fake_imp_entry:
+class fake_impt_entry:
     def __init__(self, uri: 'Uri', origin_name: str,
                  defnode: ImportNode) -> None:
         self.uri = uri
         self.origin_name = origin_name
         self.defnode = defnode
+
+
+def get_fake_data(symtable: 'SymTable') -> FakeData:
+    if not hasattr(symtable, 'fake_data'):
+        setattr(symtable, 'fake_data', FakeData())
+    fake_data = getattr(symtable, 'fake_data')
+    assert isinstance(fake_data, FakeData)
+    return fake_data
 
 
 def add_cls_def(symtable: SymTable, name: str, temp: TypeClassTemp):
@@ -45,18 +61,93 @@ def add_spt_def(symtable: SymTable, name: str, temp: TypeTemp):
 
 
 def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
-    """Add function definition information to the symtable, this will add
-    fake_fun_entry to the _func_defs of the symtable."""
-    if name in symtable._func_defs:
-        assert isinstance(symtable._func_defs[name], fake_fun_entry)
-        symtable._func_defs[name].add_defnode(node)  # type: ignore
-    else:
-        symtable._func_defs[name] = fake_fun_entry(name, node)  # type: ignore
+    fake_data = get_fake_data(symtable)
+    fake_data.fun.append(fake_fun_entry(name, node))
 
 
 def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
-    # add fake local variable entry to the local scope
-    symtable.local[name] = fake_local_entry(name, node)  # type: ignore
+    fake_data = get_fake_data(symtable)
+    fake_data.local.append(fake_local_entry(name, node))
+
+
+class ImportInfoItem:
+    __slots__ = ['uri', 'origin_name', 'asname']
+
+    def __init__(self, uri: str, origin_name: str, asname: str) -> None:
+        self.uri = uri
+        self.origin_name = origin_name
+        self.asname = asname
+
+    @property
+    def is_import_module(self):
+        """Import the whole module?"""
+        return self.origin_name == ''
+
+
+def add_import(symtable: 'SymTable', infoitem: 'ImportInfoItem',
+               defnode: 'ImportNode'):
+    """Store import information.
+
+    def node will be simply appended to symtable's _import_nodes list.
+
+    If defnode represents a ImportFrom node, then an fake_imp_entry will be
+    added to the symtable's fake_data.
+    """
+    symtable._import_nodes.append(defnode)
+
+    # TODO: warning if name collision happens
+    if isinstance(defnode, ast.ImportFrom):
+        tmp_entry = fake_impt_entry(infoitem.uri, infoitem.origin_name,
+                                    defnode)
+        fake_data = get_fake_data(symtable)
+        fake_data.impt.append(tmp_entry)
+
+
+def analyse_import_stmt(node: Union[ast.Import, ast.ImportFrom],
+                        uri: Uri) -> List[ImportInfoItem]:
+    """Extract import information stored in import ast node.
+
+    Return an dict that maps uri to a list of ImportInfoItem.
+    """
+    info_list: List[ImportInfoItem] = []
+    if isinstance(node, ast.Import):
+        for alias in node.names:
+            module_uri = alias.name
+            as_name = alias.asname or module_uri
+            info_list.append(ImportInfoItem(module_uri, '', as_name))
+
+    elif isinstance(node, ast.ImportFrom):
+        imp_name = '.' * node.level
+        imp_name += node.module or ''
+        module_uri = rel2absuri(uri, imp_name)
+        imported = []
+        for alias in node.names:
+            attr_name = alias.name
+            as_name = alias.asname or attr_name
+            imported.append((as_name, attr_name))
+            info_list.append(ImportInfoItem(module_uri, attr_name, as_name))
+
+    else:
+        raise TypeError("node doesn't stand for an import statement")
+
+    return info_list
+
+
+def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):
+    if basecls not in temp.baseclass:
+        temp.baseclass.append(basecls)
+
+
+def get_cls_defnode(temp: TypeClassTemp):
+    return temp._defnode
+
+
+def set_temp_state(temp: TypeTemp, st: TpState):
+    temp._resolve_state = st
+
+
+def get_temp_state(temp: TypeTemp) -> TpState:
+    return temp._resolve_state
 
 
 def add_uri_symtable(symtable: 'SymTable', uri: str,
@@ -120,81 +211,3 @@ def search_uri_symtable(symtable: 'SymTable', uri: str) -> Optional[TypeIns]:
         if not cur_ins:
             return None
     return cur_ins
-
-
-class ImportInfoItem:
-    __slots__ = ['uri', 'origin_name', 'asname']
-
-    def __init__(self, uri: str, origin_name: str, asname: str) -> None:
-        self.uri = uri
-        self.origin_name = origin_name
-        self.asname = asname
-
-    @property
-    def is_import_module(self):
-        """Import the whole module?"""
-        return self.origin_name == ''
-
-
-def add_import_item(symtable: 'SymTable', infoitem: 'ImportInfoItem',
-                    defnode: 'ImportNode'):
-    """Store import information in symtable.
-
-    def node will be simply appended to symtable's _import_nodes list.
-
-    If defnode represents a ImportFrom node, then an fake_imp_entry will be
-    added to the symtable's local scope.
-    """
-    symtable._import_nodes.append(defnode)
-
-    # TODO: warning if name collision happens
-    if isinstance(defnode, ast.ImportFrom):
-        tmp_entry = fake_imp_entry(infoitem.uri, infoitem.origin_name, defnode)
-        symtable.local[infoitem.asname] = tmp_entry  # type: ignore
-
-
-def analyse_import_stmt(node: Union[ast.Import, ast.ImportFrom],
-                        uri: Uri) -> List[ImportInfoItem]:
-    """Extract import information stored in import ast node.
-
-    Return an dict that maps uri to a list of ImportInfoItem.
-    """
-    info_list: List[ImportInfoItem] = []
-    if isinstance(node, ast.Import):
-        for alias in node.names:
-            module_uri = alias.name
-            as_name = alias.asname or module_uri
-            info_list.append(ImportInfoItem(module_uri, '', as_name))
-
-    elif isinstance(node, ast.ImportFrom):
-        imp_name = '.' * node.level
-        imp_name += node.module or ''
-        module_uri = rel2absuri(uri, imp_name)
-        imported = []
-        for alias in node.names:
-            attr_name = alias.name
-            as_name = alias.asname or attr_name
-            imported.append((as_name, attr_name))
-            info_list.append(ImportInfoItem(module_uri, attr_name, as_name))
-
-    else:
-        raise TypeError("node doesn't stand for an import statement")
-
-    return info_list
-
-
-def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):
-    if basecls not in temp.baseclass:
-        temp.baseclass.append(basecls)
-
-
-def get_cls_defnode(temp: TypeClassTemp):
-    return temp._defnode
-
-
-def set_temp_state(temp: TypeTemp, st: TpState):
-    temp._resolve_state = st
-
-
-def get_temp_state(temp: TypeTemp) -> TpState:
-    return temp._resolve_state
