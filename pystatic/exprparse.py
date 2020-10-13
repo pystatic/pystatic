@@ -1,10 +1,10 @@
 import ast
+import contextlib
 from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
-from pystatic.message import MessageBox
 from pystatic.typesys import TypeIns, TypeLiteralIns
-from pystatic.apply import ApplyArgs
+from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 
 
@@ -33,9 +33,27 @@ class ExprParser(NoGenVisitor):
         self.consultant = consultant
         self.errors = []
 
-    def _add_err(self, errlist: Optional[List[ErrorCode]]):
+        self.in_subs = False  # under a subscription node?
+        self.container = []
+
+    @contextlib.contextmanager
+    def register_container(self, container: list):
+        old_in_subs = self.in_subs
+        old_container = self.container
+
+        self.in_subs = True
+        self.container = container
+        yield
+        self.container = old_container
+        self.in_subs = old_in_subs
+
+    def add_err(self, errlist: Optional[List[ErrorCode]]):
         if errlist:
             self.errors.extend(errlist)
+
+    def add_to_container(self, item, node: ast.AST):
+        if self.in_subs:
+            self.container.append(WithAst(item, node))
 
     def accept(self, node: ast.AST) -> Option[TypeIns]:
         self.errors = []
@@ -50,19 +68,24 @@ class ExprParser(NoGenVisitor):
         assert isinstance(name_option, Option)
         assert isinstance(name_option.value, TypeIns)
 
-        self._add_err(name_option.errors)
+        self.add_err(name_option.errors)
+
+        self.add_to_container(name_option.value, node)
         return name_option.value
 
     def visit_Constant(self, node: ast.Constant) -> TypeIns:
-        return TypeLiteralIns(node.value)
+        tpins = TypeLiteralIns(node.value)
+        self.add_to_container(tpins, node)
+        return tpins
 
     def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
         res = self.visit(node.value)
         assert isinstance(res, TypeIns)
         attr_option = res.getattribute(node.attr, node)
 
-        self._add_err(attr_option.errors)
+        self.add_err(attr_option.errors)
 
+        self.add_to_container(attr_option.value, node)
         return attr_option.value
 
     def visit_Call(self, node: ast.Call) -> TypeIns:
@@ -83,6 +106,51 @@ class ExprParser(NoGenVisitor):
 
         call_option = left_ins.call(applyargs)
 
-        self._add_err(call_option.errors)
+        self.add_err(call_option.errors)
 
+        self.add_to_container(call_option.value, node)
         return call_option.value
+
+    def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
+        left_ins = self.visit(node.value)
+        assert isinstance(left_ins, TypeIns)
+
+        container = []
+        with self.register_container(container):
+            items = self.visit(node.slice)
+            assert isinstance(items, (list, tuple, TypeIns))
+
+        assert len(container) == 1
+        res_option = left_ins.getitem(container[0])
+
+        self.add_to_container(res_option.value, node)
+        return res_option.value
+
+    def visit_List(self, node: ast.List):
+        if self.in_subs:
+            lst = []
+            with self.register_container(lst):
+                for subnode in node.elts:
+                    self.visit(subnode)
+            self.add_to_container(lst, node)
+            return lst
+        else:
+            assert False, "TODO"
+
+    def visit_Tuple(self, node: ast.Tuple):
+        if self.in_subs:
+            lst = []
+            with self.register_container(lst):
+                for subnode in node.elts:
+                    self.visit(subnode)
+            tp = tuple(lst)
+            self.add_to_container(tp, node)
+            return tp
+        else:
+            assert False, "TODO"
+
+    def visit_Slice(self, node: ast.Slice):
+        assert False, "TODO"
+
+    def visit_Index(self, node: ast.Index):
+        return self.visit(node.value)

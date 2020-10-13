@@ -1,12 +1,11 @@
 import ast
 import enum
 import copy
-from typing import (Callable, Optional, Dict, List, Tuple, Union,
-                    TYPE_CHECKING, Final)
+from typing import (Optional, Dict, List, Tuple, Union, TYPE_CHECKING, Final)
 from pystatic.option import Option
 from pystatic.uri import Uri
+from pystatic.evalutil import (InsWithAst, ApplyArgs, GetItemType, WithAst)
 from pystatic.errorcode import *
-from pystatic.apply import InsWithAst, apply, ApplyArgs, ApplyResult
 
 if TYPE_CHECKING:
     from pystatic.arg import Argument
@@ -98,6 +97,12 @@ class TypeTemp:
         # call_option.add_err(...)
         return call_option
 
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        # TODO: add error
+        return option_res
+
     def str_expr(self,
                  bindlist: BindList,
                  context: Optional[TypeContext] = None) -> str:
@@ -165,8 +170,9 @@ class TypeIns:
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         return self.temp.call(applyargs, self.bindlist)
 
-    def getitem(self, items) -> 'TypeIns':
-        assert False, "TODO"
+    def getitem(self, item: GetItemType) -> Option['TypeIns']:
+        # TODO: add error
+        return self.temp.getitem(item, self.bindlist)
 
     def __str__(self) -> str:
         return self.temp.str_expr(self.bindlist)
@@ -197,8 +203,21 @@ class TypeType(TypeIns):
             option_res.set_value(ins_res)
         return option_res
 
-    def getitem(self, bindlist: BindList) -> 'TypeIns':
-        assert False, "TODO"
+    def getitem(self, item: GetItemType) -> Option['TypeIns']:
+        res_option = Option(any_ins)
+        if isinstance(item.ins, (tuple, list)):
+            tpins_list = []
+            for subitem in item.ins:
+                # TODO: add error
+                assert isinstance(subitem, WithAst)
+                assert isinstance(subitem.ins, TypeIns)
+                tpins_list.append(subitem.ins)
+            res_option.set_value(TypeType(self.temp, tpins_list))
+        else:
+            assert isinstance(item, TypeIns)
+            res_option = Option(any_ins)
+            res_option.set_value(TypeType(self.temp, [item]))
+        return res_option
 
     def setattr(self, name, tp):
         self.temp.setattr(name, tp)

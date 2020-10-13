@@ -10,7 +10,7 @@ from pystatic.preprocess.sym_util import *
 from pystatic.symtable import SymTable
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns)
 from pystatic.symtable import Entry
-from pystatic.preprocess.type_expr import (eval_func_type, eval_type_expr,
+from pystatic.preprocess.type_expr import (eval_func_type, eval_type_def_expr,
                                            template_resolve_fun)
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ def resolve_local_typeins(symtable: 'SymTable'):
         # resolved here.
         defnode = entry.defnode
 
-        var_type = eval_type_expr(defnode, symtable)
+        var_type = eval_type_def_expr(defnode, symtable)
         if var_type:
             func_ins = var_type.getins()
         else:

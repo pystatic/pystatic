@@ -3,13 +3,14 @@ from pystatic.symtable import SymTable, TableScope, TypeDefNode
 from typing import Callable, List, Optional, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeFuncIns, TypeIns, ellipsis_type, TypeType,
-                              any_type, none_type, any_ins)
+                              any_type, none_type)
 from pystatic.arg import Argument, Arg
+from pystatic.exprparse import eval_expr
 from pystatic.preprocess.sym_util import *
 
 
-def eval_type_expr(node: TypeDefNode,
-                   symtable: SymTable) -> Optional[TypeType]:
+def eval_type_def_expr(node: TypeDefNode,
+                       symtable: SymTable) -> Optional[TypeType]:
     if isinstance(node, str):
         return eval_str_type(node, symtable)
     elif isinstance(node, ast.Assign) or isinstance(node, ast.AnnAssign):
@@ -17,7 +18,10 @@ def eval_type_expr(node: TypeDefNode,
     elif isinstance(node, ast.FunctionDef):
         assert False, "Shouldn't reach here"
     else:
-        return TypeExprVisitor(symtable).accept(node)
+        res = eval_expr(node, symtable).value
+        assert isinstance(res, TypeType)
+        return res
+        # return TypeExprVisitor(symtable).accept(node)
 
 
 def eval_str_type(s: str, symtable: SymTable) -> Optional[TypeType]:
@@ -39,7 +43,7 @@ def eval_assign_type(node: Union[ast.Assign, ast.AnnAssign],
             return None
 
     elif isinstance(node, ast.AnnAssign):
-        return eval_type_expr(node.annotation, symtable)
+        return eval_type_def_expr(node.annotation, symtable)
 
     else:
         raise TypeError("node doesn't stands for an assignment statement")
@@ -53,7 +57,7 @@ def eval_func_type(node: ast.FunctionDef,
         return None
     ret_type = None
     if node.returns:
-        ret_type = eval_type_expr(node.returns, symtable)
+        ret_type = eval_type_def_expr(node.returns, symtable)
     if not ret_type:
         ret_type = any_type  # default return type is Any
 
@@ -67,7 +71,7 @@ def eval_func_type(node: ast.FunctionDef,
 def eval_return_type(node: Optional[TypeDefNode],
                      symtable: SymTable) -> TypeType:
     if node:
-        res_type = eval_type_expr(node, symtable)
+        res_type = eval_type_def_expr(node, symtable)
         if res_type:
             return res_type
         else:
@@ -138,7 +142,7 @@ def eval_arg_type(node: ast.arg, symtable: SymTable) -> Optional[Arg]:
     """Generate an Arg instance according to an ast.arg node"""
     new_arg = Arg(node.arg)
     if node.annotation:
-        ann = eval_type_expr(node.annotation, symtable).getins()
+        ann = eval_type_def_expr(node.annotation, symtable).getins()
         if not ann:
             return None
         else:

@@ -7,8 +7,8 @@ import logging
 import copy
 from pystatic.target import MethodTarget
 from pystatic.preprocess.type_expr import (eval_argument_type,
-                                           eval_return_type, eval_type_expr,
-                                           eval_func_type,
+                                           eval_return_type,
+                                           eval_type_def_expr, eval_func_type,
                                            template_resolve_fun)
 from typing import List, TYPE_CHECKING, Optional
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeModuleTemp,
@@ -112,7 +112,7 @@ def _resolve_cls_inh(clstemp: 'TypeClassTemp'):
     defnode = get_cls_defnode(clstemp)
 
     for base_node in defnode.bases:
-        res_type = eval_type_expr(base_node, symtable)
+        res_type = eval_type_def_expr(base_node, symtable)
         if res_type:
             add_baseclass(clstemp, res_type)
 
@@ -263,7 +263,7 @@ def _resolve_cls_attr(clstemp: 'TypeClassTemp'):
         symtb = tp_attr.get('symtable')  # type: ignore
         assert typenode
         assert symtb
-        var_type = eval_type_expr(typenode, symtb)
+        var_type = eval_type_def_expr(typenode, symtb)
         if var_type:
             var_ins = var_type.getins()
             true_var_attr[name] = var_ins
