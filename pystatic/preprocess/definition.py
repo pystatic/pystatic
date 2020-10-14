@@ -234,7 +234,7 @@ class TypeDefVisitor(BaseVisitor):
                             tpins = entry.get_type()
                             self.symtable.add_entry(infoitem.asname,
                                                     Entry(tpins, node))
-                            return
+                            continue
             self.worker.add_cache_target_uri(infoitem.uri)
             add_import(self.symtable, infoitem, node)
 

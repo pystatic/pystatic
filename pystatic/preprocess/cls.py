@@ -8,10 +8,11 @@ from pystatic.target import MethodTarget
 from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
                                           eval_type_def_expr,
                                           template_resolve_fun)
-from typing import List, TYPE_CHECKING, Optional
+from typing import List, TYPE_CHECKING, Optional, TypeVar
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeModuleTemp,
                               TypeVarTemp, TpState, TypeTemp, any_ins, TypeIns,
                               TypeVarIns, TypeType)
+from pystatic.exprparse import eval_expr
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, TableScope
@@ -36,7 +37,7 @@ def resolve_cls_def(targets: List['BlockTarget'], mbox: 'MessageBox'):
     # placeholders
     for temp in resolve_order:
         set_temp_state(temp, TpState.ON)
-        _resolve_cls_placeholder(temp)
+        _resolve_cls_placeholder(temp, mbox)
 
     # inheritance
     for temp in resolve_order:
@@ -69,7 +70,7 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
 def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
     """Add dependency relations that due to the inheritance"""
-    if _check_cls_state(clstemp):
+    if get_temp_state(clstemp) != TpState.OVER:
         graph.add_typetemp(clstemp)
         assert isinstance(
             clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
@@ -82,21 +83,19 @@ def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
             assert isinstance(first_temp, TypeTemp) and not isinstance(
                 first_temp, TypeModuleTemp
             )  # FIXME: if the result is a module, warninng here
-            if first_temp and _check_cls_state(first_temp):
-                assert isinstance(first_temp, TypeClassTemp)
-                graph.add_dependency(clstemp, first_temp)
+            if first_temp:
+                assert get_temp_state(clstemp) != TpState.OVER
+                assert isinstance(first_temp, TypeTemp)
+                if get_temp_state(first_temp) == TpState.ON:
+                    assert isinstance(first_temp, TypeClassTemp)
+                    graph.add_dependency(clstemp, first_temp)
 
 
-def _check_cls_state(temp: 'TypeTemp'):
-    state = get_temp_state(temp)
-    return state != TpState.OVER
-
-
-def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
+def _resolve_cls_placeholder(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     """Resolve placeholders of a class"""
-    assert _check_cls_state(clstemp)
+    assert get_temp_state(clstemp) != TpState.OVER
     symtable = clstemp.get_def_symtable()
-    visitor = _TypeVarVisitor(symtable, [])
+    visitor = _TypeVarVisitor(symtable, [], mbox)
     defnode = get_cls_defnode(clstemp)
     for base_node in defnode.bases:
         visitor.accept(base_node)
@@ -106,7 +105,7 @@ def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
 
 def _resolve_cls_inh(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
-    assert _check_cls_state(clstemp)
+    assert get_temp_state(clstemp) != TpState.OVER
     symtable = clstemp.get_def_symtable()
     defnode = get_cls_defnode(clstemp)
 
@@ -157,22 +156,29 @@ class _TypeVarVisitor(BaseVisitor):
 
     Used to generate correct placeholders.
     """
-    def __init__(self, symtable: 'SymTable',
-                 typevars: List['TypeVarIns']) -> None:
+    def __init__(self, symtable: 'SymTable', typevars: List['TypeVarIns'],
+                 mbox: 'MessageBox') -> None:
         self.symtable = symtable
         self.typevars = typevars
+        self.mbox = mbox
 
     def visit_Name(self, node: ast.Name):
-        curtype = self.symtable.lookup(node.id)
-        if curtype and isinstance(curtype, TypeVarIns):
-            if curtype not in self.typevars:
-                self.typevars.append(curtype)
+        option_name = eval_expr(node, self.symtable)
+        if isinstance(option_name.value, TypeVarIns):
+            self.typevars.append(option_name.value)
+        option_name.dump_to_box(self.mbox)
 
     def visit_Attribute(self, node: ast.Attribute):
-        assert False, "not implemented yet"
+        left_value = self.visit(node.value)
+        if isinstance(left_value, TypeIns):
+            option_res = left_value.getattribute(node.attr, node)
+            option_res.dump_to_box(self.mbox)
+            res = option_res.value
+            if isinstance(res, TypeVarIns):
+                self.typevars.append(res)
 
     def visit_Subscript(self, node: ast.Subscript):
-        self.visit(node.slice)
+        return self.visit(node.slice)
 
 
 def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor',

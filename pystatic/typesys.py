@@ -49,12 +49,31 @@ class TypeTemp:
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
 
-    def get_typetype(self, bindlist: BindList) -> 'TypeType':
-        new_bind = None  # TODO: rename this
-        return TypeType(self, new_bind)
+    def get_typetype(self,
+                     bindlist: Optional[BindList] = None,
+                     item: Optional[GetItemType] = None) -> Option['TypeType']:
+        """Mainly used for TypeType to generate correct TypeType"""
+        if not item:
+            return Option(TypeType(self, None))
+        else:
+            if isinstance(item.ins, (tuple, list)):
+                tpins_list = []
+                for item in item.ins:
+                    if isinstance(item.ins, TypeIns):
+                        tpins_list.append(item.ins)
+                    else:
+                        # TODO: add warning here
+                        pass
+                return Option(TypeType(self, tpins_list))
+            else:
+                if isinstance(item.ins, TypeIns):
+                    return Option(TypeType(self, [item.ins]))
+                else:
+                    # TODO: add warning here
+                    return Option(TypeType(self, None))
 
     def get_default_typetype(self) -> 'TypeType':
-        return self.get_typetype(None)
+        return self.get_typetype(None, None).value
 
     def getins(self, bindlist: BindList) -> 'TypeIns':
         return TypeIns(self, bindlist)
@@ -207,23 +226,7 @@ class TypeType(TypeIns):
         return option_res
 
     def getitem(self, item: GetItemType) -> Option['TypeIns']:
-        res_option = Option(any_ins)
-        if isinstance(item.ins, (tuple, list)):
-            tpins_list = []
-            for subitem in item.ins:
-                # TODO: add error
-                assert isinstance(subitem, WithAst)
-                assert isinstance(subitem.ins, TypeIns)
-                tpins_list.append(subitem.ins)
-            res_option.set_value(TypeType(self.temp, tpins_list))
-        else:
-            assert isinstance(item, TypeIns)
-            res_option = Option(any_ins)
-            res_option.set_value(TypeType(self.temp, [item]))
-        return res_option
-
-    def setattr(self, name, tp):
-        self.temp.setattr(name, tp)
+        return self.temp.get_typetype(self.bindlist, item)
 
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         return self.temp.init_ins(applyargs, self.bindlist)
@@ -490,6 +493,30 @@ class TypeCallableTemp(TypeTemp):
 class TypeGenericTemp(TypeTemp):
     def __init__(self):
         super().__init__('Generic', 'typing')
+
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        res = TypeIns(generic_temp, None)
+        option_res = Option(res)
+        if isinstance(item.ins, (tuple, list)):
+            for subitem in item.ins:
+                if isinstance(subitem.ins, TypeVarIns):
+                    if not res.bindlist:
+                        assert isinstance(subitem.ins, TypeVarIns)
+                        res.bindlist = [subitem.ins]  # type: ignore
+                    else:
+                        res.bindlist.append(subitem.ins)
+                else:
+                    # TODO: add error here
+                    pass
+        else:
+            assert isinstance(item.ins, TypeIns)
+            if isinstance(item.ins, TypeVarIns):
+                res.bindlist = [item.ins]
+            else:
+                # option_res.add_err()  # TODO: add error here
+                pass
+        return option_res
 
 
 class TypeLiteralTemp(TypeTemp):

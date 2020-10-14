@@ -100,6 +100,9 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
                           worker: 'Preprocessor', is_type: bool) -> bool:
     """Resolve type from an import chaine
 
+    is_type:
+        import a type(class TypeVar ...) or not.
+
     - is_type is True:
         Return true if it truly stands for an type temp.
     - is_type is False:
