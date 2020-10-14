@@ -4,13 +4,14 @@ Resolve class related type information.
 
 import ast
 import logging
+import contextlib
 from pystatic.target import MethodTarget
 from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
                                           eval_type_def_expr,
                                           template_resolve_fun)
-from typing import List, TYPE_CHECKING, Optional, TypeVar
-from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeModuleTemp,
-                              TypeVarTemp, TpState, TypeTemp, any_ins, TypeIns,
+from typing import List, TYPE_CHECKING, Optional
+from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeGenericTemp,
+                              TypeModuleTemp, TpState, TypeTemp, TypeIns,
                               TypeVarIns, TypeType)
 from pystatic.exprparse import eval_expr
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
@@ -95,12 +96,12 @@ def _resolve_cls_placeholder(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     """Resolve placeholders of a class"""
     assert get_temp_state(clstemp) != TpState.OVER
     symtable = clstemp.get_def_symtable()
-    visitor = _TypeVarVisitor(symtable, [], mbox)
+    visitor = _TypeVarVisitor(symtable, mbox)
     defnode = get_cls_defnode(clstemp)
     for base_node in defnode.bases:
         visitor.accept(base_node)
 
-    clstemp.placeholders = visitor.typevars
+    clstemp.placeholders = visitor.get_typevar_list()
 
 
 def _resolve_cls_inh(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
@@ -156,29 +157,74 @@ class _TypeVarVisitor(BaseVisitor):
 
     Used to generate correct placeholders.
     """
-    def __init__(self, symtable: 'SymTable', typevars: List['TypeVarIns'],
-                 mbox: 'MessageBox') -> None:
+    def __init__(self, symtable: 'SymTable', mbox: 'MessageBox') -> None:
         self.symtable = symtable
-        self.typevars = typevars
+        self.typevars: List['TypeVarIns'] = []
+        self.generic_tpvars: List['TypeVarIns'] = []
         self.mbox = mbox
+        self.in_gen = False
+
+        self.met_gen = False
+
+    @contextlib.contextmanager
+    def enter_generic(self):
+        if self.met_gen:
+            # TODO: double Generic Error
+            yield
+
+        else:
+            old_in_gen = self.in_gen
+
+            self.met_gen = True
+            self.in_gen = True
+            yield
+            self.in_gen = old_in_gen
+
+    def get_typevar_list(self) -> List['TypeVarIns']:
+        if self.met_gen:
+            for gen in self.typevars:
+                if gen not in self.generic_tpvars:
+                    # TODO: add error here(not in generic)
+                    self.generic_tpvars.append(gen)
+            return self.generic_tpvars
+        else:
+            return self.typevars
+
+    def add_tpvar(self, tpvarins: TypeVarIns):
+        if self.in_gen:
+            if tpvarins not in self.generic_tpvars:
+                self.generic_tpvars.append(tpvarins)
+        else:
+            if tpvarins not in self.typevars:
+                self.typevars.append(tpvarins)
 
     def visit_Name(self, node: ast.Name):
         option_name = eval_expr(node, self.symtable)
         if isinstance(option_name.value, TypeVarIns):
-            self.typevars.append(option_name.value)
+            self.add_tpvar(option_name.value)
         option_name.dump_to_box(self.mbox)
+        return option_name.value
 
     def visit_Attribute(self, node: ast.Attribute):
         left_value = self.visit(node.value)
-        if isinstance(left_value, TypeIns):
-            option_res = left_value.getattribute(node.attr, node)
-            option_res.dump_to_box(self.mbox)
-            res = option_res.value
-            if isinstance(res, TypeVarIns):
-                self.typevars.append(res)
+        assert isinstance(left_value, TypeIns)
+        option_res = left_value.getattribute(node.attr, node)
+        option_res.dump_to_box(self.mbox)
+        res = option_res.value
+        if isinstance(res, TypeVarIns):
+            self.add_tpvar(res)
+        return res
 
     def visit_Subscript(self, node: ast.Subscript):
-        return self.visit(node.slice)
+        left_value = self.visit(node.value)
+        assert isinstance(left_value, TypeIns)
+
+        if isinstance(left_value.temp, TypeGenericTemp):
+            with self.enter_generic():
+                self.visit(node.slice)
+        else:
+            self.visit(node.slice)
+        return left_value  # FIXME: bindlist is not set correctly
 
 
 def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor',
