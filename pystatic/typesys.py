@@ -231,6 +231,9 @@ class TypeType(TypeIns):
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         return self.temp.init_ins(applyargs, self.bindlist)
 
+    def get_inner_symtable(self):
+        return self.temp._inner_symtable
+
     def __str__(self):
         return self.temp.str_expr(None)
 
@@ -582,7 +585,8 @@ class TypeFuncIns(TypeIns):
         return '\n'.join(lst)
 
     def call(self, args):
-        assert False, "TODO"
+        # TODO:need modify
+        return self.overloads[0]
 
 
 # special types (typing.py)

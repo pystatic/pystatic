@@ -3,6 +3,7 @@ from typing import List, Dict
 from pystatic.errorcode import SymbolUndefined, ErrorCode
 from pystatic.typesys import TypeIns, TypeType, any_type
 from pystatic.option import Option
+from pystatic.symtable import SymTable
 
 
 class Scope:
@@ -59,18 +60,32 @@ class SymbolRecorder:
     def set_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)
 
-    def getattribute(self, name, node: ast.AST) -> Option:
+    def get_comment_type(self, name):
+        scope = self.cur_scope
+        table: SymTable = scope.tp.get_inner_symtable()
+        return table.lookup_local(name)
+
+    def get_run_time_type(self, name):
         tp = self.cur_scope.type_map.get(name)
         if tp:
-            return Option(tp)
+            return tp
         for scope in self.stack[::-1][1:]:
             tp = scope.type_map.get(name)
             if tp:
-                return Option(tp)
+                return tp
             else:
-                tp = scope.tp.get_local_symbol(name)
+                if isinstance(scope, FuncScope):
+                    table: SymTable = scope.tp.get_inner_symtable()
+                    tp = table.lookup_local(name)
                 if tp:
-                    return Option(tp)
-        option = Option(any_type)
-        option.add_err(SymbolUndefined(node, name))
-        return option
+                    return tp
+        return tp
+
+    def getattribute(self, name, node: ast.AST) -> Option:
+        tp = self.get_run_time_type(name)
+        if tp:
+            return Option(tp)
+        else:
+            option: Option = Option(any_type)
+            option.add_err(SymbolUndefined(node, name))
+            return option

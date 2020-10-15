@@ -23,7 +23,7 @@ class InferVisitor(BaseVisitor):
         # self.cur_module: TypeModuleTemp = module
         self.root = node
         self.mbox: MessageBox = mbox
-        self.checker = TypeChecker(self.mbox)
+        self.type_comparator = TypeCompatible()
 
         self.recorder = SymbolRecorder(module)
 
@@ -39,16 +39,14 @@ class InferVisitor(BaseVisitor):
         return option.value
 
     def type_consistent(self, ltype, rtype) -> bool:
-        return TypeCompatible().TypeCompatible(ltype, rtype)
+        return self.type_comparator.TypeCompatible(ltype, rtype)
 
     def handle_err(self, err_list):
-        # TODO
-        pass
+        for err in err_list:
+            self.mbox.make(err)
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
-        if rtype is None:  # some wrong with rvalue
-            return
         for target in node.targets:
             if isinstance(target, ast.Name):
                 self.infer_name_node_of_assign(target, node.value, rtype)
@@ -58,16 +56,12 @@ class InferVisitor(BaseVisitor):
                 self.check_composed_node_of_assign(target, node.value, rtype)
 
     def infer_name_node_of_assign(self, target, rnode, rtype):
-        if self.recorder.is_defined(target.id):
-            ltype = self.cur_type.lookup_local_var(target.id)
-        else:  # var appear first time
+        name = target.id
+        if not self.recorder.is_defined(name):
             self.recorder.set_type(target.id, rtype)
-            ltype = self.cur_type.lookup_local_var(target.id)
-            if is_any(ltype):  # var with no annotation
-                self.cur_type.setattr(target.id, rtype)
-        if not self.type_consistent(ltype, rtype):
-            self.mbox.make(
-                INCOMPATIBLE_TYPE_IN_ASSIGN(any_type, rnode, ltype, rtype))
+        comment = self.recorder.get_comment_type(name)
+        if not self.type_consistent(comment, rtype):
+            self.mbox.make(IncompatibleTypeInAssign(rnode, comment, rtype))
 
     def check_composed_node_of_assign(self, target, rnode, rtype):
         ltype = self.get_type(target)
@@ -91,18 +85,17 @@ class InferVisitor(BaseVisitor):
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         rtype: Optional[TypeIns] = self.get_type(node.value)
-        if rtype is None:
-            return
         target = node.target
         if isinstance(target, ast.Name):
             self.check_name_node_of_annassign(target, node.value, rtype)
         else:
             self.check_composed_node_of_assign(target, node.value, rtype)
 
-    def check_name_node_of_annassign(self, target, rnode, rtype):
-        if not self.recorder.is_defined(target.id):  # var appear first time
-            self.recorder.add_symbol(target.id)
-        ltype = self.cur_type.lookup_local_var(target.id)
+    def check_name_node_of_annassign(self, target: ast.Name, rnode, rtype):
+        name = target.id
+        if not self.recorder.is_defined(name):  # var appear first time
+            self.recorder.set_type(name, rtype)
+        ltype = self.recorder.get_comment_type(name)
         if not self.type_consistent(ltype, rtype):
             self.mbox.make(IncompatibleTypeInAssign(rnode, ltype, rtype))
 
@@ -128,16 +121,16 @@ class InferVisitor(BaseVisitor):
             self.mbox.unsupported_operand(node, operand, ltype, rtype)
 
     def visit_ClassDef(self, node: ast.ClassDef):
-        class_type = self.cur_type.lookup_local_var(node.name)
-        self.recorder.add_type(node.name, class_type)
+        class_type = self.recorder.get_comment_type(node.name)
+        self.recorder.set_type(node.name, class_type)
         self.recorder.enter_cls(class_type)
         for subnode in node.body:
             self.visit(subnode)
         self.recorder.leave_cls()
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.recorder.add_symbol(node.name)
-        func_type: TypeIns = self.cur_type.lookup_local_var(node.name)
+        func_type: TypeIns = self.recorder.get_comment_type(node.name)
+        self.recorder.set_type(node.name, func_type)
         argument, self.ret_annotation = func_type.call(
             None)  # TODO: need modify on overload func
 
@@ -212,8 +205,8 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            tp = target.module_temp.lookup_local_var('f1')
-            print(type(tp))
+            # tp = target.module_temp.getattribute('f1')
+            # print(type(tp))
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          self.mbox)
             infer_visitor.infer()

@@ -1,8 +1,7 @@
 import ast
 import enum
-from typesys import TypeClassTemp, TypeTupleTemp, TypeVar
-from typing import Callable, Tuple, Optional, Type
-from pystatic.typesys import TypeIns, TypeTemp, TypeOptionalTemp, TypeTupleTemp
+from typing import Callable, Tuple, Optional, Type, TypeVar
+from pystatic.typesys import TypeIns, TypeTemp, TypeOptionalTemp, TypeTupleTemp, TypeClassTemp
 
 
 class compatibleState(enum.IntEnum):
@@ -12,7 +11,6 @@ class compatibleState(enum.IntEnum):
 
 
 class TypeCompatible:
-
     def __init__(self) -> None:
         self.baseTypestr = ['Int', 'Float', 'Str', 'Complex', 'byte']
         self.collectionTypestr = ['Tuple', 'Set', 'List', 'Dict']
@@ -23,6 +21,7 @@ class TypeCompatible:
         tempb: TypeTemp = b.temp
 
         if tempa.name in self.baseTypestr:
+            print("here")
             return self.BaseTypeCom(tempa, tempb)
 
 
