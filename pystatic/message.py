@@ -1,6 +1,6 @@
 import ast
-from typing import Optional, List
-from pystatic.errorcode import ErrorCode
+from typing import Optional, List, Dict
+from pystatic.errorcode import ErrorCode, NoError
 
 
 class Message(object):
@@ -33,19 +33,19 @@ class Message(object):
 
 
 class MessageBox(object):
-    def __init__(self, module_uri: str):
-        self.filename = module_uri
-        self.error: List[Message] = []
+    def __init__(self):
+        self.error: Dict[str, List[Message]] = {}
 
-    def add_err(self, node: ast.AST, msg: str):
-        self.error.append(Message.from_node(node, msg))
+    def add_err(self, module_path, node: ast.AST, msg: str):
+        self.error[module_path].append(Message.from_node(node, msg))
 
     def make(self, error: ErrorCode):
-        node, msg = error.make()
+        module_path, node, msg = error.make()
         if node is None:
             return
-        self.add_err(node, msg)
+        self.add_err(module_path, node, msg)
 
     def report(self):
-        for err in self.error:
-            print(err)
+        for key in self.error.keys():
+            for err in self.error[key]:
+                print(err)
