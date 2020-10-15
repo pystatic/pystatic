@@ -18,7 +18,7 @@ INCOMPATIBLE_ARGUMENT = "Incompatible argument type for '{}'"
 
 class ErrorCode:
     def __init__(self, res: Optional[TypeIns]):
-        self.res = res
+        pass
 
     def make(self) -> Tuple[ast.AST, str]:
         pass
@@ -28,22 +28,13 @@ class ErrorCode:
         msg = review + "(" + detail + ")"
         return msg
 
-    def get_type(self):
-        return self.res
-
-
-class NoError(ErrorCode):
-    def __init__(self, res):
-        super().__init__(res)
-
 
 class IncompatibleTypeInAssign(ErrorCode):
     def __init__(self,
-                 node: ast.AST,
+                 node: Optional[ast.AST],
                  expect_type: TypeIns,
-                 expr_type: TypeIns,
-                 res: Optional[TypeIns] = None):
-        super().__init__(res)
+                 expr_type: TypeIns ):
+        super().__init__()
         self.node = node
         self.expect_type = expect_type
         self.expr_type = expr_type
