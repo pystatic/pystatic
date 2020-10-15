@@ -12,7 +12,7 @@ class compatibleState(enum.IntEnum):
 
 class TypeCompatible:
     def __init__(self) -> None:
-        self.baseTypestr = ['Int', 'Float', 'Str', 'Complex', 'byte']
+        self.baseTypestr = ['int', 'float', 'str', 'complex', 'byte']
         self.collectionTypestr = ['Tuple', 'Set', 'List', 'Dict']
         self.specialTypestr = ['Callable', 'Literal', 'Any', 'None', 'Union', 'Optional']
 
@@ -21,7 +21,6 @@ class TypeCompatible:
         tempb: TypeTemp = b.temp
 
         if tempa.name in self.baseTypestr:
-            print("here")
             return self.BaseTypeCom(tempa, tempb)
 
 
@@ -73,22 +72,22 @@ class TypeCompatible:
         nameb = b.name
         if a == b:
             return True
-        elif a == 'Int':
-            if b == 'Bool':
+        elif a == 'int':
+            if b == 'bool':
                 return True
             else:
                 return False
-        elif a == 'Float':
-            if b == 'Int':
+        elif a == 'float':
+            if b == 'int':
                 return True
             else:
                 return False
-        elif a == 'Complex':
-            if b == 'Int' or b == 'Float':
+        elif a == 'complex':
+            if b == 'int' or b == 'float':
                 return True
             else:
                 return False
-        elif a == 'Str' or a == 'Bool' or a == 'Byte' or a == 'Bytearray':
+        elif a == 'str' or a == 'bool' or a == 'byte' or a == 'Bytearray':
             return False
         else:
             return False
