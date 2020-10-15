@@ -5,13 +5,14 @@ from pystatic.typesys import *
 from pystatic.message import MessageBox
 from pystatic.arg import Argument
 from pystatic.errorcode import *
+from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.infer.op_map import *
 from pystatic.infer.checker import TypeChecker, is_any
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
-from pystatic.exprparse import eval_expr
 from pystatic.infer import op_map
+from pystatic.TypeCompatibe.simpleType import TypeCompatible
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +33,13 @@ class InferVisitor(BaseVisitor):
     def infer(self):
         self.visit(self.root)
 
-    def type_consistent(self, ltype, rtype):
-        return self.checker.check(ltype, rtype)
-
     def get_type(self, node) -> TypeIns:
         option = eval_expr(node, self.recorder)
         self.handle_err(option.errors)
         return option.value
+
+    def type_consistent(self, ltype, rtype) -> bool:
+        return TypeCompatible().TypeCompatible(ltype, rtype)
 
     def handle_err(self, err_list):
         # TODO

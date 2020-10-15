@@ -44,6 +44,8 @@ class MessageBox(object):
         if isinstance(error, NoError):
             return
         node, msg = error.make()
+        if node is None:
+            return
         self.add_err(node, msg)
 
     def report(self):

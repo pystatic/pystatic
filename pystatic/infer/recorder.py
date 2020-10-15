@@ -1,7 +1,8 @@
 import ast
 from typing import List, Dict
-from pystatic.errorcode import SymbolUndefined, NoError, ErrorCode
-from pystatic.typesys import any_type, TypeIns, TypeType
+from pystatic.errorcode import SymbolUndefined, ErrorCode
+from pystatic.typesys import TypeIns, TypeType, any_type
+from pystatic.option import Option
 
 
 class Scope:
@@ -58,23 +59,18 @@ class SymbolRecorder:
     def set_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)
 
-    @property
-    def upper_class(self):
-        for scope in self.stack[::-1]:
-            if isinstance(scope, ClassScope):
-                return scope.tp
-        return None
-
-    def getattribute(self, name, node: ast.AST) -> ErrorCode:
+    def getattribute(self, name, node: ast.AST) -> Option:
         tp = self.cur_scope.type_map.get(name)
         if tp:
-            return NoError(tp)
+            return Option(tp)
         for scope in self.stack[::-1][1:]:
             tp = scope.type_map.get(name)
             if tp:
-                return NoError(tp)
+                return Option(tp)
             else:
                 tp = scope.tp.get_local_symbol(name)
                 if tp:
-                    return NoError(tp)
-        return SymbolUndefined(node, name, any_type)
+                    return Option(tp)
+        option = Option(any_type)
+        option.add_err(SymbolUndefined(node, name))
+        return option
