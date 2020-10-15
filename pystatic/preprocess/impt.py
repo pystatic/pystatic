@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
 from pystatic.uri import rel2absuri, Uri, uri2list
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
-from pystatic.preprocess.sym_util import (fake_imp_entry, add_uri_symtable,
+from pystatic.preprocess.sym_util import (fake_impt_entry, add_uri_symtable,
                                           search_uri_symtable,
-                                          split_import_stmt)
+                                          analyse_import_stmt)
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -23,38 +23,40 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     """Resolve types(class definition) imported from other module"""
     new_import_info = {}
     for impt_node in symtable._import_nodes:
-        impt_dict = split_import_stmt(impt_node, symtable.glob_uri)
+        info_list = analyse_import_stmt(impt_node, symtable.glob_uri)
 
         if isinstance(impt_node, ast.Import):
-            for uri, tpls in impt_dict.items():
-                add_uri_symtable(symtable, uri, worker)
+            for info in info_list:
+                uri = info.uri
+                asname = info.asname
+                add_uri_symtable(symtable, info.uri, worker)
                 module_ins = search_uri_symtable(symtable, uri)
+
                 assert module_ins, "module not found error not handled yet"
 
-                for asname, origin_name in tpls:
-                    if asname == uri:
-                        assert uri2list(uri)
-                        top_uri = uri2list(uri)[0]
+                if asname == uri:
+                    assert uri2list(uri)
+                    top_uri = uri2list(uri)[0]
 
-                        if top_uri not in symtable.local:
-                            top_module_ins = search_uri_symtable(
-                                symtable, top_uri)
-                            assert top_module_ins, "module not found error not handled yet"
-                            symtable.local[top_uri] = Entry(
-                                top_module_ins, impt_node)
-
-                    else:
-                        symtable.local[asname] = Entry(module_ins, impt_node)
+                    if top_uri not in symtable.local:
+                        top_module_ins = search_uri_symtable(symtable, top_uri)
+                        assert top_module_ins, "module not found error not handled yet"
+                        symtable.local[top_uri] = Entry(
+                            top_module_ins, impt_node)
+                else:
+                    symtable.local[asname] = Entry(module_ins, impt_node)
 
         else:
-            for uri, tpls in impt_dict.items():
-                new_info = []
+            new_info = []
+            for info in info_list:
+                uri = info.uri
+                asname = info.asname
+                origin_name = info.origin_name
 
-                for asname, origin_name in tpls:
-                    is_module = _resolve_import_chain(symtable, asname, worker,
-                                                      True)
-                    if not is_module:
-                        new_info.append((asname, origin_name, impt_node))
+                is_module = _resolve_import_chain(symtable, asname, worker,
+                                                  True)
+                if not is_module:
+                    new_info.append((asname, origin_name, impt_node))
 
                 if new_info:
                     new_import_info[uri] = new_info
@@ -76,9 +78,6 @@ def resolve_import_ins(symtable: SymTable, worker: 'Preprocessor'):
     target_import_info = getattr(symtable, '_import_info_cache', None)
 
     for uri, info in target_import_info.items():
-        module_temp = worker.get_module_temp(uri)
-        assert module_temp, "module not found error not handled yet"  # TODO: add warning here
-
         new_info = []
         for name, origin_name, defnode in info:
             is_module = _resolve_import_chain(symtable, name, worker, False)
@@ -101,6 +100,9 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
                           worker: 'Preprocessor', is_type: bool) -> bool:
     """Resolve type from an import chaine
 
+    is_type:
+        import a type(class TypeVar ...) or not.
+
     - is_type is True:
         Return true if it truly stands for an type temp.
     - is_type is False:
@@ -108,7 +110,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
     """
     imp_entry: Any = symtable.lookup_entry(name)
 
-    if not isinstance(imp_entry, fake_imp_entry):
+    if not isinstance(imp_entry, fake_impt_entry):
         return False
 
     cur_state = (imp_entry.uri, imp_entry.origin_name)
@@ -135,7 +137,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
 
         cur_entry: Any = cur_symtable.lookup_local_entry(name_in_mod)
         if cur_entry:
-            if isinstance(cur_entry, fake_imp_entry):
+            if isinstance(cur_entry, fake_impt_entry):
                 # indirect import
                 cur_state = (cur_entry.uri, cur_entry.origin_name)
                 buf_targets.append((cur_symtable, name_in_mod))
@@ -167,7 +169,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
             for target_symtable, target_name in buf_targets:
                 assert isinstance(target_symtable, SymTable)
                 entry: Any = target_symtable.lookup_local_entry(target_name)
-                assert isinstance(entry, fake_imp_entry)
+                assert isinstance(entry, fake_impt_entry)
                 new_entry = Entry(result, entry.defnode)
                 target_symtable.local[
                     name] = new_entry  # avoid possible name collision test
@@ -176,7 +178,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
             for target_symtable, target_name in buf_targets:
                 assert isinstance(target_symtable, SymTable)
                 entry: Any = target_symtable.lookup_local_entry(target_name)
-                assert isinstance(entry, fake_imp_entry)
+                assert isinstance(entry, fake_impt_entry)
                 new_entry = Entry(result, entry.defnode)
                 target_symtable.local[name] = new_entry
             return True
@@ -186,7 +188,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
         for target_symtable, target_name in buf_targets:
             assert isinstance(target_symtable, SymTable)
             entry: Any = target_symtable.lookup_local_entry(target_name)
-            assert isinstance(entry, fake_imp_entry)
+            assert isinstance(entry, fake_impt_entry)
             new_entry = Entry(any_ins, entry.defnode)
             target_symtable.local[name] = new_entry  # same as above
         return False

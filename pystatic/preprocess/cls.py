@@ -4,20 +4,23 @@ Resolve class related type information.
 
 import ast
 import logging
-import copy
+import contextlib
 from pystatic.target import MethodTarget
-from pystatic.preprocess.type_expr import (eval_argument_type,
-                                           eval_return_type, eval_type_expr,
-                                           eval_func_type,
-                                           template_resolve_fun)
+from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
+                                          eval_type_def_expr,
+                                          template_resolve_fun)
 from typing import List, TYPE_CHECKING, Optional
-from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeModuleTemp,
-                              TypeVar, TpState, TypeTemp, any_ins, TypeIns)
+from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeGenericTemp,
+                              TypeModuleTemp, TpState, TypeTemp, TypeIns,
+                              TypeVarIns, TypeType)
+from pystatic.exprparse import eval_expr
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
+from pystatic.message import MessageBox
 from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
-from pystatic.preprocess.sym_util import add_baseclass, get_cls_defnode
-from pystatic.arg import Argument, copy_argument
+from pystatic.preprocess.sym_util import (add_baseclass, get_cls_defnode,
+                                          get_temp_state, set_temp_state)
+from pystatic.arg import Argument
 
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
@@ -27,20 +30,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def resolve_cls_def(targets: List['BlockTarget']):
+def resolve_cls_def(targets: List['BlockTarget'], mbox: 'MessageBox'):
     """Get class definition information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
 
     # placeholders
     for temp in resolve_order:
-        temp.set_state(TpState.ON)
-        _resolve_cls_placeholder(temp)
+        set_temp_state(temp, TpState.ON)
+        _resolve_cls_placeholder(temp, mbox)
 
     # inheritance
     for temp in resolve_order:
-        _resolve_cls_inh(temp)
-        temp.set_state(TpState.OVER)
+        _resolve_cls_inh(temp, mbox)
+        set_temp_state(temp, TpState.OVER)
 
 
 def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
@@ -68,7 +71,7 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
 def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
     """Add dependency relations that due to the inheritance"""
-    if _check_cls_state(clstemp):
+    if get_temp_state(clstemp) != TpState.OVER:
         graph.add_typetemp(clstemp)
         assert isinstance(
             clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
@@ -81,36 +84,37 @@ def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
             assert isinstance(first_temp, TypeTemp) and not isinstance(
                 first_temp, TypeModuleTemp
             )  # FIXME: if the result is a module, warninng here
-            if first_temp and _check_cls_state(first_temp):
-                assert isinstance(first_temp, TypeClassTemp)
-                graph.add_dependency(clstemp, first_temp)
+            if first_temp:
+                assert get_temp_state(clstemp) != TpState.OVER
+                assert isinstance(first_temp, TypeTemp)
+                if get_temp_state(first_temp) == TpState.ON:
+                    assert isinstance(first_temp, TypeClassTemp)
+                    graph.add_dependency(clstemp, first_temp)
 
 
-def _check_cls_state(temp: 'TypeTemp'):
-    state = temp.get_state()
-    return state != TpState.OVER
-
-
-def _resolve_cls_placeholder(clstemp: 'TypeClassTemp'):
+def _resolve_cls_placeholder(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     """Resolve placeholders of a class"""
-    assert _check_cls_state(clstemp)
+    assert get_temp_state(clstemp) != TpState.OVER
     symtable = clstemp.get_def_symtable()
-    visitor = _TypeVarVisitor(symtable, [])
+    visitor = _TypeVarVisitor(symtable, mbox)
     defnode = get_cls_defnode(clstemp)
     for base_node in defnode.bases:
         visitor.accept(base_node)
 
-    clstemp.placeholders = visitor.typevars
+    clstemp.placeholders = visitor.get_typevar_list()
 
 
-def _resolve_cls_inh(clstemp: 'TypeClassTemp'):
+def _resolve_cls_inh(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
-    assert _check_cls_state(clstemp)
+    assert get_temp_state(clstemp) != TpState.OVER
     symtable = clstemp.get_def_symtable()
     defnode = get_cls_defnode(clstemp)
 
     for base_node in defnode.bases:
-        res_type = eval_type_expr(base_node, symtable)
+        option_base = eval_type_def_expr(base_node, symtable)
+        option_base.dump_to_box(mbox)
+        res_type = option_base.value
+        assert isinstance(res_type, TypeType)
         if res_type:
             add_baseclass(clstemp, res_type)
 
@@ -153,38 +157,91 @@ class _TypeVarVisitor(BaseVisitor):
 
     Used to generate correct placeholders.
     """
-    def __init__(self, symtable: 'SymTable',
-                 typevars: List['TypeVar']) -> None:
+    def __init__(self, symtable: 'SymTable', mbox: 'MessageBox') -> None:
         self.symtable = symtable
-        self.typevars = typevars
+        self.typevars: List['TypeVarIns'] = []
+        self.generic_tpvars: List['TypeVarIns'] = []
+        self.mbox = mbox
+        self.in_gen = False
+
+        self.met_gen = False
+
+    @contextlib.contextmanager
+    def enter_generic(self):
+        if self.met_gen:
+            # TODO: double Generic Error
+            yield
+
+        else:
+            old_in_gen = self.in_gen
+
+            self.met_gen = True
+            self.in_gen = True
+            yield
+            self.in_gen = old_in_gen
+
+    def get_typevar_list(self) -> List['TypeVarIns']:
+        if self.met_gen:
+            for gen in self.typevars:
+                if gen not in self.generic_tpvars:
+                    # TODO: add error here(not in generic)
+                    self.generic_tpvars.append(gen)
+            return self.generic_tpvars
+        else:
+            return self.typevars
+
+    def add_tpvar(self, tpvarins: TypeVarIns):
+        if self.in_gen:
+            if tpvarins not in self.generic_tpvars:
+                self.generic_tpvars.append(tpvarins)
+        else:
+            if tpvarins not in self.typevars:
+                self.typevars.append(tpvarins)
 
     def visit_Name(self, node: ast.Name):
-        curtype = self.symtable.lookup(node.id)
-        if curtype and isinstance(curtype.temp, TypeVar):
-            temp = curtype.temp
-            if temp not in self.typevars:
-                self.typevars.append(temp)
+        option_name = eval_expr(node, self.symtable)
+        if isinstance(option_name.value, TypeVarIns):
+            self.add_tpvar(option_name.value)
+        option_name.dump_to_box(self.mbox)
+        return option_name.value
 
     def visit_Attribute(self, node: ast.Attribute):
-        assert 0, "not implemented yet"
+        left_value = self.visit(node.value)
+        assert isinstance(left_value, TypeIns)
+        option_res = left_value.getattribute(node.attr, node)
+        option_res.dump_to_box(self.mbox)
+        res = option_res.value
+        if isinstance(res, TypeVarIns):
+            self.add_tpvar(res)
+        return res
 
     def visit_Subscript(self, node: ast.Subscript):
-        self.visit(node.slice)
+        left_value = self.visit(node.value)
+        assert isinstance(left_value, TypeIns)
+
+        if isinstance(left_value.temp, TypeGenericTemp):
+            with self.enter_generic():
+                self.visit(node.slice)
+        else:
+            self.visit(node.slice)
+        return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor'):
+def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor',
+                       mbox: 'MessageBox'):
     # uri here is not set correctly
     for tp_temp in symtable._cls_defs.values():
-        mt = _resolve_cls_method(uri, tp_temp)
+        mt = _resolve_cls_method(uri, tp_temp, mbox)
         if mt:
             worker.process_block(mt, False)
 
     for tp_temp in symtable._cls_defs.values():
         new_uri = '.'.join([uri, tp_temp.basename])
-        resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker)
+        resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker, mbox)
 
 
-def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
+def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
+                        mbox: 'MessageBox'):
     targets = []
     new_fun_defs = {}
     symtable = clstemp.get_inner_symtable()
@@ -210,12 +267,17 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
             argument.args[0].ann = clstemp.get_default_ins()
 
     def add_def(node: ast.FunctionDef) -> TypeFuncIns:
-        nonlocal symtable, new_fun_defs
-        argument = eval_argument_type(node.args, symtable)
-        assert argument
-        ret_ins = eval_return_type(node.returns, symtable).getins()
-        name = node.name
+        nonlocal symtable, new_fun_defs, mbox
+        option_argument = eval_argument_type(node.args, symtable)
+        option_return = eval_return_type(node.returns, symtable)
 
+        option_argument.dump_to_box(mbox)
+        option_return.dump_to_box(mbox)
+
+        argument = option_argument.value
+        ret_ins = option_return.value
+
+        name = node.name
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(argument, is_classmethod, is_staticmethod)
 
@@ -240,21 +302,21 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp'):
         modify_argument(args, is_classmethod, is_staticmethod)
         ins.add_overload(args, ret)
         logger.debug(
-            f'overload ({symtable.uri}) {node.name}: {ins.get_str_expr(None)}')
+            f'overload ({symtable.uri}) {node.name}: {ins.str_expr(None)}')
 
-    template_resolve_fun(symtable, add_def, add_overload)
+    template_resolve_fun(symtable, add_def, add_overload, mbox)
     symtable._func_defs = new_fun_defs
 
     return targets
 
 
-def resolve_cls_attr(symtable: 'SymTable'):
+def resolve_cls_attr(symtable: 'SymTable', mbox: 'MessageBox'):
     for tp_temp in symtable._cls_defs.values():
-        _resolve_cls_attr(tp_temp)
-        resolve_cls_attr(tp_temp.get_inner_symtable())
+        _resolve_cls_attr(tp_temp, mbox)
+        resolve_cls_attr(tp_temp.get_inner_symtable(), mbox)
 
 
-def _resolve_cls_attr(clstemp: 'TypeClassTemp'):
+def _resolve_cls_attr(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     true_var_attr = {}
     for name, tp_attr in clstemp.var_attr.items():
         # tp_attr is the temporary dict set in definition.py
@@ -262,12 +324,12 @@ def _resolve_cls_attr(clstemp: 'TypeClassTemp'):
         symtb = tp_attr.get('symtable')  # type: ignore
         assert typenode
         assert symtb
-        var_type = eval_type_expr(typenode, symtb)
-        if var_type:
-            var_ins = var_type.getins()
-            true_var_attr[name] = var_ins
-            logger.debug(f'add attribute {name}: {var_ins} to {clstemp}')
-        else:
-            # TODO: warning here
-            true_var_attr[name] = any_ins
+        option_var = eval_type_def_expr(typenode, symtb)
+        var_ins = option_var.value
+
+        option_var.dump_to_box(mbox)
+
+        true_var_attr[name] = var_ins
+        logger.debug(
+            f'add attribute {name}: {var_ins} to {clstemp.str_expr(None)}')
     clstemp.var_attr = true_var_attr

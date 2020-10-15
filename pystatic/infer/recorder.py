@@ -34,7 +34,7 @@ class SymbolRecorder:
     def cur_scope(self) -> Scope:
         return self.stack[-1]
 
-    def is_defined(self, name:str):
+    def is_defined(self, name: str):
         return name in self.cur_scope.type_map
 
     def enter_scope(self, tp: TypeType):

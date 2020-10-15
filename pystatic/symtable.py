@@ -1,6 +1,8 @@
 import ast
 import enum
 from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
+from pystatic.option import Option
+from pystatic.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.typesys import (TypeIns, TypeClassTemp, TypeTemp,
@@ -27,14 +29,8 @@ class Entry:
         self._tp = tp
         self._defnode = defnode
 
-    def set_type(self, tp: 'TypeIns'):
-        self._tp = tp
-
     def get_type(self) -> 'TypeIns':
         return self._tp
-
-    def set_defnode(self, defnode: ast.AST):
-        self._defnode = defnode
 
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
@@ -114,6 +110,20 @@ class SymTable:
     def getattr(self, name: str) -> Optional['TypeIns']:
         return self.lookup(name)
 
+    def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
+        """Getattribute from symtable
+
+        support the getattribute interface.
+        """
+        from pystatic.typesys import any_ins  # avoid import circle
+        option_res = Option(any_ins)
+        res = self.lookup(name)
+        if not res:
+            option_res.add_err(SymbolUndefined(node, name))
+        else:
+            option_res.set_value(res)
+        return option_res
+
     def lookup_local_entry(self, name: str) -> Optional['Entry']:
         return self.local.get(name)
 
@@ -132,4 +142,3 @@ class SymTable:
         glob = self.glob
         new_uri = self.uri + '.' + name
         return SymTable(new_uri, glob, non_local, builtins, new_scope)
-

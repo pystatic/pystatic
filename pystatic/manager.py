@@ -29,15 +29,15 @@ class Manager:
         finder = ModuleFinder(self.config.manual_path, list(self.user_path),
                               self.config.sitepkg, self.config.typeshed,
                               self.config.python_version)
-        self.pre_proc = Preprocessor(self, finder)
+
+        self.mbox = MessageBox('test')  # TODO: refactor this
+        self.pre_proc = Preprocessor(self.mbox, finder)
 
         self.stdout = stdout
         self.stderr = stderr
 
         self.find_check_files(module_files)
         self.find_check_files(package_files)
-
-        self.mbox = MessageBox('test')  # TODO: refactor this
 
         if load_typeshed:
             self.init_typeshed()
@@ -57,7 +57,7 @@ class Manager:
 
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
-        self.start_infer()
+        # self.start_infer()
         self.mbox.report()
 
     def start_infer(self):

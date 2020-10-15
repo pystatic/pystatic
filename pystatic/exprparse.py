@@ -1,102 +1,156 @@
 import ast
-from pystatic.typesys import *
-from pystatic.message import MessageBox
-from pystatic.infer.checker import TypeChecker
-from pystatic.infer.visitor import BaseVisitor
-from pystatic.infer import op_map
-from pystatic.arg import Argument, Arg
+import contextlib
+from typing import List, Optional, Protocol
+from pystatic.errorcode import ErrorCode
+from pystatic.visitor import NoGenVisitor
+from pystatic.typesys import TypeIns, TypeLiteralIns
+from pystatic.evalutil import ApplyArgs, WithAst
+from pystatic.option import Option
 
 
-class ExprParser(BaseVisitor):
-    def __init__(self, mbox: MessageBox, recorder):
-        self.mbox = mbox
-        self.recorder = recorder
-        self.checker = TypeChecker(self.mbox)
-
-    def parse_expr(self, node):
-        print(ast.dump(node))
-        return self.visit(node)
-
-    def type_consistent(self, tp1, tp2):
-        return self.checker.check(tp1, tp2)
+class SupportGetAttribute(Protocol):
+    def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
+        ...
 
 
+def eval_expr(node: ast.AST, attr_consultant: SupportGetAttribute):
+    """
+    consultant:
+        support getattribute(str, ast.AST) -> Option[TypeIns]
 
-    def visit_Attribute(self, node: ast.Attribute):
-        attr: str = node.attr
-        value = self.visit(node.value)
-        if value is not None:
-            tp = value.getattribute(attr)
-            if tp is None:
-                self.mbox.no_attribute(node, value, attr)
-            return tp
-        return value
+    is_record:
+        report error or not.
+    """
+    return ExprParser(attr_consultant).accept(node)
 
-    def visit_BinOp(self, node: ast.BinOp):
-        print(ast.dump(node))
-        left_type = self.visit(node.left)
-        if left_type is None:
-            return None
-        right_type = self.visit(node.right)
-        if right_type is None:
-            return None
-        func_name = op_map.binop_map[type(node.op)]
-        func_type = left_type.getattribute(func_name)
-        operand = op_map.binop_char_map[type(node.op)]
-        if not func_type:
-            self.mbox.unsupported_operand(node, operand, left_type, right_type)
-        
-        args = Argument()
-        args.args.append(Arg(None, right_type))
-        argument, ret = func_type.call(args)
-        ann = argument.args[1].ann
-        
-        if not self.type_consistent(ann, right_type):
-            self.mbox.unsupported_operand(node, operand, left_type, right_type)
-        return ret
 
-    def visit_Call(self, node: ast.Call):
-        if isinstance(node.func, ast.Name):
-            # get the type by the name
-            call_type = self.visit(node.func)
-            if not call_type:
-                return None
-            if isinstance(call_type, TypeType):
-                return call_type.call()
-            elif isinstance(call_type, TypeIns):
-                arg, ret = call_type.call(None)
-                return ret
-            else:
-                raise Exception(f"todo {type(call_type)} of {call_type}")
-        # check the args' type in the call
-        args_type = []
-        for arg in node.args:
-            args_type.append(self.visit(arg))
-        # TODO: here is according to the class of the type, check the args
+class ExprParser(NoGenVisitor):
+    def __init__(self, consultant: SupportGetAttribute) -> None:
+        """
+        is_record:
+            whether report error or not.
+        """
+        self.consultant = consultant
+        self.errors = []
 
-    def visit_Constant(self, node: ast.Constant):
-        assert type(node.value) is not None
-        name = type(node.value).__name__
-        return self.lookup_var(name)
+        self.in_subs = False  # under a subscription node?
+        self.container = []
+
+    @contextlib.contextmanager
+    def register_container(self, container: list):
+        old_in_subs = self.in_subs
+        old_container = self.container
+
+        self.in_subs = True
+        self.container = container
+        yield
+        self.container = old_container
+        self.in_subs = old_in_subs
+
+    def add_err(self, errlist: Optional[List[ErrorCode]]):
+        if errlist:
+            self.errors.extend(errlist)
+
+    def add_to_container(self, item, node: ast.AST):
+        if self.in_subs:
+            self.container.append(WithAst(item, node))
+
+    def accept(self, node: ast.AST) -> Option[TypeIns]:
+        self.errors = []
+        tpins = self.visit(node)
+        assert isinstance(tpins, TypeIns)
+        option_res = Option(tpins)
+        option_res.add_errlist(self.errors)
+        return option_res
+
+    def visit_Name(self, node: ast.Name) -> TypeIns:
+        name_option = self.consultant.getattribute(node.id, node)
+        assert isinstance(name_option, Option)
+        assert isinstance(name_option.value, TypeIns)
+
+        self.add_err(name_option.errors)
+
+        self.add_to_container(name_option.value, node)
+        return name_option.value
+
+    def visit_Constant(self, node: ast.Constant) -> TypeIns:
+        tpins = TypeLiteralIns(node.value)
+        self.add_to_container(tpins, node)
+        return tpins
+
+    def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
+        res = self.visit(node.value)
+        assert isinstance(res, TypeIns)
+        attr_option = res.getattribute(node.attr, node)
+
+        self.add_err(attr_option.errors)
+
+        self.add_to_container(attr_option.value, node)
+        return attr_option.value
+
+    def visit_Call(self, node: ast.Call) -> TypeIns:
+        left_ins = self.visit(node.func)
+        assert isinstance(left_ins, TypeIns)
+
+        applyargs = ApplyArgs()
+        # generate applyargs
+        for argnode in node.args:
+            argins = self.visit(argnode)
+            assert isinstance(argins, TypeIns)
+            applyargs.add_arg(argins, argnode)
+        for kwargnode in node.keywords:
+            argins = self.visit(kwargnode.value)
+            assert isinstance(argins, TypeIns)
+            assert kwargnode.arg, "**kwargs is not supported now"
+            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
+
+        call_option = left_ins.call(applyargs)
+
+        self.add_err(call_option.errors)
+
+        self.add_to_container(call_option.value, node)
+        return call_option.value
+
+    def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
+        left_ins = self.visit(node.value)
+        assert isinstance(left_ins, TypeIns)
+
+        container = []
+        with self.register_container(container):
+            items = self.visit(node.slice)
+            assert isinstance(items, (list, tuple, TypeIns))
+
+        assert len(container) == 1
+        res_option = left_ins.getitem(container[0])
+
+        self.add_to_container(res_option.value, node)
+        return res_option.value
 
     def visit_List(self, node: ast.List):
-        type_list = []
-        for elt in node.elts:
-            type_list.append(super().visit(elt))
-        return type_list
-
-    def visit_Name(self, node: ast.Name):
-        if node.id == 'self':
-            return self.recorder.upper_class
-        tp = self.lookup_var(node.id)
-        if not tp:
-            self.mbox.symbol_undefined(node, node.id)
-        return tp
+        if self.in_subs:
+            lst = []
+            with self.register_container(lst):
+                for subnode in node.elts:
+                    self.visit(subnode)
+            self.add_to_container(lst, node)
+            return lst
+        else:
+            assert False, "TODO"
 
     def visit_Tuple(self, node: ast.Tuple):
-        type_list = []
-        for elt in node.elts:
-            type_list.append(super().visit(elt))
-        return tuple(type_list)
+        if self.in_subs:
+            lst = []
+            with self.register_container(lst):
+                for subnode in node.elts:
+                    self.visit(subnode)
+            tp = tuple(lst)
+            self.add_to_container(tp, node)
+            return tp
+        else:
+            assert False, "TODO"
 
-        
+    def visit_Slice(self, node: ast.Slice):
+        assert False, "TODO"
+
+    def visit_Index(self, node: ast.Index):
+        return self.visit(node.value)

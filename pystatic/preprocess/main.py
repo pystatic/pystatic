@@ -1,8 +1,8 @@
 import ast
 from collections import deque
 from pystatic.uri import uri2list
-from typing import Optional, TYPE_CHECKING, Deque, List, Dict, Tuple
-from pystatic.typesys import TpState, TypeModuleTemp, TypePackageTemp
+from typing import Optional, TYPE_CHECKING, Deque, List, Dict
+from pystatic.typesys import TypeModuleTemp, TypePackageTemp
 from pystatic.modfinder import ModuleFinder
 from pystatic.predefined import get_init_module_symtable
 from pystatic.preprocess.definition import (get_definition,
@@ -15,7 +15,7 @@ from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 from pystatic.modfinder import ModuleFinder, ModuleFindRes
 
 if TYPE_CHECKING:
-    from pystatic.manager import Manager
+    from pystatic.message import MessageBox
     from pystatic.uri import Uri
 
 
@@ -31,10 +31,11 @@ def path2ast(path: str) -> ast.AST:
 
 
 class Preprocessor:
-    def __init__(self, manager: 'Manager', finder: 'ModuleFinder') -> None:
-        self.manager = manager  # TODO: is this necessary?
+    def __init__(self, mbox: 'MessageBox', finder: 'ModuleFinder') -> None:
+        self.mbox = mbox
         self.finder = finder
 
+        # dequeue that store targets waiting for get definitions in them
         self.q_parse: Deque[BlockTarget] = deque()
 
         self.targets: Dict[Uri, Target] = {}
@@ -104,30 +105,30 @@ class Preprocessor:
             assert current.ast
             to_check.append(current)
 
-            # get current module's class definitions
+            # get current module's class definitions.
             if isinstance(current, MethodTarget):
-                get_definition_in_method(current, self, self.manager.mbox)
+                get_definition_in_method(current, self, self.mbox)
             else:
-                get_definition(current, self, self.manager.mbox)
+                get_definition(current, self, self.mbox)
 
-        # get type imported from other module
+        # get type imported from other module.
         for target in to_check:
             resolve_import_type(target.symtable, self)
 
-        resolve_cls_def(to_check)
+        resolve_cls_def(to_check, self.mbox)
 
         # from now on, all valid types in the module should be correctly
-        # identified because possible type(class) information is collected
+        # identified because possible type(class) information is collected.
         for target in to_check:
-            resolve_local_typeins(target.symtable)
-            resolve_local_func(target.symtable)
+            resolve_local_typeins(target.symtable, self.mbox)
+            resolve_local_func(target.symtable, self.mbox)
 
         for target in to_check:
             resolve_import_ins(target.symtable, self)
 
         for target in to_check:
-            resolve_cls_method(target.symtable, target.uri, self)
-            resolve_cls_attr(target.symtable)
+            resolve_cls_method(target.symtable, target.uri, self, self.mbox)
+            resolve_cls_attr(target.symtable, self.mbox)
 
             if isinstance(target, Target):
                 target.stage = Stage.Processed

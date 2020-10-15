@@ -1,17 +1,27 @@
 import ast
 import enum
 import copy
-from typing import Optional, Dict, List, Tuple, Union, TYPE_CHECKING
-from pystatic.symtable import Entry, SymTable
-from pystatic.message import MessageBox
+from typing import (Optional, Dict, List, Tuple, Union, TYPE_CHECKING, Final)
+from pystatic.option import Option
 from pystatic.uri import Uri
+from pystatic.evalutil import (InsWithAst, ApplyArgs, GetItemType, WithAst)
+from pystatic.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.arg import Argument
+    from pystatic.symtable import Entry, SymTable
 
-TypeContext = Dict['TypeVar', 'TypeType']
-TypeVarList = List['TypeVar']
+TypeContext = Dict['TypeVarIns', 'TypeType']
+TypeVarList = List['TypeVarIns']
 BindList = Optional[List[Union['TypeType', List['TypeType'], 'TypeIns']]]
+
+DEFAULT_TYPEVAR_NAME: Final[str] = '__unknown_typevar_name__'
+
+
+class TpVarKind(enum.IntEnum):
+    INVARIANT = 0
+    COVARIANT = 1
+    CONTRAVARIANT = 2
 
 
 class TpState(enum.IntEnum):
@@ -39,18 +49,31 @@ class TypeTemp:
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
 
-    def set_state(self, st: TpState):
-        self._resolve_state = st
-
-    def get_state(self) -> TpState:
-        return self._resolve_state
-
-    def get_typetype(self, bindlist: BindList) -> 'TypeType':
-        new_bind = None  # TODO: rename this
-        return TypeType(self, new_bind)
+    def get_typetype(self,
+                     bindlist: Optional[BindList] = None,
+                     item: Optional[GetItemType] = None) -> Option['TypeType']:
+        """Mainly used for TypeType to generate correct TypeType"""
+        if not item:
+            return Option(TypeType(self, None))
+        else:
+            if isinstance(item.ins, (tuple, list)):
+                tpins_list = []
+                for item in item.ins:
+                    if isinstance(item.ins, TypeIns):
+                        tpins_list.append(item.ins)
+                    else:
+                        # TODO: add warning here
+                        pass
+                return Option(TypeType(self, tpins_list))
+            else:
+                if isinstance(item.ins, TypeIns):
+                    return Option(TypeType(self, [item.ins]))
+                else:
+                    # TODO: add warning here
+                    return Option(TypeType(self, None))
 
     def get_default_typetype(self) -> 'TypeType':
-        return self.get_typetype(None)
+        return self.get_typetype(None, None).value
 
     def getins(self, bindlist: BindList) -> 'TypeIns':
         return TypeIns(self, bindlist)
@@ -58,24 +81,46 @@ class TypeTemp:
     def get_default_ins(self) -> 'TypeIns':
         return self.getins(None)
 
-    def getattribute(self,
-                     name: str,
-                     node: ast.AST,
-                     mbox: MessageBox,
-                     bindlist: BindList,
-                     context: Optional[TypeContext] = None) -> 'TypeIns':
-        return any_ins
+    def get_type_attribute(
+            self,
+            name: str,
+            bindlist: BindList,
+            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        """Get attribute that belong to the Type itself, mainly used for typetype"""
+        return self.getattribute(name, bindlist, context)
+
+    def init_ins(self, applyargs: 'ApplyArgs',
+                 bindlist: BindList) -> Option['TypeIns']:
+        return Option(self.getins(bindlist))
+
+    def getattribute(
+            self,
+            name: str,
+            bindlist: BindList,
+            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        return None
 
     def setattr(self, name: str, attr_type: 'TypeIns'):
-        assert 0, "This function should be avoided because TypeClassTemp doesn't support it"
+        assert False, "This function should be avoided because TypeClassTemp doesn't support it"
 
     def getattr(self,
                 name: str,
-                node: ast.AST,
-                mbox: MessageBox,
                 bindlist: BindList,
                 context: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        return self.getattribute(name, node, mbox, bindlist, context)
+        return self.getattribute(name, bindlist, context)
+
+    def call(self, applyargs: 'ApplyArgs',
+             bindlist: BindList) -> Option['TypeIns']:
+        call_option = Option(any_ins)
+        # TODO: add error for not callable
+        # call_option.add_err(...)
+        return call_option
+
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        # TODO: add error
+        return option_res
 
     def str_expr(self,
                  bindlist: BindList,
@@ -84,29 +129,7 @@ class TypeTemp:
         return self.name
 
     def __str__(self):
-        return self.name
-
-
-class TypeVar(TypeTemp):
-    def __init__(self,
-                 name: str,
-                 module_uri: str,
-                 *args: 'TypeIns',
-                 bound: Optional['TypeIns'] = None,
-                 covariant=False,
-                 contravariant=False):
-        super().__init__(module_uri, name)
-        self.bound = bound
-        if contravariant:
-            self.covariant = False
-        else:
-            self.covariant = covariant
-        if contravariant or covariant:
-            self.invariant = False
-        else:
-            self.invariant = True
-        self.contravariant = contravariant
-        self.constrains: List['TypeIns'] = list(*args)
+        assert False, "use str_expr instead"
 
 
 class TypeIns:
@@ -120,7 +143,7 @@ class TypeIns:
         new_bindlist = []
         bindlist = self.bindlist or []
         for item in bindlist:
-            if isinstance(item, TypeVar) and item in context:
+            if isinstance(item, TypeVarTemp) and item in context:
                 # TODO: check consistence here
                 new_bindlist.append(context[item])
             else:
@@ -133,7 +156,8 @@ class TypeIns:
         for i, item in enumerate(bindlist):
             if len(self.temp.placeholders) > i:
                 old_slot = self.temp.placeholders[i]
-                if isinstance(old_slot, TypeVar) and old_slot in new_context:
+                if isinstance(old_slot,
+                              TypeVarIns) and old_slot in new_context:
                     assert isinstance(item, TypeType)
                     new_context[old_slot] = item
         return new_context
@@ -141,32 +165,36 @@ class TypeIns:
     def getattribute(
             self,
             name: str,
-            node: ast.AST,
-            mbox: MessageBox,
-            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+            node: Optional[ast.AST],
+            context: Optional[TypeContext] = None) -> Option['TypeIns']:
         context = context or {}
         context = self.shadow(context)
-        return self.temp.getattribute(name, node, mbox,
-                                      self.substitute(context), context)
+
+        option_res = Option(any_ins)
+        ins_res = self.temp.getattribute(name, self.substitute(context),
+                                         context)
+
+        if not ins_res:
+            option_res.add_err(NoAttribute(node, self, name))
+        else:
+            option_res.set_value(ins_res)
+        return option_res
 
     def getattr(self,
                 name: str,
-                node: ast.AST,
-                mbox: MessageBox,
-                context: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        return self.getattribute(name, node, mbox, context)
+                node: Optional[ast.AST],
+                context: Optional[TypeContext] = None) -> Option['TypeIns']:
+        return self.getattribute(name, node, context)
 
-    def getitem(self, items) -> 'TypeIns':
-        assert False, "TODO"
+    def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
+        return self.temp.call(applyargs, self.bindlist)
+
+    def getitem(self, item: GetItemType) -> Option['TypeIns']:
+        # TODO: add error
+        return self.temp.getitem(item, self.bindlist)
 
     def __str__(self) -> str:
         return self.temp.str_expr(self.bindlist)
-
-    def call(self, args):
-        assert False, "TODO"
-
-    def get_local_symbol(self, name: str):
-        return self.temp.get_local_symbol(name)
 
 
 class TypeType(TypeIns):
@@ -179,23 +207,123 @@ class TypeType(TypeIns):
     def call(self, args) -> 'TypeIns':
         return self.getins()
 
-    def getattribute(self,
-                     name: str,
-                     node: ast.AST,
-                     mbox: MessageBox,
-                     context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+    def getattribute(
+            self,
+            name: str,
+            node: Optional[ast.AST],
+            context: Optional[TypeContext] = None) -> Option['TypeIns']:
         context = context or {}
         context = self.shadow(context)
-        return self.temp.get_local_symbol(name)
 
-    def getitem(self, bindlist: BindList) -> 'TypeIns':
-        assert False, "TODO"
+        option_res = Option(any_ins)
+        ins_res = self.temp.get_type_attribute(name, self.substitute(context),
+                                               context)
 
-    def setattr(self, name, tp):
-        self.temp.setattr(name, tp)
+        if not ins_res:
+            option_res.add_err(NoAttribute(node, self, name))
+        else:
+            option_res.set_value(ins_res)
+        return option_res
+
+    def getitem(self, item: GetItemType) -> Option['TypeIns']:
+        return self.temp.get_typetype(self.bindlist, item)
+
+    def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
+        return self.temp.init_ins(applyargs, self.bindlist)
 
     def __str__(self):
         return self.temp.str_expr(None)
+
+
+class TypeVarTemp(TypeTemp):
+    def __init__(self):
+        super().__init__('TypeVar', 'typing')
+
+    def init_ins(self, applyargs: 'ApplyArgs',
+                 bindlist: BindList) -> Option[TypeIns]:
+        def extract_value(ins_ast: Optional[InsWithAst], expect_type):
+            if not ins_ast:
+                return None
+
+            if isinstance(ins_ast.ins, TypeLiteralIns):
+                value = ins_ast.ins.value
+                if isinstance(value, expect_type):
+                    return value
+                else:
+                    # TODO: add error here
+                    return None
+            else:
+                # TODO: add error here
+                return None
+
+        default_ins = TypeVarIns(DEFAULT_TYPEVAR_NAME, bound=any_ins)
+        ins_option = Option(default_ins)
+        args_rear = 0
+
+        if applyargs.args:
+            name = extract_value(applyargs.args[0], str)
+            if name:
+                default_ins.tpvar_name = name
+            else:
+                assert False, "TODO"
+            args_rear = 1
+        else:
+            assert False, "TODO"
+
+        if len(applyargs.args) > args_rear:
+            default_ins.bound = None
+            for rangenode in applyargs.args[args_rear:]:
+                assert isinstance(rangenode.ins, TypeType), "TODO"
+                default_ins.constrains.append(rangenode.ins)
+
+        cova = applyargs.kwargs.get('covariant')
+        if not cova:
+            covariant = False
+        else:
+            covariant = extract_value(cova, bool)
+            if not covariant:
+                assert False, "TODO"
+
+        contra = applyargs.kwargs.get('contravariant')
+        if not contra:
+            contravariant = False
+        else:
+            contravariant = extract_value(contra, bool)
+            if not contravariant:
+                assert False, "TODO"
+
+        bound_ins_ast = applyargs.kwargs.get('bound')
+        if bound_ins_ast:
+            if default_ins.constrains:
+                assert False, "TODO"
+            bound = bound_ins_ast.ins
+            assert isinstance(bound, TypeType), "TODO"
+            default_ins.bound = bound
+
+        if covariant and contravariant:
+            assert False, "TODO"
+
+        if covariant:
+            default_ins.kind = TpVarKind.COVARIANT
+        elif contravariant:
+            default_ins.kind = TpVarKind.CONTRAVARIANT
+        else:
+            default_ins.kind = TpVarKind.INVARIANT
+
+        return ins_option
+
+
+class TypeVarIns(TypeIns):
+    def __init__(self,
+                 tpvar_name: str,
+                 *args: 'TypeIns',
+                 bound: Optional['TypeIns'] = None,
+                 kind: TpVarKind = TpVarKind.INVARIANT):
+        self.tpvar_name = tpvar_name
+        self.bound = bound
+        assert kind == TpVarKind.INVARIANT or kind == TpVarKind.COVARIANT or kind == TpVarKind.CONTRAVARIANT
+        self.kind = kind
+        self.constrains: List['TypeIns'] = list(*args)
 
 
 class TypeClassTemp(TypeTemp):
@@ -219,13 +347,6 @@ class TypeClassTemp(TypeTemp):
         self._defnode = defnode
 
         self._glob_uri = module_uri  # the module uri that this class is defined
-
-    def _add_defer_var(self, name, attrs):
-        """Defer attribute type evaluation.
-
-        Never use this unless you have a good reason.
-        """
-        self.var_attr[name] = attrs
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         cls_defs = self._inner_symtable._cls_defs
@@ -253,27 +374,29 @@ class TypeClassTemp(TypeTemp):
         else:
             return self._inner_symtable.lookup_local(name)
 
-    def setattr(self, name: str, attr_type: 'TypeIns'):
-        if name in self.var_attr:
-            self.var_attr[name] = attr_type
-        else:
-            self._inner_symtable.set_local_type(name, attr_type)
+    def get_type_attribute(
+            self, name: str, bindlist: BindList,
+            context: Optional[TypeContext]) -> Optional['TypeIns']:
+        res = self._inner_symtable.lookup_local(name)
+        if not res:
+            for basecls in self.baseclass:
+                res = basecls.getattribute(name, None, None).value
+                if res:
+                    break
+        return res
 
-    def getattribute(self, name: str, node: ast.AST, mbox: MessageBox,
-                     bindlist: BindList,
-                     context: Optional[TypeContext]) -> 'TypeIns':
+    def getattribute(
+            self,
+            name: str,
+            bindlist: BindList,
+            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
         res = self.get_local_attr(name)
         if not res:
             for basecls in self.baseclass:
-                res = basecls.getattribute(name, node, mbox)
+                res = basecls.getattribute(name, None, None).value
                 if res:
-                    return res
-
-        # TODO: output error if res is None
-        return res or any_ins
-
-    def get_local_symbol(self, name: str) -> 'TypeIns':
-        return self._inner_symtable.lookup_local(name)
+                    break
+        return res
 
 
 class TypeFuncTemp(TypeTemp):
@@ -371,10 +494,40 @@ class TypeGenericTemp(TypeTemp):
     def __init__(self):
         super().__init__('Generic', 'typing')
 
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        res = TypeIns(generic_temp, None)
+        option_res = Option(res)
+        if isinstance(item.ins, (tuple, list)):
+            for subitem in item.ins:
+                if isinstance(subitem.ins, TypeVarIns):
+                    if not res.bindlist:
+                        assert isinstance(subitem.ins, TypeVarIns)
+                        res.bindlist = [subitem.ins]  # type: ignore
+                    else:
+                        res.bindlist.append(subitem.ins)
+                else:
+                    # TODO: add error here
+                    pass
+        else:
+            assert isinstance(item.ins, TypeIns)
+            if isinstance(item.ins, TypeVarIns):
+                res.bindlist = [item.ins]
+            else:
+                # option_res.add_err()  # TODO: add error here
+                pass
+        return option_res
+
 
 class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__('Literal', 'typing')
+
+
+class TypeLiteralIns(TypeIns):
+    def __init__(self, value):
+        super().__init__(literal_temp, None)
+        self.value = value
 
 
 class TypePackageType(TypeType):
@@ -391,11 +544,11 @@ class TypePackageIns(TypeIns):
         super().__init__(pkgtemp, None)
         self.submodule: Dict[str, TypeIns] = {}  # submodule
 
-    def add_submodule(self, name: str, ins: TypeIns):
-        self.submodule[name] = ins
-        assert isinstance(self.temp, TypePackageTemp)
-        inner_sym = self.temp.get_inner_symtable()
-        inner_sym.add_entry(name, Entry(ins))
+    # def add_submodule(self, name: str, ins: TypeIns):
+    #     self.submodule[name] = ins
+    #     assert isinstance(self.temp, TypePackageTemp)
+    #     inner_sym = self.temp.get_inner_symtable()
+    #     inner_sym.add_entry(name, Entry(ins))
 
 
 class TypeFuncIns(TypeIns):
@@ -415,9 +568,9 @@ class TypeFuncIns(TypeIns):
     def get_inner_symtable(self) -> 'SymTable':
         return self._inner_symtable
 
-    def get_str_expr(self,
-                     bindlist: BindList,
-                     context: Optional[TypeContext] = None) -> str:
+    def str_expr(self,
+                 bindlist: BindList,
+                 context: Optional[TypeContext] = None) -> str:
         if len(self.overloads) == 1:
             fun_fmt = "{}{} -> {}"
         else:
@@ -431,12 +584,6 @@ class TypeFuncIns(TypeIns):
     def call(self, args):
         assert False, "TODO"
 
-    def lookup_local_var(self, name):
-        return self._inner_symtable.lookup_local(name)
-
-    def lookup_var(self, name):
-        return self._inner_symtable.egb_lookup(name)
-
 
 # special types (typing.py)
 any_temp = TypeAnyTemp()
@@ -448,6 +595,7 @@ tuple_temp = TypeTupleTemp()
 optional_temp = TypeOptionalTemp()
 literal_temp = TypeLiteralTemp()
 union_temp = TypeUnionTemp()
+typevar_temp = TypeVarTemp()
 
 # builtins.py
 func_temp = TypeFuncTemp()
@@ -456,6 +604,7 @@ func_temp = TypeFuncTemp()
 ellipsis_type = TypeType(ellipsis_temp, None)
 none_type = TypeType(none_temp, None)
 any_type = TypeType(any_temp, None)
+typevar_type = TypeType(typevar_temp, None)
 
 any_ins = TypeIns(any_temp, None)
 ellipsis_ins = TypeIns(ellipsis_temp, None)

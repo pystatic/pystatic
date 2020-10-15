@@ -60,7 +60,8 @@ class InferVisitor(BaseVisitor):
             if is_any(ltype):  # var with no annotation
                 self.cur_type.setattr(target.id, rtype)
         if not self.type_consistent(ltype, rtype):
-            self.mbox.make(INCOMPATIBLE_TYPE_IN_ASSIGN(any_type, rnode, ltype, rtype))
+            self.mbox.make(
+                INCOMPATIBLE_TYPE_IN_ASSIGN(any_type, rnode, ltype, rtype))
 
     def check_composed_node_of_assign(self, target, rnode, rtype):
         ltype = self.get_type(target)
@@ -109,7 +110,8 @@ class InferVisitor(BaseVisitor):
         func_type = ltype.getattribute(func_name)
         operand = op_map.binop_char_map[type(node.op)]
         if func_type is None:
-            self.mbox.make(UnsupportedBinOperand(node.target, operand, ltype, rtype))
+            self.mbox.make(
+                UnsupportedBinOperand(node.target, operand, ltype, rtype))
         self.check_operand(node.value, func_type, operand, ltype, rtype)
 
     def check_operand(self, node, func_type, operand, ltype, rtype):
@@ -183,8 +185,8 @@ class InferVisitor(BaseVisitor):
             self.mbox.make(ReturnValueExpected(ret_node))
             return
         if not self.type_consistent(annotation, ret_type):
-            self.mbox.make(IncompatibleReturnType(ret_node.value,
-                                                  annotation, ret_type))
+            self.mbox.make(
+                IncompatibleReturnType(ret_node.value, annotation, ret_type))
 
     def visit_While(self, node: ast.While):
         pass

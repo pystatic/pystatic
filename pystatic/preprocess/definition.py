@@ -3,14 +3,13 @@ import logging
 from contextlib import contextmanager
 from typing import Dict, List, Tuple, Optional, TYPE_CHECKING, Union
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import (TypeClassTemp, TpState)
+from pystatic.typesys import (TypeClassTemp, TpState, TypeVarIns, TypeVarTemp,
+                              TypeType)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.uri import Uri
-from pystatic.preprocess.spt import record_stp
-from pystatic.preprocess.sym_util import (add_import_item, add_fun_def,
-                                          add_local_var, add_cls_def,
-                                          add_local_var, split_import_stmt)
+from pystatic.exprparse import eval_expr
+from pystatic.preprocess.sym_util import *
 
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
@@ -72,19 +71,26 @@ class TypeDefVisitor(BaseVisitor):
         if attr:
             # Unfortunately this is a hack to put temporary information
             # on class template's var_attr
+            assert self.clstemp
+            inner_sym = self.clstemp.get_inner_symtable()
+            fake_data = try_fake_data(inner_sym)
+            if fake_data and attr in fake_data.local:
+                return
+            if attr in inner_sym.local:
+                return
+
             tmp_attr = {
                 'node': node,
                 'symtable': self.symtable,
             }
-            assert self.clstemp
-            self.clstemp._add_defer_var(attr, tmp_attr)
+            self.clstemp.var_attr[attr] = tmp_attr  # type: ignore
 
     def accept_func(self, node: ast.FunctionDef):
         for stmt in node.body:
             self.visit(stmt)
 
     @contextmanager
-    def enter_class(self, new_symtable, clsname: str):
+    def enter_class(self, new_symtable: 'SymTable', clsname: str):
         old_symtable = self.symtable
         old_is_method = self._is_method
 
@@ -111,15 +117,28 @@ class TypeDefVisitor(BaseVisitor):
                 return None
         return None
 
+    def _is_typevar(self, node: ast.expr) -> Optional[TypeVarIns]:
+        if isinstance(node, ast.Call):
+            f_ins = eval_expr(node.func, self.symtable).value
+            if isinstance(f_ins, TypeType) and isinstance(
+                    f_ins.temp, TypeVarTemp):
+                res = eval_expr(node, self.symtable).value
+                assert isinstance(res, TypeVarIns), "TODO"
+                return res
+        return None
+
     def visit_Assign(self, node: ast.Assign):
-        # TODO: here we haven't add redefine warning and check consistence, the
-        # def node is also incorrect
-        name, entry = record_stp(self.glob_uri, node)
-        if entry:
-            assert name
-            self.symtable.add_entry(name, entry)
-            logger.debug(f'add type var {name}'
-                         )  # because currently only support TypeVar
+        # TODO: here pystatic haven't add redefine warning and check consistence
+        tpvarins = self._is_typevar(node.value)
+        if tpvarins:
+            assert isinstance(tpvarins, TypeVarIns)
+            last_target = node.targets[-1]
+            assert isinstance(last_target, ast.Name), "TODO"
+
+            tpvarins.tpvar_name = last_target.id
+            self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
+            logger.debug(f'TypeVar {tpvarins.tpvar_name}')
+
         else:
             for target in node.targets:
                 name = self._is_new_def(target)
@@ -130,12 +149,18 @@ class TypeDefVisitor(BaseVisitor):
                     self._try_attr(node, target)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        name, entry = record_stp(self.glob_uri, node)
-        if entry:
-            assert name
-            self.symtable.add_entry(name, entry)
-            logger.debug(f'add type var {name}'
-                         )  # because currently only support TypeVar
+        tpvarins = None
+        if node.value:
+            tpvarins = self._is_typevar(node.value)
+        if tpvarins:
+            assert isinstance(tpvarins, TypeVarIns)
+            last_target = node.target
+            assert isinstance(last_target, ast.Name), "TODO"
+
+            tpvarins.tpvar_name = last_target.id
+            self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
+            logger.debug(f'TypeVar {tpvarins.tpvar_name}')
+
         else:
             name = self._is_new_def(node.target)
             if name:
@@ -171,19 +196,47 @@ class TypeDefVisitor(BaseVisitor):
                     self.visit(body)
 
     def visit_Import(self, node: ast.Import):
-        imp_dict = split_import_stmt(node, self.uri)
-        self._add_import_info(node, imp_dict)
+        info_list = analyse_import_stmt(node, self.uri)
+        self._add_import_info(node, info_list)
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        imp_dict = split_import_stmt(node, self.uri)
-        self._add_import_info(node, imp_dict)
+        info_list = analyse_import_stmt(node, self.uri)
+        self._add_import_info(node, info_list)
 
     def _add_import_info(self, node: 'ImportNode',
-                         imp_dict: Dict[Uri, List[Tuple[str, str]]]):
-        for uri, tples in imp_dict.items():
-            self.worker.add_cache_target_uri(uri)
-            for asname, origin_name in tples:
-                add_import_item(self.symtable, asname, uri, origin_name, node)
+                         info_list: List[ImportInfoItem]):
+        """Add import information to the symtable.
+
+        info_list:
+            import information dict returned by split_import_stmt.
+        """
+        read_typing = False  # flag, if True typing module has been read
+        typing_temp = None
+        for infoitem in info_list:
+            # when the imported module is typing.py, pystatic will add symbols
+            # imported from it as soon as possible because some types (such as
+            # TypeVar) may affect how pystatic judge whether an assignment
+            # statement is a special type definition or not.
+            if infoitem.uri == 'typing':
+                if not read_typing:
+                    typing_temp = self.worker.get_module_temp('typing')
+
+                if typing_temp:
+                    if infoitem.is_import_module:
+                        self.symtable.add_entry(
+                            'typing', Entry(typing_temp.get_default_ins(),
+                                            node))
+                    else:
+                        symtb = typing_temp.get_inner_symtable()
+                        entry = symtb.lookup_local_entry(infoitem.origin_name)
+
+                        if isinstance(entry, Entry):
+                            tpins = entry.get_type()
+                            self.symtable.add_entry(infoitem.asname,
+                                                    Entry(tpins, node))
+                            continue
+            self.worker.add_cache_target_uri(infoitem.uri)
+            add_import(self.symtable, infoitem, node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         add_fun_def(self.symtable, node.name, node)
