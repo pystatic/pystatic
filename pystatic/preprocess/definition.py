@@ -111,10 +111,13 @@ class TypeDefVisitor(BaseVisitor):
     def _is_new_def(self, node: ast.AST) -> Optional[str]:
         """Whether the node stands for a new definition"""
         if isinstance(node, ast.Name):
-            if self.symtable.lookup_local_entry(node.id) is None:
-                return node.id
-            else:
+            fake_data = get_fake_data(self.symtable)
+            name = node.id
+            if (name in fake_data.fun or name in fake_data.local
+                    or name in fake_data.impt):
                 return None
+            else:
+                return name
         return None
 
     def _is_typevar(self, node: ast.expr) -> Optional[TypeVarIns]:
