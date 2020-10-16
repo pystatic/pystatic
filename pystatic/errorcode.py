@@ -4,6 +4,7 @@ from pystatic.typesys import TypeIns
 
 INCOMPATIBLE_TYPE_IN_ASSIGN = "Incompatible type in assignment"
 SYMBOL_UNDEFINED = 'Cannot determine type of "{}"'
+SYMBOL_REDEFINE = '{} has already defined'
 NO_ATTRIBUTE = 'Type "{}" has no attribute "{}"'
 UNSUPPORTED_OPERAND = 'Unsupported operand types for "{}"'
 # tuple
@@ -30,9 +31,7 @@ class ErrorCode:
 
 
 class IncompatibleTypeInAssign(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 expect_type: TypeIns,
+    def __init__(self, node: Optional[ast.AST], expect_type: TypeIns,
                  expr_type: TypeIns):
         super().__init__()
         self.node = node
@@ -46,9 +45,7 @@ class IncompatibleTypeInAssign(ErrorCode):
 
 
 class SymbolUndefined(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 name: str):
+    def __init__(self, node: Optional[ast.AST], name: str):
         super().__init__()
         self.node = node
         self.name = name
@@ -58,10 +55,25 @@ class SymbolUndefined(ErrorCode):
         return self.node, review
 
 
+class SymbolRedefine(ErrorCode):
+    def __init__(self, node: Optional[ast.AST], name: str,
+                 old_node: Optional[ast.AST]) -> None:
+        super().__init__()
+        self.node = node
+        self.name = name
+        self.old_node = old_node
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        review = SYMBOL_REDEFINE.format(self.name)
+        if self.old_node:
+            detail = f'{self.name} previously defined at line {self.old_node.lineno}'
+            return self.node, self.concat_msg(review, detail)
+        else:
+            return self.node, review
+
+
 class IncompatibleReturnType(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 expect_type: TypeIns,
+    def __init__(self, node: Optional[ast.AST], expect_type: TypeIns,
                  ret_type: TypeIns):
         super().__init__()
         self.node = node
@@ -75,10 +87,7 @@ class IncompatibleReturnType(ErrorCode):
 
 
 class IncompatibleArgument(ErrorCode):
-    def __init__(self,
-                 node: ast.AST,
-                 func_name: str,
-                 annotation: TypeIns,
+    def __init__(self, node: ast.AST, func_name: str, annotation: TypeIns,
                  real_type: TypeIns):
         super().__init__()
         self.node = node
@@ -120,9 +129,7 @@ class ReturnValueExpected(ErrorCode):
 
 
 class NoAttribute(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 target_type: TypeIns,
+    def __init__(self, node: Optional[ast.AST], target_type: TypeIns,
                  attr_name: str):
         super().__init__()
         self.node = node
@@ -135,11 +142,8 @@ class NoAttribute(ErrorCode):
 
 
 class UnsupportedBinOperand(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 operand: str,
-                 left_type: TypeIns,
-                 right_type: TypeIns):
+    def __init__(self, node: Optional[ast.AST], operand: str,
+                 left_type: TypeIns, right_type: TypeIns):
         super().__init__()
         self.node = node
         self.operand = operand
