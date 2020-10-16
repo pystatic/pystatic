@@ -2,6 +2,20 @@ import ast
 from typing import Tuple, Optional
 from pystatic.typesys import TypeIns
 
+INCOMPATIBLE_TYPE_IN_ASSIGN = "Incompatible type in assignment"
+SYMBOL_UNDEFINED = 'Cannot determine type of "{}"'
+SYMBOL_REDEFINE = '{} has already defined'
+NO_ATTRIBUTE = 'Type "{}" has no attribute "{}"'
+UNSUPPORTED_OPERAND = 'Unsupported operand types for "{}"'
+# tuple
+NEED_MORE_VALUES_TO_UNPACK = "Need more values to unpack"
+TOO_MORE_VALUES_TO_UNPACK = "Too more values to unpack"
+# ret
+RETURN_VALUE_EXPECTED = "Return value expected"
+INCOMPATIBLE_RETURN_TYPE = "Incompatible return value type"
+# call
+INCOMPATIBLE_ARGUMENT = "Incompatible argument type for '{}'"
+
 
 class ErrorCode:
     def __init__(self):
@@ -17,9 +31,7 @@ class ErrorCode:
 
 
 class IncompatibleTypeInAssign(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 expect_type: TypeIns,
+    def __init__(self, node: Optional[ast.AST], expect_type: TypeIns,
                  expr_type: TypeIns):
         super().__init__()
         self.node = node
@@ -27,28 +39,41 @@ class IncompatibleTypeInAssign(ErrorCode):
         self.expr_type = expr_type
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = "Incompatible type in assignment"
+        review = INCOMPATIBLE_TYPE_IN_ASSIGN
         detail = f"expression has type '{self.expr_type}', variable has type '{self.expect_type}'"
         return self.node, self.concat_msg(review, detail)
 
 
 class SymbolUndefined(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 name: str):
+    def __init__(self, node: Optional[ast.AST], name: str):
         super().__init__()
         self.node = node
         self.name = name
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = 'Cannot determine type of "{}"'.format(self.name)
+        review = SYMBOL_UNDEFINED.format(self.name)
         return self.node, review
 
 
+class SymbolRedefine(ErrorCode):
+    def __init__(self, node: Optional[ast.AST], name: str,
+                 old_node: Optional[ast.AST]) -> None:
+        super().__init__()
+        self.node = node
+        self.name = name
+        self.old_node = old_node
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        review = SYMBOL_REDEFINE.format(self.name)
+        if self.old_node:
+            detail = f'{self.name} previously defined at line {self.old_node.lineno}'
+            return self.node, self.concat_msg(review, detail)
+        else:
+            return self.node, review
+
+
 class IncompatibleReturnType(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 expect_type: TypeIns,
+    def __init__(self, node: Optional[ast.AST], expect_type: TypeIns,
                  ret_type: TypeIns):
         super().__init__()
         self.node = node
@@ -56,16 +81,13 @@ class IncompatibleReturnType(ErrorCode):
         self.ret_type = ret_type
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = "Incompatible return value type"
+        review = INCOMPATIBLE_RETURN_TYPE
         detail = f"expected '{self.expect_type}', got '{self.ret_type}'"
         return self.node, self.concat_msg(review, detail)
 
 
 class IncompatibleArgument(ErrorCode):
-    def __init__(self,
-                 node: ast.AST,
-                 func_name: str,
-                 annotation: TypeIns,
+    def __init__(self, node: ast.AST, func_name: str, annotation: TypeIns,
                  real_type: TypeIns):
         super().__init__()
         self.node = node
@@ -74,7 +96,7 @@ class IncompatibleArgument(ErrorCode):
         self.real_type = real_type
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = "Incompatible argument type for '{}'".format(self.func_name)
+        review = INCOMPATIBLE_ARGUMENT.format(self.func_name)
         detail = f"argument has type '{self.real_type}', expected '{self.annotation}'"
         return self.node, self.concat_msg(review, detail)
 
@@ -85,7 +107,7 @@ class TooMoreValuesToUnpack(ErrorCode):
         self.node = node
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, "Too more values to unpack"
+        return self.node, TOO_MORE_VALUES_TO_UNPACK
 
 
 class NeedMoreValuesToUnpack(ErrorCode):
@@ -94,7 +116,7 @@ class NeedMoreValuesToUnpack(ErrorCode):
         self.node = node
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, "Need more values to unpack"
+        return self.node, NEED_MORE_VALUES_TO_UNPACK
 
 
 class ReturnValueExpected(ErrorCode):
@@ -103,13 +125,11 @@ class ReturnValueExpected(ErrorCode):
         self.node = node
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, "Return value expected"
+        return self.node, RETURN_VALUE_EXPECTED
 
 
 class NoAttribute(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 target_type: TypeIns,
+    def __init__(self, node: Optional[ast.AST], target_type: TypeIns,
                  attr_name: str):
         super().__init__()
         self.node = node
@@ -117,16 +137,13 @@ class NoAttribute(ErrorCode):
         self.attr_name = attr_name
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        msg = 'Type "{}" has no attribute "{}"'.format(self.target_type, self.attr_name)
+        msg = NO_ATTRIBUTE.format(self.target_type, self.attr_name)
         return self.node, msg
 
 
 class UnsupportedBinOperand(ErrorCode):
-    def __init__(self,
-                 node: Optional[ast.AST],
-                 operand: str,
-                 left_type: TypeIns,
-                 right_type: TypeIns):
+    def __init__(self, node: Optional[ast.AST], operand: str,
+                 left_type: TypeIns, right_type: TypeIns):
         super().__init__()
         self.node = node
         self.operand = operand
@@ -134,6 +151,6 @@ class UnsupportedBinOperand(ErrorCode):
         self.right_type = right_type
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = 'Unsupported operand types for "{}"'.format(self.operand)
+        review = UNSUPPORTED_OPERAND.format(self.operand)
         detail = f"'{self.left_type}' and {self.right_type}"
         return self.node, self.concat_msg(review, detail)

@@ -15,7 +15,6 @@ from pystatic.infer import op_map
 from pystatic.TypeCompatibe.simpleType import TypeCompatible
 
 logger = logging.getLogger(__name__)
-# logging.basicConfig(level=logging.DEBUG)
 
 class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleTemp,
@@ -44,7 +43,7 @@ class InferVisitor(BaseVisitor):
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
         res = self.type_comparator.TypeCompatible(ltype, rtype)
-        print(f"'{ltype}' and '{rtype}' is {res}")
+        print(f"type compatible of '{ltype}' and '{rtype}' is {res}")
         return res
 
     def handle_err(self, err_list: List[ErrorCode]):
@@ -210,7 +209,7 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            print(target.module_temp.getattribute('a', None))
+            # print(target.module_temp.getattribute('a', None))
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          self.mbox)
             infer_visitor.infer()

@@ -1,3 +1,4 @@
+import os
 import ast
 from collections import deque
 from pystatic.uri import uri2list
@@ -145,6 +146,7 @@ class Preprocessor:
             assert len(find_res.paths) == 1
             assert find_res.target_file
             target.ast = path2ast(find_res.target_file)
+            target.path = os.path.realpath(find_res.target_file)
 
         elif find_res.res_type == ModuleFindRes.Package:
             assert len(find_res.paths) == 1
@@ -152,6 +154,8 @@ class Preprocessor:
             target.ast = path2ast(find_res.target_file)
             target.module_temp = TypePackageTemp(find_res.paths,
                                                  target.symtable, target.uri)
+            assert len(find_res.paths[0]) == 1
+            target.path = os.path.realpath(find_res.paths[0])
 
         elif find_res.res_type == ModuleFindRes.Namespace:
             raise ReadNsAst()

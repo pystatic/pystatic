@@ -67,12 +67,10 @@ class SymbolRecorder:
 
     def get_comment_type(self, name):
         scope = self.cur_scope
-        if isinstance(scope, ModuleScope):
-            res=scope.tp.getattribute(name, None)
-            print(name, res)
-        table: SymTable = scope.tp.get_inner_symtable()
-        print([str(str(k)) for k in table.local.values()])
-        return table.legb_lookup(name)
+        if isinstance(scope, (ModuleScope, FuncScope)):
+            table: SymTable = scope.tp.get_inner_symtable()
+            return table.legb_lookup(name)
+        assert False, "not reach here"
 
     def get_run_time_type(self, name):
         tp = self.cur_scope.type_map.get(name)
