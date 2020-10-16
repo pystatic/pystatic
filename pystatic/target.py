@@ -49,3 +49,4 @@ class Target(BlockTarget):
         super().__init__(uri, symtable, stage)
         # NOTE: TpStage.OVER may be wrong.
         self.module_temp = TypeModuleTemp(uri, self.symtable)
+        self.path = ''
