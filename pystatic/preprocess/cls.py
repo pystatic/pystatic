@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def resolve_cls_def(targets: List['BlockTarget'], mbox: 'MessageBox'):
+def resolve_cls_def(targets: List['BlockTarget'], worker: 'Preprocessor'):
     """Get class definition information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
@@ -38,11 +38,15 @@ def resolve_cls_def(targets: List['BlockTarget'], mbox: 'MessageBox'):
     # placeholders
     for temp in resolve_order:
         set_temp_state(temp, TpState.ON)
-        _resolve_cls_placeholder(temp, mbox)
+        temp_mbox = worker.get_mbox(temp.module_uri)
+        assert temp_mbox, "This should always true because pystatic must have added the mbox before"
+        _resolve_cls_placeholder(temp, temp_mbox)
 
     # inheritance
     for temp in resolve_order:
-        _resolve_cls_inh(temp, mbox)
+        temp_mbox = worker.get_mbox(temp.module_uri)
+        assert temp_mbox, "This should always true because pystatic must have added the mbox before"
+        _resolve_cls_inh(temp, temp_mbox)
         set_temp_state(temp, TpState.OVER)
 
 
@@ -291,7 +295,8 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
         if not is_staticmethod:
             symtb = func_ins.get_inner_symtable()
             method_uri = '.'.join([uri, name])
-            targets.append(MethodTarget(method_uri, symtb, clstemp, node))
+            targets.append(MethodTarget(method_uri, symtb, clstemp, node,
+                                        mbox))
 
         logger.debug(f'({symtable.uri}) {name}: {func_ins}')
         return func_ins
