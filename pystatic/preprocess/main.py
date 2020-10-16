@@ -1,6 +1,7 @@
 import os
 import ast
 from collections import deque
+from pystatic.message import Message, MessageBox
 from pystatic.uri import uri2list
 from typing import Optional, TYPE_CHECKING, Deque, List, Dict
 from pystatic.typesys import TypeModuleTemp, TypePackageTemp
@@ -16,7 +17,6 @@ from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 from pystatic.modfinder import ModuleFinder, ModuleFindRes
 
 if TYPE_CHECKING:
-    from pystatic.message import MessageBox
     from pystatic.uri import Uri
 
 
@@ -32,14 +32,21 @@ def path2ast(path: str) -> ast.AST:
 
 
 class Preprocessor:
-    def __init__(self, mbox: 'MessageBox', finder: 'ModuleFinder') -> None:
-        self.mbox = mbox
+    def __init__(self, boxdict: Dict[str, MessageBox],
+                 finder: 'ModuleFinder') -> None:
         self.finder = finder
+        self.boxdict = boxdict
+
+        self._uri_boxdict = {}
 
         # dequeue that store targets waiting for get definitions in them
         self.q_parse: Deque[BlockTarget] = deque()
 
         self.targets: Dict[Uri, Target] = {}
+
+    def add_mbox(self, uri: 'Uri', path: str, mbox: MessageBox):
+        self.boxdict[path] = mbox
+        self._uri_boxdict[uri] = mbox
 
     def process_block(self, blocks: List[BlockTarget], added: bool = False):
         """Process a block level target.
@@ -108,31 +115,45 @@ class Preprocessor:
 
             # get current module's class definitions.
             if isinstance(current, MethodTarget):
-                get_definition_in_method(current, self, self.mbox)
+                get_definition_in_method(current, self, current.mbox)
             else:
-                get_definition(current, self, self.mbox)
+                get_definition(current, self, current.mbox)
 
         # get type imported from other module.
         for target in to_check:
             resolve_import_type(target.symtable, self)
 
-        resolve_cls_def(to_check, self.mbox)
+        resolve_cls_def(to_check, self)
 
         # from now on, all valid types in the module should be correctly
         # identified because possible type(class) information is collected.
         for target in to_check:
-            resolve_local_typeins(target.symtable, self.mbox)
-            resolve_local_func(target.symtable, self.mbox)
+            resolve_local_typeins(target.symtable, target.mbox)
+            resolve_local_func(target.symtable, target.mbox)
 
         for target in to_check:
             resolve_import_ins(target.symtable, self)
 
         for target in to_check:
-            resolve_cls_method(target.symtable, target.uri, self, self.mbox)
-            resolve_cls_attr(target.symtable, self.mbox)
+            resolve_cls_method(target.symtable, target.uri, self, target.mbox)
+            resolve_cls_attr(target.symtable, target.mbox)
 
             if isinstance(target, Target):
                 target.stage = Stage.Processed
+
+    def set_target_mbox(self, target: Target):
+        """Set correct mbox according to a target"""
+        if not target.mbox:
+            target.mbox = MessageBox(target.uri)
+
+        if target.path not in self.boxdict:
+            self.boxdict[target.path] = target.mbox
+
+        if target.uri not in self._uri_boxdict:
+            self._uri_boxdict[target.uri] = target.mbox
+
+    def get_mbox(self, uri: 'Uri'):
+        return self._uri_boxdict.get(uri)
 
     def parse_target(self, target: Target):
         # TODO: error handling
@@ -146,7 +167,12 @@ class Preprocessor:
             assert len(find_res.paths) == 1
             assert find_res.target_file
             target.ast = path2ast(find_res.target_file)
+
+            if target.path:
+                assert find_res.target_file == target.path
             target.path = os.path.realpath(find_res.target_file)
+
+            self.set_target_mbox(target)
 
         elif find_res.res_type == ModuleFindRes.Package:
             assert len(find_res.paths) == 1
@@ -156,6 +182,8 @@ class Preprocessor:
                                                  target.symtable, target.uri)
             assert len(find_res.paths[0]) == 1
             target.path = os.path.realpath(find_res.paths[0])
+
+            self.set_target_mbox(target)
 
         elif find_res.res_type == ModuleFindRes.Namespace:
             raise ReadNsAst()
