@@ -35,6 +35,8 @@ class Entry:
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
 
+    def __str__(self):
+        return str(self._tp)
 
 class SymTable:
     def __init__(self, uri: 'Uri', glob: 'SymTable',
@@ -142,3 +144,6 @@ class SymTable:
         glob = self.glob
         new_uri = self.uri + '.' + name
         return SymTable(new_uri, glob, non_local, builtins, new_scope)
+
+    def legb_lookup(self, name):
+        return self._legb_lookup(name, SymTable.lookup_local)

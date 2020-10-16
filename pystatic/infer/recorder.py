@@ -25,12 +25,17 @@ class ClassScope(Scope):
     def __init__(self, tp: TypeIns):
         super().__init__(tp)
 
+class ModuleScope(Scope):
+    def __init__(self, tp: TypeIns):
+        super().__init__(tp)
+
+
 
 class SymbolRecorder:
     def __init__(self, module):
         # record the appeared symbol in cur scope
         self.stack: List[Scope] = []
-        self.stack.append(Scope(module))
+        self.stack.append(ModuleScope(module))
 
     @property
     def cur_scope(self) -> Scope:
@@ -62,8 +67,12 @@ class SymbolRecorder:
 
     def get_comment_type(self, name):
         scope = self.cur_scope
+        if isinstance(scope, ModuleScope):
+            res=scope.tp.getattribute(name, None)
+            print(name, res)
         table: SymTable = scope.tp.get_inner_symtable()
-        return table.lookup_local(name)
+        print([str(str(k)) for k in table.local.values()])
+        return table.legb_lookup(name)
 
     def get_run_time_type(self, name):
         tp = self.cur_scope.type_map.get(name)

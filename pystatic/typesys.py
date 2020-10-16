@@ -584,9 +584,9 @@ class TypeFuncIns(TypeIns):
         ]
         return '\n'.join(lst)
 
-    def call(self, args):
-        # TODO:need modify
-        return self.overloads[0]
+    def call(self, args: ApplyArgs):
+        # TODO:match args
+        return Option(self.overloads[0][0])
 
 
 # special types (typing.py)
