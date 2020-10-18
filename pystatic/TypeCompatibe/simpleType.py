@@ -70,24 +70,24 @@ class TypeCompatible:
     def BaseTypeCom(self, a: TypeTemp, b: TypeTemp) -> bool:
         namea = a.name
         nameb = b.name
-        if a == b:
+        if namea == b:
             return True
-        elif a == 'int':
-            if b == 'bool':
+        elif namea == 'int':
+            if nameb == 'bool':
                 return True
             else:
                 return False
-        elif a == 'float':
-            if b == 'int':
+        elif namea == 'float':
+            if nameb == 'int':
                 return True
             else:
                 return False
-        elif a == 'complex':
-            if b == 'int' or b == 'float':
+        elif namea == 'complex':
+            if nameb == 'int' or nameb == 'float':
                 return True
             else:
                 return False
-        elif a == 'str' or a == 'bool' or a == 'byte' or a == 'Bytearray':
+        elif namea == 'str' or namea == 'bool' or namea == 'byte' or namea == 'Bytearray':
             return False
         else:
             return False
