@@ -21,7 +21,7 @@ class ErrorCode:
     def __init__(self):
         pass
 
-    def make(self) -> Tuple[ast.AST, str]:
+    def make(self) -> Tuple[Optional[ast.AST], str]:
         pass
 
     @staticmethod

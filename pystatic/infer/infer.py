@@ -16,6 +16,7 @@ from pystatic.TypeCompatibe.simpleType import TypeCompatible
 
 logger = logging.getLogger(__name__)
 
+
 class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleTemp,
                  mbox: MessageBox):
@@ -49,6 +50,9 @@ class InferVisitor(BaseVisitor):
     def handle_err(self, err_list: List[ErrorCode]):
         for err in err_list:
             self.mbox.make(err)
+
+    def exsit_error(self, option: Option) -> bool:
+        return len(option.errors) != 0
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
@@ -110,20 +114,22 @@ class InferVisitor(BaseVisitor):
     def visit_AugAssign(self, node: ast.AugAssign):
         ltype = self.get_type(node.target)
         rtype = self.get_type(node.value)
-        func_name = op_map.binop_map[type(node.op)]
-        func_type = ltype.getattribute(func_name, )
+        func_name: str = op_map.binop_map[type(node.op)]
+        option: Option = ltype.getattribute(func_name, None)
         operand = op_map.binop_char_map[type(node.op)]
-        if func_type is None:
+        if self.exsit_error(option):
             self.mbox.make(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype))
-        self.check_operand(node.value, func_type, operand, ltype, rtype)
+            return
+        func_type = self.dump_option(option)
+        self.check_arg_of_operand_func(node.value, func_type, operand, ltype, rtype)
 
-    def check_operand(self, node, func_type, operand, ltype, rtype):
-        # TODO:revise call
-        argument, ret = func_type.call(None)
-        assert len(argument.args) == 2
-        if not self.type_consistent(argument.args[1].ann, rtype):
-            self.mbox.unsupported_operand(node, operand, ltype, rtype)
+    def check_arg_of_operand_func(self, node, func_type, operand, ltype, rtype):
+        apply_args = ApplyArgs()
+        apply_args.add_arg(rtype, node)
+        option: Option = func_type.call(apply_args)
+        if self.exsit_error(option):
+            self.mbox.make(UnsupportedBinOperand(node, operand, ltype, rtype))
 
     def visit_ClassDef(self, node: ast.ClassDef):
         class_type = self.recorder.get_comment_type(node.name)
