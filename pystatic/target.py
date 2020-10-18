@@ -4,11 +4,11 @@ from pystatic.option import Option
 from pystatic import symtable
 from typing import TYPE_CHECKING, Optional
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TpState
+from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
     from pystatic.uri import Uri
     from pystatic.symtable import SymTable
-    from pystatic.message import MessageBox
 
 
 class Stage(enum.IntEnum):

@@ -202,14 +202,12 @@ class InferVisitor(BaseVisitor):
 
 
 class InferStarter:
-    def __init__(self, sources, mbox):
+    def __init__(self, sources):
         self.sources = sources
-        self.mbox = mbox
 
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            # print(target.module_temp.getattribute('a', None))
             infer_visitor = InferVisitor(target.ast, target.module_temp,
-                                         self.mbox)
+                                         target.mbox)
             infer_visitor.infer()
