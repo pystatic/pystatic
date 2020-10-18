@@ -29,9 +29,8 @@ class Manager:
         finder = ModuleFinder(self.config.manual_path, list(self.user_path),
                               self.config.sitepkg, self.config.typeshed,
                               self.config.python_version)
-
-        self.mbox = MessageBox('test')  # TODO: refactor this
-        self.pre_proc = Preprocessor(self.mbox, finder)
+        self.boxdict: Dict[str, MessageBox] = {}
+        self.pre_proc = Preprocessor(self.boxdict, finder)
 
         self.stdout = stdout
         self.stderr = stderr
@@ -58,10 +57,11 @@ class Manager:
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
         self.start_infer()
-        self.mbox.report()
+        for key in self.boxdict.keys():
+            self.boxdict[key].report()
 
     def start_infer(self):
-        InferStarter(self.check_targets, self.mbox).start_infer()
+        InferStarter(self.check_targets).start_infer()
 
     def preprocess(self, targets):
         self.pre_proc.process_module(targets)
@@ -89,8 +89,21 @@ class Manager:
             uri = relpath2uri(rt_path, srcfile)
             target = Target(uri,
                             get_init_module_symtable(uri),
+                            path=srcfile,
                             stage=Stage.PreParse)
+            self.set_target_mbox(target)
             self.check_targets[uri] = target
+
+    def set_target_mbox(self, target: Target):
+        """Set correct mbox according to a target"""
+        if not target.mbox:
+            target.mbox = MessageBox(target.uri)
+
+        if target.path not in self.boxdict:
+            self.boxdict[target.path] = target.mbox
+
+        if target.uri not in self.boxdict:
+            self.boxdict[target.uri] = target.mbox
 
 
 def crawl_path(path: str) -> str:

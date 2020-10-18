@@ -34,7 +34,7 @@ class Message(object):
 
 class MessageBox(object):
     def __init__(self, module_uri: str):
-        self.filename = module_uri
+        self.module_uri = module_uri
         self.error: List[Message] = []
 
     def add_err(self, node: ast.AST, msg: str):
