@@ -103,8 +103,8 @@ class ExprParser(NoGenVisitor):
             assert isinstance(argins, TypeIns)
             assert kwargnode.arg, "**kwargs is not supported now"
             applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
-
         call_option = left_ins.call(applyargs)
+
 
         self.add_err(call_option.errors)
 

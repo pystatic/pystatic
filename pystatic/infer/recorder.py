@@ -25,10 +25,10 @@ class ClassScope(Scope):
     def __init__(self, tp: TypeIns):
         super().__init__(tp)
 
+
 class ModuleScope(Scope):
     def __init__(self, tp: TypeIns):
         super().__init__(tp)
-
 
 
 class SymbolRecorder:
@@ -66,11 +66,11 @@ class SymbolRecorder:
         self.cur_scope.set_type(name, tp)
 
     def get_comment_type(self, name):
-        scope = self.cur_scope
-        if isinstance(scope, (ModuleScope, FuncScope)):
-            table: SymTable = scope.tp.get_inner_symtable()
-            return table.legb_lookup(name)
-        assert False, "not reach here"
+        for scope in self.stack[::-1]:
+            if isinstance(scope, (ModuleScope, FuncScope)):
+                table: SymTable = scope.tp.get_inner_symtable()
+                return table.lookup_local(name)
+        assert False, f"undefined {name}"
 
     def get_run_time_type(self, name):
         tp = self.cur_scope.type_map.get(name)
@@ -81,7 +81,7 @@ class SymbolRecorder:
             if tp:
                 return tp
             else:
-                if isinstance(scope, FuncScope):
+                if isinstance(scope, (FuncScope, ModuleScope)):
                     table: SymTable = scope.tp.get_inner_symtable()
                     tp = table.lookup_local(name)
                 if tp:
