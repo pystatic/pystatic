@@ -40,6 +40,16 @@ class ConditionInfer:
                 args = test.args
                 if len(args) <= 1:
                     self.err_maker.add_err(TooFewArgument(test, name))
+                    return Reach.UNKNOWN
+                options = [eval_expr(arg, self.recorder) for arg in args]
+                list(map(self.err_maker.handle_err, options))  # lazy evaluation
+
+
+                if self.err_maker.exsit_error(option):
+                    return Reach.UNKNOWN
+                for arg in args[1:]:
+
+
 
             elif name == "issubclass":
                 pass

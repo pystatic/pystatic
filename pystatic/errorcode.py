@@ -20,8 +20,8 @@ class ErrorCode:
 
 
 class IncompatibleTypeInAssign(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], expect_type: "TypeIns",
-                 expr_type: "TypeIns"):
+    def __init__(self, node: Optional[ast.AST], expect_type: 'TypeIns',
+                 expr_type: 'TypeIns'):
         super().__init__()
         self.node = node
         self.expect_type = expect_type
@@ -62,8 +62,8 @@ class SymbolRedefine(ErrorCode):
 
 
 class IncompatibleReturnType(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], expect_type: "TypeIns",
-                 ret_type: "TypeIns"):
+    def __init__(self, node: Optional[ast.AST], expect_type: 'TypeIns',
+                 ret_type: 'TypeIns'):
         super().__init__()
         self.node = node
         self.expect_type = expect_type
@@ -76,8 +76,8 @@ class IncompatibleReturnType(ErrorCode):
 
 
 class IncompatibleArgument(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], func_name: str, annotation: "TypeIns",
-                 real_type: "TypeIns"):
+    def __init__(self, node: ast.AST, func_name: str, annotation: 'TypeIns',
+                 real_type: 'TypeIns'):
         super().__init__()
         self.node = node
         self.func_name = func_name
@@ -142,7 +142,7 @@ class NoAttribute(ErrorCode):
 
 class UnsupportedBinOperand(ErrorCode):
     def __init__(self, node: Optional[ast.AST], operand: str,
-                 left_type: "TypeIns", right_type: "TypeIns"):
+                 left_type: 'TypeIns', right_type: 'TypeIns'):
         super().__init__()
         self.node = node
         self.operand = operand

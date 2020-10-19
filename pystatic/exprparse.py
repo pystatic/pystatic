@@ -6,6 +6,7 @@ from pystatic.visitor import NoGenVisitor
 from pystatic.typesys import TypeIns, TypeLiteralIns
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
+from pystatic.opmap import binop_map, unaryop_map
 
 
 class SupportGetAttribute(Protocol):
@@ -110,6 +111,34 @@ class ExprParser(NoGenVisitor):
 
         self.add_to_container(call_option.value, node)
         return call_option.value
+
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> TypeIns:
+        operand_ins = self.visit(node.operand)
+        assert isinstance(operand_ins, TypeIns)
+
+        op = unaryop_map.get(type(node.op))
+        assert op, f"{node.op} is not supported now"
+        option_res = operand_ins.unaryop_mgf(op, node)
+
+        self.add_err(option_res.errors)
+
+        self.add_to_container(option_res.value, node)
+        return option_res.value
+
+    def visit_BinOp(self, node: ast.BinOp) -> TypeIns:
+        left_ins = self.visit(node.left)
+        right_ins = self.visit(node.right)
+        assert isinstance(left_ins, TypeIns)
+        assert isinstance(right_ins, TypeIns)
+
+        op = binop_map.get(type(node.op))
+        assert op, f"{node.op} is not supported now"
+        option_res = left_ins.binop_mgf(op, right_ins, node)
+
+        self.add_err(option_res.errors)
+
+        self.add_to_container(option_res.value, node)
+        return option_res.value
 
     def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
         left_ins = self.visit(node.value)

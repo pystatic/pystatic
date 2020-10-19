@@ -1,3 +1,4 @@
+# common
 INCOMPATIBLE_TYPE_IN_ASSIGN = "Incompatible type in assignment"
 SYMBOL_UNDEFINED = 'Cannot determine type of "{}"'
 SYMBOL_REDEFINE = '{} has already defined'
