@@ -197,7 +197,7 @@ class Preprocessor:
                 self.parse_target(target)
             else:
                 assert target.ast
-        target.stage = Stage.PreSymtable
+            target.stage = Stage.PreSymtable
 
     def is_valid_uri(self, uri: 'Uri') -> bool:
         find_res = self.finder.find(uri)
