@@ -41,7 +41,8 @@ class SymbolUndefined(ErrorCode):
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = SYMBOL_UNDEFINED.format(self.name)
-        return self.node, review
+        detail=f"unresolved reference '{self.name}'"
+        return self.node, self.concat_msg(review, detail)
 
 
 class SymbolRedefine(ErrorCode):

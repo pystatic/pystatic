@@ -161,7 +161,7 @@ class InferVisitor(BaseVisitor):
         if len(self.ret_list) == 0:
             rtype = none_type
             if not is_any(self.ret_annotation):
-                self.mbox.make(ReturnValueExpected(type_comment))
+                self.err_maker.add_err(ReturnValueExpected(type_comment))
         elif len(self.ret_list) == 1:
             # TODO
             rtype = self.ret_list[0]
