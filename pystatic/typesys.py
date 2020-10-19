@@ -93,6 +93,33 @@ class TypeTemp:
                  bindlist: BindList) -> Option['TypeIns']:
         return Option(self.getins(bindlist))
 
+    # magic operation functions(mgf is short for magic function).
+    def unaryop_mgf(self, bindlist: BindList, op: str,
+                    node: ast.UnaryOp) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        func = self.getattribute(op, bindlist)
+        if not func or not isinstance(func, TypeFuncIns):
+            # TODO: add warning here
+            return option_res
+
+        else:
+            applyargs = ApplyArgs()
+            return func.call(applyargs)
+
+    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
+                  node: ast.BinOp) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        func = self.getattribute(op, bindlist)
+        if not func or not isinstance(func, TypeFuncIns):
+            # TODO: add warning here
+            return option_res
+
+        else:
+            applyargs = ApplyArgs()
+            applyargs.add_arg(other, node)
+            return func.call(applyargs)
+
+    # basic
     def getattribute(
             self,
             name: str,
@@ -122,6 +149,7 @@ class TypeTemp:
         # TODO: add error
         return option_res
 
+    # string expression
     def str_expr(self,
                  bindlist: BindList,
                  context: Optional[TypeContext] = None) -> str:
@@ -584,9 +612,10 @@ class TypeFuncIns(TypeIns):
         ]
         return '\n'.join(lst)
 
-    def call(self, args: ApplyArgs):
-        # TODO:match args
-        return Option(self.overloads[0][0])
+    def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
+        # TODO: deal with arguments
+        assert self.overloads
+        return Option(self.overloads[0][1])
 
 
 # special types (typing.py)

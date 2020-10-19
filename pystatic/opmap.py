@@ -1,4 +1,5 @@
 import ast
+from typing import Type, Dict
 
 # MGF: magic function
 MGF_UADD = '__pos__'
@@ -8,19 +9,19 @@ MGF_MULT = '__mul__'
 MGF_ADD = '__add__'
 MGF_SUB = '__sub__'
 
-unaryop_map = {
+unaryop_map: Dict[Type, str] = {
     ast.UAdd: MGF_UADD,
     ast.USub: MGF_USUB,
     ast.Invert: MGF_INVERT,
 }
 
-binop_map = {
+binop_map: Dict[Type, str] = {
     ast.Add: MGF_ADD,
     ast.Sub: MGF_SUB,
     ast.Mult: MGF_MULT,
 }
 
-binop_char_map = {
+binop_char_map: Dict[Type, str] = {
     ast.Add: '+',
     ast.Sub: '-',
     ast.Mult: '*',
