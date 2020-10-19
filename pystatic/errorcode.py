@@ -1,6 +1,6 @@
 import ast
 from typing import Tuple, Optional, TYPE_CHECKING
-from pystatic.error_review import *
+from pystatic.error_register import *
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
@@ -92,6 +92,7 @@ class IncompatibleArgument(ErrorCode):
 
 class TooFewArgument(ErrorCode):
     def __init__(self, node: Optional[ast.AST], func_name: str):
+        super().__init__()
         self.node = node
         self.func_name = func_name
 
