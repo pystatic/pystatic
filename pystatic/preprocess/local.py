@@ -29,7 +29,8 @@ def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
         defnode = entry.defnode
 
         option_tpins = eval_type_def_expr(defnode, symtable)
-        tpins = option_tpins.value
+        assert isinstance(option_tpins.value, TypeType)
+        tpins = option_tpins.value.getins()
 
         option_tpins.dump_to_box(mbox)
 
