@@ -221,6 +221,13 @@ class TypeIns:
         # TODO: add error
         return self.temp.getitem(item, self.bindlist)
 
+    def unaryop_mgf(self, op: str, node: ast.UnaryOp) -> Option['TypeIns']:
+        return self.temp.unaryop_mgf(self.bindlist, op, node)
+
+    def binop_mgf(self, other: 'TypeIns', op: str,
+                  node: ast.BinOp) -> Option['TypeIns']:
+        return self.temp.binop_mgf(self.bindlist, other, op, node)
+
     def __str__(self) -> str:
         return self.temp.str_expr(self.bindlist)
 
