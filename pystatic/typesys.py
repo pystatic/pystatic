@@ -271,7 +271,11 @@ class TypeType(TypeIns):
         return self.temp._inner_symtable
 
     def __str__(self):
-        return "type(" + self.temp.str_expr(None) + ')'
+        s = self.temp.str_expr(None)
+        if s == "Any":
+            return s
+        else:
+            return "type(" + s + ')'
 
 
 class TypeVarTemp(TypeTemp):
