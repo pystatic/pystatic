@@ -1,5 +1,6 @@
 import ast
 
+
 class BaseVisitor(object):
     def visit(self, node):
         """Visit a node."""

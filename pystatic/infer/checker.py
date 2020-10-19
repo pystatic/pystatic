@@ -7,10 +7,10 @@ class TypeChecker:
         self.mbox = mbox
 
     def check(self, tp1, tp2):
-        if tp1.__str__() == "Any":
+        if tp1.__str__ == "Any":
             return True
-        res = tp1.__str__() == tp2.__str__()
+        res = tp1.__str__ == tp2.__str__
         return res
 
 def is_any(tp):
-    return tp.__str__() == "Any"
+    return tp.__str__ == "Any"

@@ -1,6 +1,7 @@
 import ast
 from typing import Optional, List
 from pystatic.errorcode import ErrorCode
+from pystatic.option import Option
 
 
 class Message(object):
@@ -49,3 +50,24 @@ class MessageBox(object):
     def report(self):
         for err in self.error:
             print(err)
+
+
+class ErrorMaker:
+    def __init__(self, mbox: MessageBox):
+        self.mbox = mbox
+
+    def dump_option(self, option: Option):
+        self.handle_err(option.errors)
+        return option.value
+
+    def handle_err(self, err_list: List[ErrorCode]):
+        if err_list is None:
+            return
+        for err in err_list:
+            self.mbox.make(err)
+
+    def add_err(self, err: ErrorCode):
+        self.mbox.make(err)
+
+    def exsit_error(self, option: Option) -> bool:
+        return len(option.errors) != 0

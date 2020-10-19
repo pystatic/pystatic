@@ -2,7 +2,7 @@ import ast
 import logging
 from typing import Optional
 from pystatic.typesys import *
-from pystatic.message import MessageBox
+from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
 from pystatic.errorcode import *
 from pystatic.exprparse import eval_expr
@@ -20,9 +20,8 @@ logger = logging.getLogger(__name__)
 class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleTemp,
                  mbox: MessageBox):
-        # self.cur_module: TypeModuleTemp = module
         self.root = node
-        self.mbox: MessageBox = mbox
+        self.err_maker = ErrorMaker(mbox)
         self.type_comparator = TypeCompatible()
 
         self.recorder = SymbolRecorder(module)
@@ -35,24 +34,15 @@ class InferVisitor(BaseVisitor):
 
     def get_type(self, node: ast.AST) -> TypeIns:
         option = eval_expr(node, self.recorder)
-        self.handle_err(option.errors)
-        return option.value
 
-    def dump_option(self, option: Option):
-        self.handle_err(option.errors)
+        self.err_maker.handle_err(option.errors)
         return option.value
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
+        # print(type(ltype), type(rtype))
         res = self.type_comparator.TypeCompatible(ltype, rtype)
         print(f"type compatible of '{ltype}' and '{rtype}' is {res}")
         return res
-
-    def handle_err(self, err_list: List[ErrorCode]):
-        for err in err_list:
-            self.mbox.make(err)
-
-    def exsit_error(self, option: Option) -> bool:
-        return len(option.errors) != 0
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
@@ -70,20 +60,20 @@ class InferVisitor(BaseVisitor):
             self.recorder.set_type(target.id, rtype)
         comment = self.recorder.get_comment_type(name)
         if not self.type_consistent(comment, rtype):
-            self.mbox.make(IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
 
     def check_composed_node_of_assign(self, target: ast.AST, rnode: ast.AST, rtype: TypeIns):
         ltype = self.get_type(target)
         if not ltype:
             return
         if not self.type_consistent(ltype, rtype):
-            self.mbox.make(IncompatibleTypeInAssign(rnode, ltype, rtype))
+            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
 
     def check_multi_left_of_assign(self, target: List[ast.AST], rnode, rtypes):
         if len(target) < len(rtypes):
-            self.mbox.make(NeedMoreValuesToUnpack(rnode))
+            self.err_maker.add_err(NeedMoreValuesToUnpack(rnode))
         elif len(target) > len(rtypes):
-            self.mbox.make(TooMoreValuesToUnpack(rnode))
+            self.err_maker.add_err(TooMoreValuesToUnpack(rnode))
         for lvalue, node, rtype in zip(target, rnode.elts, rtypes):
             if isinstance(lvalue, ast.Name):
                 self.infer_name_node_of_assign(lvalue, node, rtype)
@@ -106,7 +96,7 @@ class InferVisitor(BaseVisitor):
             self.recorder.set_type(name, rtype)
         ltype = self.recorder.get_comment_type(name)
         if not self.type_consistent(ltype, rtype):
-            self.mbox.make(IncompatibleTypeInAssign(rnode, ltype, rtype))
+            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
 
     def check_composed_node_of_annassign(self, target: ast.AST, rnode: ast.AST, rtype: TypeIns):
         self.check_composed_node_of_assign(target, rnode, rtype)
@@ -118,7 +108,7 @@ class InferVisitor(BaseVisitor):
         option: Option = ltype.getattribute(func_name, None)
         operand = op_map.binop_char_map[type(node.op)]
         if self.exsit_error(option):
-            self.mbox.make(
+            self.err_maker.add_err(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype))
             return
         func_type = self.dump_option(option)
@@ -128,8 +118,8 @@ class InferVisitor(BaseVisitor):
         apply_args = ApplyArgs()
         apply_args.add_arg(rtype, node)
         option: Option = func_type.call(apply_args)
-        if self.exsit_error(option):
-            self.mbox.make(UnsupportedBinOperand(node, operand, ltype, rtype))
+        if self.err_maker.exsit_error(option):
+            self.err_maker.add_err(UnsupportedBinOperand(node, operand, ltype, rtype))
 
     def visit_ClassDef(self, node: ast.ClassDef):
         class_type = self.recorder.get_comment_type(node.name)
@@ -142,9 +132,9 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         func_type: TypeIns = self.recorder.get_comment_type(node.name)
         self.recorder.set_type(node.name, func_type)
-        self.ret_annotation = self.dump_option(func_type.call(None))
+        self.recorder.enter_func(func_type)
+        self.ret_annotation = self.err_maker.dump_option(func_type.call(None))
 
-        self.recorder.enter_func(func_type, self.infer_argument(argument))
         for subnode in node.body:
             self.visit(subnode)
         self.infer_ret_value_of_func(func_type, node.returns)
@@ -191,10 +181,10 @@ class InferVisitor(BaseVisitor):
 
     def check_ret_type(self, annotation, ret_node: ast.Return, ret_type):
         if ret_type is None:
-            self.mbox.make(ReturnValueExpected(ret_node))
+            self.err_maker.add_err(ReturnValueExpected(ret_node))
             return
         if not self.type_consistent(annotation, ret_type):
-            self.mbox.make(
+            self.err_maker.add_err(
                 IncompatibleReturnType(ret_node.value, annotation, ret_type))
 
     def visit_While(self, node: ast.While):
@@ -214,6 +204,8 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
+            print(type(target.module_temp.getattribute('a', None)))
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox)
             infer_visitor.infer()
+            target.mbox.report()

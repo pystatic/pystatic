@@ -16,9 +16,8 @@ class Scope:
 
 
 class FuncScope(Scope):
-    def __init__(self, tp: TypeIns, argument: Dict[str, TypeIns]):
+    def __init__(self, tp: TypeIns):
         super().__init__(tp)
-        self.type_map = argument
 
 
 class ClassScope(Scope):
@@ -32,8 +31,8 @@ class ModuleScope(Scope):
 
 
 class SymbolRecorder:
+    """record the appeared symbol in cur scope"""
     def __init__(self, module):
-        # record the appeared symbol in cur scope
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))
 
@@ -44,14 +43,14 @@ class SymbolRecorder:
     def is_defined(self, name: str):
         return name in self.cur_scope.type_map
 
-    def enter_scope(self, tp: TypeType):
+    def enter_scope(self, tp: TypeIns):
         self.stack.append(Scope(tp))
 
     def leave_scope(self):
         self.stack.pop()
 
-    def enter_func(self, tp: TypeIns, args: Dict[str, TypeIns]):
-        self.stack.append(FuncScope(tp, args))
+    def enter_func(self, tp: TypeIns):
+        self.stack.append(FuncScope(tp))
 
     def leave_func(self):
         self.leave_scope()
@@ -65,11 +64,16 @@ class SymbolRecorder:
     def set_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)
 
-    def get_comment_type(self, name):
-        for scope in self.stack[::-1]:
-            if isinstance(scope, (ModuleScope, FuncScope)):
-                table: SymTable = scope.tp.get_inner_symtable()
-                return table.lookup_local(name)
+    def get_comment_type(self, name) -> TypeIns:
+        # for scope in self.stack[::-1]:
+        # if isinstance(scope, (ModuleScope, FuncScope)):
+        # table: SymTable = scope.tp.get_inner_symtable()
+        # return table.lookup_local(name)
+        scope = self.cur_scope
+        table: SymTable = scope.tp.get_inner_symtable()
+        tp = table.legb_lookup(name)
+        if tp:
+            return tp
         assert False, f"undefined {name}"
 
     def get_run_time_type(self, name):

@@ -5,7 +5,7 @@ from typing import (Optional, Dict, List, Tuple, Union, TYPE_CHECKING, Final)
 from pystatic.option import Option
 from pystatic.uri import Uri
 from pystatic.evalutil import (InsWithAst, ApplyArgs, GetItemType, WithAst)
-from pystatic.errorcode import *
+from pystatic.errorcode import NoAttribute
 
 if TYPE_CHECKING:
     from pystatic.arg import Argument
@@ -220,7 +220,8 @@ class TypeType(TypeIns):
                                                context)
 
         if not ins_res:
-            option_res.add_err(NoAttribute(node, self, name))
+            err = NoAttribute(node, self, name)
+            option_res.add_err(err)
         else:
             option_res.set_value(ins_res)
         return option_res
@@ -235,7 +236,7 @@ class TypeType(TypeIns):
         return self.temp._inner_symtable
 
     def __str__(self):
-        return self.temp.str_expr(None)
+        return "type(" + self.temp.str_expr(None) + ')'
 
 
 class TypeVarTemp(TypeTemp):
@@ -531,6 +532,9 @@ class TypeLiteralIns(TypeIns):
     def __init__(self, value):
         super().__init__(literal_temp, None)
         self.value = value
+
+    def __str__(self):
+        return type(self.value).__name__
 
 
 class TypePackageType(TypeType):

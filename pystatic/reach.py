@@ -1,6 +1,9 @@
 from typing import TYPE_CHECKING
 import enum
-
+import ast
+from typing import Dict
+from pystatic.config import Config
+from pystatic.exprparse import ExprParser
 
 # Enum constant part
 class Reach(enum.Enum):
@@ -8,11 +11,8 @@ class Reach(enum.Enum):
     TYPE_FALSE = 2  # false on type checking
     RUNTIME_TRUE = 3  # true on runtime
     RUNTIME_FALSE = 4  # false on runtime
-    ALWAYS_TRUE = 5  # always true
-    ALWAYS_FALSE = 6  # always wrong
-    CLS_REDEF = 7  # class redefined(usually omit this)
-    NEVER = 8  # node that will never be visited
-    UNKNOWN = 9  # uncertain about its reachability
+    UNKNOWN = 5  # uncertain about its reachability
+
 
 
 
@@ -25,10 +25,6 @@ def cal_neg(res: Reach) -> Reach:
         return Reach.RUNTIME_FALSE
     elif res == Reach.RUNTIME_FALSE:
         return Reach.RUNTIME_TRUE
-    elif res == Reach.ALWAYS_FALSE:
-        return Reach.ALWAYS_TRUE
-    elif res == Reach.ALWAYS_TRUE:
-        return Reach.ALWAYS_FALSE
     else:
         return Reach.UNKNOWN
 
