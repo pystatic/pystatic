@@ -330,7 +330,9 @@ def _resolve_cls_attr(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
         assert typenode
         assert symtb
         option_var = eval_type_def_expr(typenode, symtb)
-        var_ins = option_var.value
+        type_ins = option_var.value
+        assert isinstance(type_ins, TypeType)
+        var_ins = type_ins.getins()
 
         option_var.dump_to_box(mbox)
 
