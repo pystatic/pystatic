@@ -57,8 +57,8 @@ class Manager:
     def start_check(self):
         self.preprocess(list(self.check_targets.values()))
         self.start_infer()
-        # for key in self.boxdict.keys():
-        #     self.boxdict[key].report()
+        for key in self.boxdict.keys():
+            self.boxdict[key].report()
 
     def start_infer(self):
         InferStarter(self.check_targets).start_infer()
@@ -102,8 +102,6 @@ class Manager:
         if target.path not in self.boxdict:
             self.boxdict[target.path] = target.mbox
 
-        if target.uri not in self.boxdict:
-            self.boxdict[target.uri] = target.mbox
 
 
 def crawl_path(path: str) -> str:

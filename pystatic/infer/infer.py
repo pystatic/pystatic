@@ -132,8 +132,9 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         func_type: TypeIns = self.recorder.get_comment_type(node.name)
         self.recorder.set_type(node.name, func_type)
-        self.recorder.enter_func(func_type)
-        self.ret_annotation = self.err_maker.dump_option(func_type.call(None))
+
+        argument, self.ret_annotation = self.err_maker.dump_option(func_type.call(None))
+        self.recorder.enter_func(func_type, self.infer_argument(argument))
 
         for subnode in node.body:
             self.visit(subnode)
@@ -208,4 +209,3 @@ class InferStarter:
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox)
             infer_visitor.infer()
-            target.mbox.report()

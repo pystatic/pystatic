@@ -25,8 +25,9 @@ class Scope:
 
 
 class FuncScope(Scope):
-    def __init__(self, tp: TypeIns):
+    def __init__(self, tp: TypeIns, args: Dict[str, TypeIns]):
         super().__init__(tp)
+        self.type_map=args
 
 
 class ClassScope(Scope):
@@ -59,8 +60,8 @@ class SymbolRecorder:
     def leave_scope(self):
         self.stack.pop()
 
-    def enter_func(self, tp: TypeIns):
-        self.stack.append(FuncScope(tp))
+    def enter_func(self, tp: TypeIns, args: Dict[str, TypeIns]):
+        self.stack.append(FuncScope(tp, args))
 
     def leave_func(self):
         self.leave_scope()

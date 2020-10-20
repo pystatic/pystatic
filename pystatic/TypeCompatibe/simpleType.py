@@ -231,5 +231,9 @@ class TypeCompatible:
             return False
 
 
+def type_consistent(tp1, tp2):
+    return TypeCompatible.TypeCompatible(tp1, tp2)
+
+
 def is_any(tp):
     return str(tp) == "Any"

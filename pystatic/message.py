@@ -71,3 +71,6 @@ class ErrorMaker:
 
     def exsit_error(self, option: Option) -> bool:
         return len(option.errors) != 0
+
+    def generate_code_unreachable_error(self, code_frag: List[ast.AST]):
+        pass
