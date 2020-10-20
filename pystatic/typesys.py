@@ -5,11 +5,11 @@ from typing import (Optional, Dict, List, Tuple, Union, TYPE_CHECKING, Final)
 from pystatic.option import Option
 from pystatic.uri import Uri
 from pystatic.evalutil import (InsWithAst, ApplyArgs, GetItemType, WithAst)
+from pystatic.symtable import Entry, SymTable
 from pystatic.errorcode import NoAttribute
 
 if TYPE_CHECKING:
     from pystatic.arg import Argument
-    from pystatic.symtable import Entry, SymTable
 
 TypeContext = Dict['TypeVarIns', 'TypeType']
 TypeVarList = List['TypeVarIns']
@@ -590,11 +590,11 @@ class TypePackageIns(TypeIns):
         super().__init__(pkgtemp, None)
         self.submodule: Dict[str, TypeIns] = {}  # submodule
 
-    # def add_submodule(self, name: str, ins: TypeIns):
-    #     self.submodule[name] = ins
-    #     assert isinstance(self.temp, TypePackageTemp)
-    #     inner_sym = self.temp.get_inner_symtable()
-    #     inner_sym.add_entry(name, Entry(ins))
+    def add_submodule(self, name: str, ins: TypeIns):
+        self.submodule[name] = ins
+        assert isinstance(self.temp, TypePackageTemp)
+        inner_sym = self.temp.get_inner_symtable()
+        inner_sym.add_entry(name, Entry(ins))
 
 
 class TypeFuncIns(TypeIns):

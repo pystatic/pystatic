@@ -7,7 +7,7 @@ import logging
 import contextlib
 from pystatic.target import MethodTarget
 from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
-                                          eval_type_def_expr,
+                                          eval_typedef_expr,
                                           template_resolve_fun)
 from typing import List, TYPE_CHECKING, Optional
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeGenericTemp,
@@ -115,7 +115,7 @@ def _resolve_cls_inh(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     defnode = get_cls_defnode(clstemp)
 
     for base_node in defnode.bases:
-        option_base = eval_type_def_expr(base_node, symtable)
+        option_base = eval_typedef_expr(base_node, symtable)
         option_base.dump_to_box(mbox)
         res_type = option_base.value
         assert isinstance(res_type, TypeType)
@@ -329,10 +329,8 @@ def _resolve_cls_attr(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
         symtb = tp_attr.get('symtable')  # type: ignore
         assert typenode
         assert symtb
-        option_var = eval_type_def_expr(typenode, symtb)
-        type_ins = option_var.value
-        assert isinstance(type_ins, TypeType)
-        var_ins = type_ins.getins()
+        option_var = eval_typedef_expr(typenode, symtb)
+        var_ins = option_var.value
 
         option_var.dump_to_box(mbox)
 

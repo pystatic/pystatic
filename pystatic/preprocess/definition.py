@@ -162,13 +162,11 @@ class TypeDefVisitor(BaseVisitor):
 
             tpvarins.tpvar_name = last_target.id
             self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
-            logger.debug(f'TypeVar {tpvarins.tpvar_name}')
 
         else:
             name = self._is_new_def(node.target)
             if name:
                 add_local_var(self.symtable, name, node)
-                logger.debug(f'add variable {name}')
             elif self._is_method:
                 self._try_attr(node, node.target)
 
@@ -219,7 +217,7 @@ class TypeDefVisitor(BaseVisitor):
             # when the imported module is typing.py, pystatic will add symbols
             # imported from it as soon as possible because some types (such as
             # TypeVar) may affect how pystatic judge whether an assignment
-            # statement is a special type definition or not.
+            # statement stands for a special type definition or not.
             if infoitem.uri == 'typing':
                 if not read_typing:
                     typing_temp = self.worker.get_module_temp('typing')
