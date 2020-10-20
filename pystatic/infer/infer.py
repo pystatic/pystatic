@@ -11,9 +11,20 @@ from pystatic.infer.op_map import *
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer import op_map
+from pystatic.infer.reachability import Reach, ACCEPT_REACH, REJECT_REACH
 from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any
 
 logger = logging.getLogger(__name__)
+
+
+class Interrupter:
+    def __init__(self):
+        self.ret_list = []
+        self.ret_annotation = None
+        self.state = Reach.RUNTIME_TRUE
+
+    def to_break(self):
+        return self.state in REJECT_REACH
 
 
 class InferVisitor(BaseVisitor):
@@ -22,23 +33,18 @@ class InferVisitor(BaseVisitor):
         self.root = node
         self.err_maker = ErrorMaker(mbox)
         self.type_comparator = TypeCompatible()
-
         self.recorder = SymbolRecorder(module)
-
-        self.ret_list = []
-        self.ret_annotation = None
+        self.intr = Interrupter()
 
     def infer(self):
         self.visit(self.root)
 
     def get_type(self, node: ast.AST) -> TypeIns:
         option = eval_expr(node, self.recorder)
-
         self.err_maker.handle_err(option.errors)
         return option.value
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
-        # print(type(ltype), type(rtype))
         res = self.type_comparator.TypeCompatible(ltype, rtype)
         print(f"type compatible of '{ltype}' and '{rtype}' is {res}")
         return res
@@ -110,11 +116,11 @@ class InferVisitor(BaseVisitor):
         func_name: str = op_map.binop_map[type(node.op)]
         option: Option = ltype.getattribute(func_name, None)
         operand = op_map.binop_char_map[type(node.op)]
-        if self.exsit_error(option):
+        if self.err_maker.exsit_error(option):
             self.err_maker.add_err(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype))
             return
-        func_type = self.dump_option(option)
+        func_type = self.err_maker.dump_option(option)
         self.check_arg_of_operand_func(node.value, func_type, operand, ltype, rtype)
 
     def check_arg_of_operand_func(self, node, func_type, operand, ltype, rtype):
@@ -145,7 +151,6 @@ class InferVisitor(BaseVisitor):
         self.recorder.leave_func()
 
     def infer_argument(self, argument: Argument):
-        # TODO: default value
         args = {}
         for arg in argument.posonlyargs:
             args[arg.name] = arg.ann
@@ -180,13 +185,11 @@ class InferVisitor(BaseVisitor):
 
     def visit_Return(self, node: ast.Return):
         ret_type = self.get_type(node.value)
+
         self.check_ret_type(self.ret_annotation, node, ret_type)
         self.ret_list.append(ret_type)
 
     def check_ret_type(self, annotation, ret_node: ast.Return, ret_type):
-        if ret_type is None:
-            self.err_maker.add_err(ReturnValueExpected(ret_node))
-            return
         if not self.type_consistent(annotation, ret_type):
             self.err_maker.add_err(
                 IncompatibleReturnType(ret_node.value, annotation, ret_type))

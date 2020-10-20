@@ -27,7 +27,15 @@ class Scope:
 class FuncScope(Scope):
     def __init__(self, tp: TypeIns, args: Dict[str, TypeIns]):
         super().__init__(tp)
-        self.type_map=args
+        self.type_map = args
+        self.ret_annotation = any_type
+        self.ret_type: List[TypeIns] = []
+
+    def set_ret_annotation(self, ret_annotation: TypeIns):
+        self.ret_annotation = ret_annotation
+
+    def add_ret(self, ret_type: TypeIns):
+        self.ret_type.append(ret_type)
 
 
 class ClassScope(Scope):
@@ -72,6 +80,16 @@ class SymbolRecorder:
     def leave_cls(self):
         self.leave_scope()
 
+    def set_ret_annotation(self, ret_annotation: TypeIns):
+        cur_scope = self.cur_scope
+        assert isinstance(cur_scope, FuncScope)
+        cur_scope.set_ret_annotation(ret_annotation)
+
+    def add_ret(self, ret_type: TypeIns):
+        cur_scope = self.cur_scope
+        assert isinstance(cur_scope, FuncScope)
+        cur_scope.set_ret_annotation(ret_type)
+
     def set_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)
 
@@ -82,10 +100,6 @@ class SymbolRecorder:
         self.cur_scope.release_buffer(name)
 
     def get_comment_type(self, name) -> TypeIns:
-        # for scope in self.stack[::-1]:
-        # if isinstance(scope, (ModuleScope, FuncScope)):
-        # table: SymTable = scope.tp.get_inner_symtable()
-        # return table.lookup_local(name)
         scope = self.cur_scope
         table: SymTable = scope.tp.get_inner_symtable()
         tp = table.legb_lookup(name)
