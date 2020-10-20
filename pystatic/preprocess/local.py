@@ -11,7 +11,7 @@ from pystatic.symtable import SymTable
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns)
 from pystatic.symtable import Entry
 from pystatic.message import MessageBox
-from pystatic.preprocess.def_expr import (eval_func_type, eval_type_def_expr,
+from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,
                                           template_resolve_fun)
 
 logger = logging.getLogger(__name__)
@@ -28,9 +28,8 @@ def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
         # resolved here.
         defnode = entry.defnode
 
-        option_tpins = eval_type_def_expr(defnode, symtable)
-        assert isinstance(option_tpins.value, TypeType)
-        tpins = option_tpins.value.getins()
+        option_tpins = eval_typedef_expr(defnode, symtable)
+        tpins = option_tpins.value
 
         option_tpins.dump_to_box(mbox)
 

@@ -180,7 +180,7 @@ class Preprocessor:
             target.ast = path2ast(find_res.target_file)
             target.module_temp = TypePackageTemp(find_res.paths,
                                                  target.symtable, target.uri)
-            assert len(find_res.paths[0]) == 1
+            assert len(find_res.paths) == 1
             target.path = os.path.realpath(find_res.paths[0])
 
             self.set_target_mbox(target)
