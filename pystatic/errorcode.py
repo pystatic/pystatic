@@ -41,7 +41,7 @@ class SymbolUndefined(ErrorCode):
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = SYMBOL_UNDEFINED.format(self.name)
-        detail=f"unresolved reference '{self.name}'"
+        detail = f"unresolved reference '{self.name}'"
         return self.node, self.concat_msg(review, detail)
 
 
@@ -99,6 +99,16 @@ class TooFewArgument(ErrorCode):
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, TOO_FEW_ARGUMENT_FOR_FUNC.format(self.func_name)
+
+
+class TooMoreArgument(ErrorCode):
+    def __init__(self, node: Optional[ast.AST], func_name: str):
+        super().__init__()
+        self.node = node
+        self.func_name = func_name
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, TOO_MORE_ARGUMENT_FOR_FUNC.format(self.func_name)
 
 
 class TooMoreValuesToUnpack(ErrorCode):

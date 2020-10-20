@@ -1,6 +1,6 @@
 import ast
 from typing import Dict
-from pystatic.reach import Reach, cal_neg
+from pystatic.infer.reachability import Reach, cal_neg
 from pystatic.config import Config
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
@@ -8,6 +8,7 @@ from pystatic.message import ErrorMaker
 from pystatic.typesys import TypeLiteralIns
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.errorcode import *
+from pystatic.TypeCompatibe.simpleType import is_any
 
 
 class ConditionInfer:
@@ -36,18 +37,20 @@ class ConditionInfer:
     def infer_value_of_call(self, test: ast.Call) -> Reach:
         if isinstance(test.func, ast.Name):
             name = test.func.id
+            args = test.args
             if name == "isinstance":
-                args = test.args
-                if len(args) <= 1:
-                    self.err_maker.add_err(TooFewArgument(test, name))
-                    return Reach.UNKNOWN
-                options = [eval_expr(arg, self.recorder) for arg in args]
-                list(map(self.err_maker.handle_err, options))  # lazy evaluation
-
-
+                option = eval_expr(test, self.recorder)
                 if self.err_maker.exsit_error(option):
-                    return Reach.UNKNOWN
-                for arg in args[1:]:
+                    self.err_maker.dump_option(option)
+                first_type = self.err_maker.dump_option(eval_expr(args[0], self.recorder))
+                second_type = self.err_maker.dump_option(eval_expr(args[1], self.recorder))
+                if is_any(first_type):
+
+
+
+
+
+
 
 
 

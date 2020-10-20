@@ -13,3 +13,4 @@ INCOMPATIBLE_RETURN_TYPE = "Incompatible return value type"
 # call
 INCOMPATIBLE_ARGUMENT = "Incompatible argument type for '{}'"
 TOO_FEW_ARGUMENT_FOR_FUNC = "Too few arguments for '{}'"
+TOO_MORE_ARGUMENT_FOR_FUNC = "Too more arguments for '{}'"

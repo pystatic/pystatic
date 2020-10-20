@@ -229,3 +229,7 @@ class TypeCompatible:
 
         else:
             return False
+
+
+def is_any(tp):
+    return str(tp) == "Any"

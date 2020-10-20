@@ -8,11 +8,10 @@ from pystatic.errorcode import *
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.infer.op_map import *
-from pystatic.infer.checker import TypeChecker, is_any
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer import op_map
-from pystatic.TypeCompatibe.simpleType import TypeCompatible
+from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +30,7 @@ class InferVisitor(BaseVisitor):
 
     def infer(self):
         self.visit(self.root)
+
 
     def get_type(self, node: ast.AST) -> TypeIns:
         option = eval_expr(node, self.recorder)
@@ -204,7 +204,7 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            print(type(target.module_temp.getattribute('a', None)))
+            print(type(target.module_temp.getattribute('aa', None)))
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox)
             infer_visitor.infer()

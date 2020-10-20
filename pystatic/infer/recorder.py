@@ -10,9 +10,18 @@ class Scope:
     def __init__(self, tp: TypeIns):
         self.type_map: Dict[str, TypeIns] = {}
         self.tp = tp
+        self.buffer: Dict[str, TypeIns] = {}
 
     def set_type(self, name: str, tp: TypeIns):
         self.type_map[name] = tp
+
+    def add_buffer(self, name, tp):
+        old_tp = self.type_map[name]
+        self.type_map[name] = tp
+        self.buffer[name] = old_tp
+
+    def release_buffer(self, name):
+        self.type_map[name] = self.buffer[name]
 
 
 class FuncScope(Scope):
@@ -32,6 +41,7 @@ class ModuleScope(Scope):
 
 class SymbolRecorder:
     """record the appeared symbol in cur scope"""
+
     def __init__(self, module):
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))
@@ -63,6 +73,12 @@ class SymbolRecorder:
 
     def set_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)
+
+    def add_buffer(self, name, tp):
+        self.cur_scope.add_buffer(name, tp)
+
+    def release_buffer(self, name):
+        self.cur_scope.release_buffer(name)
 
     def get_comment_type(self, name) -> TypeIns:
         # for scope in self.stack[::-1]:
