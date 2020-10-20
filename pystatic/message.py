@@ -1,7 +1,10 @@
 import ast
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from pystatic.errorcode import ErrorCode
 from pystatic.option import Option
+
+if TYPE_CHECKING:
+    from pystatic.typesys import TypeIns
 
 
 class Message(object):
@@ -9,6 +12,7 @@ class Message(object):
 
     from_node: generate an error message for the position implied by the node
     """
+
     def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
                  end_col_offset: Optional[int], msg: str):
         self.lineno = lineno
@@ -33,13 +37,32 @@ class Message(object):
         return f'line {self.lineno} col {self.col_offset}: ' + self.msg
 
 
+class TypeNode:
+    def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
+                 end_col_offset: Optional[int], node_type: 'TypeIns'):
+        self.lineno = lineno
+        self.end_lineno: int = end_lineno if end_lineno else lineno
+        self.col_offset = col_offset
+        self.end_col_offset: int = end_col_offset if end_col_offset else col_offset
+        self.node_type = node_type
+
+    @classmethod
+    def from_node(cls, node: ast.AST, node_type: 'TypeIns'):
+        return cls(node.lineno, node.end_lineno, node.col_offset,
+                   node.end_col_offset, node_type)
+
+
 class MessageBox(object):
     def __init__(self, module_uri: str):
         self.module_uri = module_uri
         self.error: List[Message] = []
+        self.types: List[TypeNode] = []
 
     def add_err(self, node: ast.AST, msg: str):
         self.error.append(Message.from_node(node, msg))
+
+    def add_type(self, node: ast.AST, tp: 'TypeIns'):
+        self.types.append(TypeNode.from_node(node, tp))
 
     def make(self, error: ErrorCode):
         node, msg = error.make()
@@ -68,6 +91,9 @@ class ErrorMaker:
 
     def add_err(self, err: ErrorCode):
         self.mbox.make(err)
+
+    def add_type(self, node: ast.AST, tp: 'TypeIns'):
+        self.mbox.add_type(node, tp)
 
     def exsit_error(self, option: Option) -> bool:
         return len(option.errors) != 0
