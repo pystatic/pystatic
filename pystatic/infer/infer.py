@@ -31,7 +31,6 @@ class InferVisitor(BaseVisitor):
     def infer(self):
         self.visit(self.root)
 
-
     def get_type(self, node: ast.AST) -> TypeIns:
         option = eval_expr(node, self.recorder)
 
@@ -46,7 +45,9 @@ class InferVisitor(BaseVisitor):
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
+        self.err_maker.add_type(node.value, rtype)
         for target in node.targets:
+            self.err_maker.add_type(target, rtype)  # TODO
             if isinstance(target, ast.Name):
                 self.infer_name_node_of_assign(target, node.value, rtype)
             elif isinstance(target, (ast.List, ast.Tuple)):
@@ -84,6 +85,8 @@ class InferVisitor(BaseVisitor):
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         rtype: Optional[TypeIns] = self.get_type(node.value)
+        self.err_maker.add_type(node.target, rtype)
+        self.err_maker.add_type(node.value, rtype)
         target = node.target
         if isinstance(target, ast.Name):
             self.check_name_node_of_annassign(target, node.value, rtype)
