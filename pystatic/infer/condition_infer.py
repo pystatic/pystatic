@@ -13,11 +13,13 @@ from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REA
 
 class ConditionStmtType(Enum):
     GLOBAL = 1
-    WHILE = 2
+    LOOP = 2
     IF = 3
+    FUNC = 4
 
 
 class BreakFlag(Enum):
+    NORMAL = 0
     RETURN = 1
     BREAK = 2
     CONTINUE = 3
@@ -40,67 +42,71 @@ class ConditionInfer(BaseVisitor):
         self.err_maker = err_maker
         self.reach_stack: List[Condition] = [Condition(ConditionStmtType.GLOBAL,
                                                        Reach.RUNTIME_TRUE)]
-        self.break_flag = False
+        self.break_flag = BreakFlag.NORMAL
         self.break_node = None
 
     @property
     def cur_condition(self):
         return self.reach_stack[-1]
 
-    def accept(self, node: ast.stmt) -> Reach:
-        return self.visit(node)
+    def accept(self, node: ast.stmt):
+        self.visit(node)
 
-    def to_break(self, node: ast.stmt, flag=True):
-        reach = self.reach_map.get(node)
-        if not reach:
-            reach = self.accept(node)
-        if flag:
-            return reach in REJECT_REACH
-        else:
-            neg_reach = cal_neg(reach)
-            return neg_reach in REJECT_REACH
-
-    def push(self, stmt: ConditionStmtType, reach: Reach):
-        cur_state = self.cur_state
-        if cur_state == Reach.UNKNOWN:
-            self.reach_stack.append(Reach.UNKNOWN)
-        elif cur_state == Reach.RUNTIME_TRUE:
-            self.reach_stack.append(reach)
+    def rejected(self):
+        reach = self.cur_condition.reach
+        return reach in REJECT_REACH
 
     def pop(self):
         self.reach_stack.pop()
         assert len(self.reach_stack) != 0
 
-    def detect_break(self):
-        return self.break_flag
+    def flip(self):
+        self.reach_stack[-1].stmt_type = ConditionStmtType.IF
+        self.reach_stack[-1].reach = cal_neg(self.reach_stack[-1].reach)
 
-    def eliminate_break(self):
-        self.break_flag = False
+    def detect_break(self):
+        return self.break_flag != BreakFlag.NORMAL
+
+    def eliminate_break(self, outer_state):
+        if self.break_flag == BreakFlag.BREAK or self.break_flag == BreakFlag.CONTINUE:
+            if outer_state != ConditionStmtType.IF:
+                self.break_flag = BreakFlag.NORMAL
+        elif self.break_flag == BreakFlag.RETURN:
+            if outer_state == ConditionStmtType.FUNC:
+                self.break_flag = BreakFlag.NORMAL
+            elif outer_state == ConditionStmtType.LOOP:
+                self.break_flag = BreakFlag.RETURN
+            else:
+                assert False
 
     def get_break_node(self):
         return self.break_node
 
-    def visit_Return(self, node: ast.Return) -> Reach:
-        reach = self.cur_state
-        return cal_neg(reach)
-
-    def visit_While(self, node: ast.While) -> Reach:
+    def visit_While(self, node: ast.While):
         reach = self.infer_value_of_condition(node.test)
         self.reach_map[node] = reach
-        if reach in ACCEPT_REACH:
-            self.push(ConditionStmtType.WHILE, reach)
-        return reach
+        self.reach_stack.append(Condition(ConditionStmtType.LOOP, reach))
 
-    def visit_If(self, node: ast.If) -> Reach:
+    def visit_If(self, node: ast.If):
         reach = self.infer_value_of_condition(node.test)
         self.reach_map[node] = reach
-        return reach
+        self.reach_stack.append(Condition(ConditionStmtType.IF, reach))
 
-    def visit_Break(self, node: ast.AST):
+    def visit_Break(self, node: ast.Break):
+        for cond in self.reach_stack[::-1]:
+            if cond.stmt_type == ConditionStmtType.IF and cond.reach == Reach.UNKNOWN:
+                break
+            if cond.stmt_type == ConditionStmtType.LOOP:
+                self.break_flag = BreakFlag.BREAK
+                self.break_node = node
 
-        if self.cur_state == Reach.RUNTIME_TRUE:
-            self.break_flag = True
-            self.break_node = node
+    def visit_Return(self, node: ast.Return):
+        for cond in self.reach_stack[::-1]:
+            if self.cur_condition.reach == Reach.UNKNOWN:
+                break
+            if self.cur_condition.stmt_type == ConditionStmtType.FUNC:
+                self.break_flag = BreakFlag.RETURN
+                self.break_node = node
 
     def infer_value_of_condition(self, test: ast.expr) -> Reach:
         if isinstance(test, ast.Constant):
@@ -114,10 +120,10 @@ class ConditionInfer(BaseVisitor):
                 return self.infer_value_of_condition(test.operand)
             else:
                 assert False, "TODO"
-        elif isinstance(test, ast.BinOp):
-            pass
         elif isinstance(test, ast.Call):
             return self.infer_value_of_call(test)
+        else:
+            return Reach.UNKNOWN
 
     def infer_value_of_call(self, test: ast.Call) -> Reach:
         if isinstance(test.func, ast.Name):

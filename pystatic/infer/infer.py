@@ -11,7 +11,7 @@ from pystatic.infer.op_map import *
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer import op_map
-from pystatic.infer.condition_infer import ConditionInfer
+from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
 from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class InferVisitor(BaseVisitor):
         self.err_maker = ErrorMaker(mbox)
         self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
-        self.condition = ConditionInfer(self.recorder, self.err_maker)
+        self.cond_infer = ConditionInfer(self.recorder, self.err_maker)
 
     def infer(self):
         self.visit(self.root)
@@ -184,41 +184,48 @@ class InferVisitor(BaseVisitor):
             self.err_maker.add_err(
                 IncompatibleReturnType(ret_node.value, annotation, ret_type))
 
-    def visit_While(self, node: ast.While):
-        if not self.condition.to_break(node):
-            for stmt in node.body:
-                if self.condition.detect_break():
-                    self.condition.eliminate_break()
-                    break_node = self.condition.get_break_node()
-                    self.err_maker.add_err(BreakOfCode(break_node))
-                    break
-                self.visit(stmt)
-        else:
-            self.err_maker.add_err(CodeUnreachable(node))
+    def accept_condition_stmt_list(self, stmt_list: List[ast.stmt], stmt_type):
+        for stmt in stmt_list:
+            if self.cond_infer.detect_break():
+                self.cond_infer.eliminate_break(stmt_type)
+                index = stmt_list.index(stmt)
+                self.err_maker.generate_code_unreachable_error(stmt_list[index:])
+                break
+            self.visit(stmt)
 
-        if not self.condition.to_break(node, flag=False):
-            for stmt in node.orelse:
-                self.visit(stmt)
+    def visit_While(self, node: ast.While):
+        self.cond_infer.accept(node)
+
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(node.body, ConditionStmtType.LOOP)
         else:
-            # TODO:add error
-            pass
+            self.err_maker.generate_code_unreachable_error(node.body)
+
+        self.cond_infer.flip()
+
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(node.orelse, ConditionStmtType.LOOP)
+        else:
+            self.err_maker.generate_code_unreachable_error(node.orelse)
+        self.cond_infer.pop()
 
     def visit_If(self, node: ast.If):
-        if not self.condition.to_break(node):
-            for stmt in node.body:
-                self.visit(stmt)
+        self.cond_infer.accept(node)
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(node.body, ConditionStmtType.IF)
         else:
-            # self.err_maker.add_err(CodeUnreachable(node))
             self.err_maker.generate_code_unreachable_error(node.body)
-        if not self.condition.to_break(node, flag=False):
-            for stmt in node.orelse:
-                self.visit(stmt)
+
+        self.cond_infer.flip()
+
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(node.orelse, ConditionStmtType.IF)
         else:
-            # TODO:add error, but how to get the pos?
-            pass
+            self.err_maker.generate_code_unreachable_error(node.orelse)
 
     def visit_Break(self, node: ast.Break):
-        self.condition.accept(node)
+        self.cond_infer.accept(node)
+
 
 class InferStarter:
     def __init__(self, sources):
