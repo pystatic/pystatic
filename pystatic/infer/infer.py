@@ -80,6 +80,7 @@ class InferVisitor(BaseVisitor):
                 self.check_composed_node_of_assign(lvalue, node, rtype)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
+
         rtype: Optional[TypeIns] = self.get_type(node.value)
         self.err_maker.add_type(node.target, rtype)
         self.err_maker.add_type(node.value, rtype)
@@ -184,22 +185,40 @@ class InferVisitor(BaseVisitor):
                 IncompatibleReturnType(ret_node.value, annotation, ret_type))
 
     def visit_While(self, node: ast.While):
-        pass
+        if not self.condition.to_break(node):
+            for stmt in node.body:
+                if self.condition.detect_break():
+                    self.condition.eliminate_break()
+                    break_node = self.condition.get_break_node()
+                    self.err_maker.add_err(BreakOfCode(break_node))
+                    break
+                self.visit(stmt)
+        else:
+            self.err_maker.add_err(CodeUnreachable(node))
+
+        if not self.condition.to_break(node, flag=False):
+            for stmt in node.orelse:
+                self.visit(stmt)
+        else:
+            # TODO:add error
+            pass
 
     def visit_If(self, node: ast.If):
         if not self.condition.to_break(node):
             for stmt in node.body:
                 self.visit(stmt)
         else:
-            self.err_maker.add_err(CodeUnreachable(node.test))
-
+            # self.err_maker.add_err(CodeUnreachable(node))
+            self.err_maker.generate_code_unreachable_error(node.body)
         if not self.condition.to_break(node, flag=False):
-            for stmt in node.body:
+            for stmt in node.orelse:
                 self.visit(stmt)
         else:
             # TODO:add error, but how to get the pos?
             pass
 
+    def visit_Break(self, node: ast.Break):
+        self.condition.accept(node)
 
 class InferStarter:
     def __init__(self, sources):

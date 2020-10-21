@@ -98,3 +98,12 @@ class ErrorMaker:
     def exsit_error(self, option: Option) -> bool:
         return len(option.errors) != 0
 
+    def generate_code_unreachable_error(self, code_frag: List[ast.stmt]):
+        if len(code_frag) == 0:
+            return
+
+        begin = code_frag[0]
+        end = code_frag[-1]
+        begin.end_lineno = end.end_lineno
+        begin.end_col_offset = end.end_col_offset
+        self.add_err(CodeUnreachable(begin))

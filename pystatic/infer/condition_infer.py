@@ -1,15 +1,32 @@
 import ast
 from typing import Dict, Union, List
-from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH
-from pystatic.config import Config
+from enum import Enum
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.message import ErrorMaker
 from pystatic.typesys import TypeLiteralIns
+from pystatic.errorcode import *
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.visitor import BaseVisitor
-from pystatic.errorcode import *
-from pystatic.TypeCompatibe.simpleType import is_any, type_consistent
+from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH
+
+
+class ConditionStmtType(Enum):
+    GLOBAL = 1
+    WHILE = 2
+    IF = 3
+
+
+class BreakFlag(Enum):
+    RETURN = 1
+    BREAK = 2
+    CONTINUE = 3
+
+
+class Condition:
+    def __init__(self, stmt_type: ConditionStmtType, reach: Reach):
+        self.stmt_type = stmt_type
+        self.reach = reach
 
 
 class ConditionInfer(BaseVisitor):
@@ -21,10 +38,13 @@ class ConditionInfer(BaseVisitor):
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}
         self.err_maker = err_maker
-        self.reach_stack: List[Reach] = [Reach.RUNTIME_TRUE]
+        self.reach_stack: List[Condition] = [Condition(ConditionStmtType.GLOBAL,
+                                                       Reach.RUNTIME_TRUE)]
+        self.break_flag = False
+        self.break_node = None
 
     @property
-    def cur_state(self):
+    def cur_condition(self):
         return self.reach_stack[-1]
 
     def accept(self, node: ast.stmt) -> Reach:
@@ -33,40 +53,59 @@ class ConditionInfer(BaseVisitor):
     def to_break(self, node: ast.stmt, flag=True):
         reach = self.reach_map.get(node)
         if not reach:
-            return self.accept(node)
+            reach = self.accept(node)
         if flag:
             return reach in REJECT_REACH
         else:
             neg_reach = cal_neg(reach)
             return neg_reach in REJECT_REACH
 
+    def push(self, stmt: ConditionStmtType, reach: Reach):
+        cur_state = self.cur_state
+        if cur_state == Reach.UNKNOWN:
+            self.reach_stack.append(Reach.UNKNOWN)
+        elif cur_state == Reach.RUNTIME_TRUE:
+            self.reach_stack.append(reach)
+
     def pop(self):
         self.reach_stack.pop()
         assert len(self.reach_stack) != 0
+
+    def detect_break(self):
+        return self.break_flag
+
+    def eliminate_break(self):
+        self.break_flag = False
+
+    def get_break_node(self):
+        return self.break_node
 
     def visit_Return(self, node: ast.Return) -> Reach:
         reach = self.cur_state
         return cal_neg(reach)
 
     def visit_While(self, node: ast.While) -> Reach:
-        reach = self.reach_map.get(node)
-        if not reach:
-            reach = self.infer_value_of_condition(node.test)
-            self.reach_map[node] = reach
+        reach = self.infer_value_of_condition(node.test)
+        self.reach_map[node] = reach
         if reach in ACCEPT_REACH:
-            self.reach_stack.append(reach)
+            self.push(ConditionStmtType.WHILE, reach)
         return reach
 
     def visit_If(self, node: ast.If) -> Reach:
-        reach = self.reach_map.get(node)
-        if not reach:
-            reach = self.infer_value_of_condition(node.test)
-            self.reach_map[node] = reach
+        reach = self.infer_value_of_condition(node.test)
+        self.reach_map[node] = reach
         return reach
+
+    def visit_Break(self, node: ast.AST):
+
+        if self.cur_state == Reach.RUNTIME_TRUE:
+            self.break_flag = True
+            self.break_node = node
 
     def infer_value_of_condition(self, test: ast.expr) -> Reach:
         if isinstance(test, ast.Constant):
-            return self.infer_value_of_constant(test)
+            res = self.infer_value_of_constant(test)
+            return res
         elif isinstance(test, ast.UnaryOp):
             op = test.op
             if isinstance(op, (ast.Not, ast.USub)):

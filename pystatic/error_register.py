@@ -5,6 +5,7 @@ SYMBOL_REDEFINE = "'{}' has already defined"
 NO_ATTRIBUTE = "Type '{}' has no attribute '{}'"
 UNSUPPORTED_OPERAND = "Unsupported operand types for '{}'"
 CODE_UNREACHABLE = "The code under this block is unreachable"
+BREAK_OF_CODE = "This code may cause some code unreachable"
 # tuple
 NEED_MORE_VALUES_TO_UNPACK = "Need more values to unpack"
 TOO_MORE_VALUES_TO_UNPACK = "Too more values to unpack"

@@ -173,3 +173,13 @@ class CodeUnreachable(ErrorCode):
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, CODE_UNREACHABLE
+
+
+class BreakOfCode(ErrorCode):
+    # TODO:rename?
+    def __init__(self, node):
+        super().__init__()
+        self.node = node
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, BREAK_OF_CODE
