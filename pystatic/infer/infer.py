@@ -11,20 +11,10 @@ from pystatic.infer.op_map import *
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer import op_map
-from pystatic.infer.reachability import Reach, ACCEPT_REACH, REJECT_REACH
+from pystatic.infer.condition_infer import ConditionInfer
 from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any
 
 logger = logging.getLogger(__name__)
-
-
-class Interrupter:
-    def __init__(self):
-        self.ret_list = []
-        self.ret_annotation = None
-        self.state = Reach.RUNTIME_TRUE
-
-    def to_break(self):
-        return self.state in REJECT_REACH
 
 
 class InferVisitor(BaseVisitor):
@@ -34,7 +24,7 @@ class InferVisitor(BaseVisitor):
         self.err_maker = ErrorMaker(mbox)
         self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
-        self.intr = Interrupter()
+        self.condition = ConditionInfer(self.recorder, self.err_maker)
 
     def infer(self):
         self.visit(self.root)
@@ -141,13 +131,12 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         func_type: TypeIns = self.recorder.get_comment_type(node.name)
         self.recorder.set_type(node.name, func_type)
-
-        argument, self.ret_annotation = self.err_maker.dump_option(func_type.call(None))
-        self.recorder.enter_func(func_type, self.infer_argument(argument))
+        argument, ret_annotation = self.err_maker.dump_option(func_type.call(None))
+        self.recorder.enter_func(func_type, self.infer_argument(argument), ret_annotation)
 
         for subnode in node.body:
             self.visit(subnode)
-        self.infer_ret_value_of_func(func_type, node.returns)
+        # self.infer_ret_value_of_func(func_type, node.returns)
         self.recorder.leave_func()
 
     def infer_argument(self, argument: Argument):
@@ -185,9 +174,9 @@ class InferVisitor(BaseVisitor):
 
     def visit_Return(self, node: ast.Return):
         ret_type = self.get_type(node.value)
-
-        self.check_ret_type(self.ret_annotation, node, ret_type)
-        self.ret_list.append(ret_type)
+        ret_annotation = self.recorder.get_ret_annotation()
+        self.check_ret_type(ret_annotation, node, ret_type)
+        self.recorder.add_ret(ret_type)
 
     def check_ret_type(self, annotation, ret_node: ast.Return, ret_type):
         if not self.type_consistent(annotation, ret_type):
@@ -198,10 +187,18 @@ class InferVisitor(BaseVisitor):
         pass
 
     def visit_If(self, node: ast.If):
-        cond = self.get_type(node.test)
-        for subnode in node.body:
-            self.visit(subnode)
-        self.visit(node.orelse)
+        if not self.condition.to_break(node):
+            for stmt in node.body:
+                self.visit(stmt)
+        else:
+            self.err_maker.add_err(CodeUnreachable(node.test))
+
+        if not self.condition.to_break(node, flag=False):
+            for stmt in node.body:
+                self.visit(stmt)
+        else:
+            # TODO:add error, but how to get the pos?
+            pass
 
 
 class InferStarter:
@@ -211,7 +208,7 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            print(type(target.module_temp.getattribute('aa', None)))
+            # print(type(target.module_temp.getattribute('aa', None)))
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox)
             infer_visitor.infer()

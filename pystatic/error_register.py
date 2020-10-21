@@ -1,9 +1,10 @@
 # common
 INCOMPATIBLE_TYPE_IN_ASSIGN = "Incompatible type in assignment"
-SYMBOL_UNDEFINED = 'Cannot determine type of "{}"'
-SYMBOL_REDEFINE = '{} has already defined'
-NO_ATTRIBUTE = 'Type "{}" has no attribute "{}"'
-UNSUPPORTED_OPERAND = 'Unsupported operand types for "{}"'
+SYMBOL_UNDEFINED = "Cannot determine type of '{}'"
+SYMBOL_REDEFINE = "'{}' has already defined"
+NO_ATTRIBUTE = "Type '{}' has no attribute '{}'"
+UNSUPPORTED_OPERAND = "Unsupported operand types for '{}'"
+CODE_UNREACHABLE = "The code under this block is unreachable"
 # tuple
 NEED_MORE_VALUES_TO_UNPACK = "Need more values to unpack"
 TOO_MORE_VALUES_TO_UNPACK = "Too more values to unpack"

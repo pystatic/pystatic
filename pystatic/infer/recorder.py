@@ -25,17 +25,12 @@ class Scope:
 
 
 class FuncScope(Scope):
-    def __init__(self, tp: TypeIns, args: Dict[str, TypeIns]):
+    def __init__(self, tp: TypeIns, args: Dict[str, TypeIns],
+                 ret_annotation: TypeIns):
         super().__init__(tp)
         self.type_map = args
-        self.ret_annotation = any_type
-        self.ret_type: List[TypeIns] = []
-
-    def set_ret_annotation(self, ret_annotation: TypeIns):
         self.ret_annotation = ret_annotation
-
-    def add_ret(self, ret_type: TypeIns):
-        self.ret_type.append(ret_type)
+        self.ret_type: List[TypeIns] = []
 
 
 class ClassScope(Scope):
@@ -68,8 +63,8 @@ class SymbolRecorder:
     def leave_scope(self):
         self.stack.pop()
 
-    def enter_func(self, tp: TypeIns, args: Dict[str, TypeIns]):
-        self.stack.append(FuncScope(tp, args))
+    def enter_func(self, tp: TypeIns, args: Dict[str, TypeIns], ret_annotation):
+        self.stack.append(FuncScope(tp, args, ret_annotation))
 
     def leave_func(self):
         self.leave_scope()
@@ -80,15 +75,15 @@ class SymbolRecorder:
     def leave_cls(self):
         self.leave_scope()
 
-    def set_ret_annotation(self, ret_annotation: TypeIns):
-        cur_scope = self.cur_scope
-        assert isinstance(cur_scope, FuncScope)
-        cur_scope.set_ret_annotation(ret_annotation)
-
     def add_ret(self, ret_type: TypeIns):
         cur_scope = self.cur_scope
         assert isinstance(cur_scope, FuncScope)
-        cur_scope.set_ret_annotation(ret_type)
+        cur_scope.ret_type.append(ret_type)
+
+    def get_ret_annotation(self):
+        cur_scope = self.cur_scope
+        assert isinstance(cur_scope, FuncScope)
+        return cur_scope.ret_annotation
 
     def set_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)

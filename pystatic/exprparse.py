@@ -81,6 +81,7 @@ class ExprParser(NoGenVisitor):
 
     def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
         res = self.visit(node.value)
+        print(res)
         assert isinstance(res, TypeIns)
         attr_option = res.getattribute(node.attr, node)
 

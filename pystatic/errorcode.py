@@ -164,3 +164,12 @@ class UnsupportedBinOperand(ErrorCode):
         review = UNSUPPORTED_OPERAND.format(self.operand)
         detail = f"'{self.left_type}' and {self.right_type}"
         return self.node, self.concat_msg(review, detail)
+
+
+class CodeUnreachable(ErrorCode):
+    def __init__(self, node: Optional[ast.AST]):
+        super().__init__()
+        self.node = node
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, CODE_UNREACHABLE
