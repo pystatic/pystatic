@@ -316,8 +316,8 @@ class TypeVarTemp(TypeTemp):
         if len(applyargs.args) > args_rear:
             default_ins.bound = None
             for rangenode in applyargs.args[args_rear:]:
-                assert isinstance(rangenode.ins, TypeType), "TODO"
-                default_ins.constrains.append(rangenode.ins)
+                assert isinstance(rangenode.ins, TypeType), "expect typetype"
+                default_ins.constrains.append(rangenode.ins.getins())
 
         cova = applyargs.kwargs.get('covariant')
         if not cova:
@@ -362,6 +362,7 @@ class TypeVarIns(TypeIns):
                  *args: 'TypeIns',
                  bound: Optional['TypeIns'] = None,
                  kind: TpVarKind = TpVarKind.INVARIANT):
+        super().__init__(typevar_temp, None)
         self.tpvar_name = tpvar_name
         self.bound = bound
         assert kind == TpVarKind.INVARIANT or kind == TpVarKind.COVARIANT or kind == TpVarKind.CONTRAVARIANT
