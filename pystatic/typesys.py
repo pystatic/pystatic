@@ -1,7 +1,8 @@
 import ast
 import enum
 import copy
-from typing import (Optional, Dict, List, Tuple, Union, TYPE_CHECKING, Final)
+from typing import (Any, Optional, Dict, List, Tuple, Union, TYPE_CHECKING,
+                    Final)
 from pystatic.option import Option
 from pystatic.uri import Uri
 from pystatic.evalutil import (InsWithAst, ApplyArgs, GetItemType, WithAst)
@@ -11,9 +12,9 @@ from pystatic.errorcode import NoAttribute
 if TYPE_CHECKING:
     from pystatic.arg import Argument
 
-TypeContext = Dict['TypeVarIns', 'TypeType']
+TypeContext = Dict['TypeVarIns', 'TypeIns']
 TypeVarList = List['TypeVarIns']
-BindList = Optional[List[Union['TypeType', List['TypeType'], 'TypeIns']]]
+BindList = Optional[List[Any]]
 
 DEFAULT_TYPEVAR_NAME: Final[str] = '__unknown_typevar_name__'
 
@@ -57,7 +58,7 @@ class TypeTemp:
             return Option(TypeType(self, None))
         else:
             if isinstance(item.ins, (tuple, list)):
-                tpins_list = []
+                tpins_list: List[TypeIns] = []
                 for item in item.ins:
                     if isinstance(item.ins, TypeIns):
                         tpins_list.append(item.ins)
@@ -176,7 +177,7 @@ class TypeIns:
         new_bindlist = []
         bindlist = self.bindlist or []
         for item in bindlist:
-            if isinstance(item, TypeVarTemp) and item in context:
+            if isinstance(item, TypeVarIns) and item in context:
                 # TODO: check consistence here
                 new_bindlist.append(context[item])
             else:
@@ -320,8 +321,9 @@ class TypeVarTemp(TypeTemp):
             default_ins.bound = None
             for rangenode in applyargs.args[args_rear:]:
                 assert isinstance(rangenode.ins, TypeType), "expect typetype"
-                option_range = 
-                default_ins.constrains.append(rangenode.ins.getins())
+                range_option = rangenode.ins.getins()
+                ins_option.combine_error(range_option)
+                default_ins.constrains.append(range_option.value)
 
         cova = applyargs.kwargs.get('covariant')
         if not cova:
