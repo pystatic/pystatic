@@ -123,6 +123,8 @@ class ConditionInfer(BaseVisitor):
                 assert False, "TODO"
         elif isinstance(test, ast.Call):
             return self.infer_value_of_call(test)
+        elif isinstance(test, ast.Name):
+            return self.infer_value_of_name_node(test)
         else:
             return Reach.UNKNOWN
 
@@ -136,7 +138,7 @@ class ConditionInfer(BaseVisitor):
                 #     self.err_maker.dump_option(option)
                 first_type = self.err_maker.dump_option(eval_expr(args[0], self.recorder))
                 second_type = self.err_maker.dump_option(eval_expr(args[1], self.recorder))
-                
+
                 if type_consistent(first_type, self.err_maker.dump_option(second_type.call(None))):
                     return Reach.RUNTIME_TRUE
                 else:
@@ -154,3 +156,17 @@ class ConditionInfer(BaseVisitor):
             return Reach.RUNTIME_TRUE
         else:
             return Reach.RUNTIME_FALSE
+
+    def infer_value_of_name_node(self, test: ast.Name):
+        option: Option = eval_expr(test, self.recorder)
+        tp = self.err_maker.dump_option(option)
+        if self.err_maker.exsit_error(option):
+            return Reach.UNKNOWN
+        if isinstance(tp, TypeLiteralIns):
+            if tp.value:
+                return Reach.RUNTIME_TRUE
+            else:
+                return Reach.RUNTIME_FALSE
+        else:
+            return Reach.UNKNOWN
+

@@ -56,6 +56,7 @@ class InferVisitor(BaseVisitor):
             self.recorder.set_type(target.id, comment)
         if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.recorder.set_type(name, comment)
         else:
             self.recorder.set_type(target.id, rtype)
 
