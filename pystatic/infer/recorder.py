@@ -1,7 +1,7 @@
 import ast
 from typing import List, Dict
 from pystatic.errorcode import SymbolUndefined, ErrorCode
-from pystatic.typesys import TypeIns, TypeType, any_type
+from pystatic.typesys import TypeIns, TypeType, any_type, TypeFuncIns
 from pystatic.option import Option
 from pystatic.symtable import SymTable
 
@@ -98,6 +98,8 @@ class SymbolRecorder:
         scope = self.cur_scope
         table: SymTable = scope.tp.get_inner_symtable()
         tp = table.legb_lookup(name)
+        # if isinstance(scope.tp, TypeFuncIns):
+        #     print(table.local)
         if tp:
             return tp
         assert False, f"undefined {name}"
@@ -120,6 +122,8 @@ class SymbolRecorder:
 
     def getattribute(self, name, node: ast.AST) -> Option:
         tp = self.get_run_time_type(name)
+        if name=="self":
+            print(tp.getattribute("hj", None).value)
         if tp:
             return Option(tp)
         else:

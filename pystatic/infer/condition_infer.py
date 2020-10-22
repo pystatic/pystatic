@@ -43,7 +43,7 @@ class ConditionInfer(BaseVisitor):
         self.reach_stack: List[Condition] = [Condition(ConditionStmtType.GLOBAL,
                                                        Reach.RUNTIME_TRUE)]
         self.break_flag = BreakFlag.NORMAL
-        self.break_node = None
+        self.break_node: Optional[ast.stmt] = None
 
     @property
     def cur_condition(self):
@@ -71,16 +71,21 @@ class ConditionInfer(BaseVisitor):
         if self.break_flag == BreakFlag.BREAK or self.break_flag == BreakFlag.CONTINUE:
             if outer_state != ConditionStmtType.IF:
                 self.break_flag = BreakFlag.NORMAL
+            else:
+                if self.cur_condition.reach == Reach.UNKNOWN:
+                    self.break_flag = BreakFlag.NORMAL
         elif self.break_flag == BreakFlag.RETURN:
             if outer_state == ConditionStmtType.FUNC:
                 self.break_flag = BreakFlag.NORMAL
-            elif outer_state == ConditionStmtType.LOOP:
-                self.break_flag = BreakFlag.RETURN
-            else:
-                assert False
+            elif self.cur_condition.reach == Reach.UNKNOWN:
+                # print("ejre")
+                self.break_flag = BreakFlag.NORMAL
 
     def get_break_node(self):
         return self.break_node
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        self.reach_stack.append(Condition(ConditionStmtType.FUNC, Reach.RUNTIME_TRUE))
 
     def visit_While(self, node: ast.While):
         reach = self.infer_value_of_condition(node.test)
@@ -93,20 +98,16 @@ class ConditionInfer(BaseVisitor):
         self.reach_stack.append(Condition(ConditionStmtType.IF, reach))
 
     def visit_Break(self, node: ast.Break):
-        for cond in self.reach_stack[::-1]:
-            if cond.stmt_type == ConditionStmtType.IF and cond.reach == Reach.UNKNOWN:
-                break
-            if cond.stmt_type == ConditionStmtType.LOOP:
-                self.break_flag = BreakFlag.BREAK
-                self.break_node = node
+        self.break_flag = BreakFlag.BREAK
+        self.break_node = node
+
+    def visit_Continue(self, node: ast.Continue):
+        self.break_flag = BreakFlag.CONTINUE
+        self.break_node = node
 
     def visit_Return(self, node: ast.Return):
-        for cond in self.reach_stack[::-1]:
-            if self.cur_condition.reach == Reach.UNKNOWN:
-                break
-            if self.cur_condition.stmt_type == ConditionStmtType.FUNC:
-                self.break_flag = BreakFlag.RETURN
-                self.break_node = node
+        self.break_flag = BreakFlag.RETURN
+        self.break_node = node
 
     def infer_value_of_condition(self, test: ast.expr) -> Reach:
         if isinstance(test, ast.Constant):
