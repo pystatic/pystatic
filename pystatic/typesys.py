@@ -1,5 +1,4 @@
 import ast
-from ast import dump
 import enum
 import copy
 from typing import (Any, Optional, Dict, List, Tuple, Union, TYPE_CHECKING,
@@ -48,6 +47,63 @@ class TypeTemp:
         rpos = self.name.rfind('.')
         return self.name[rpos + 1:]
 
+    # basic
+    def getattribute(
+            self,
+            name: str,
+            bindlist: BindList,
+            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        return None
+
+    def setattr(self, name: str, attr_type: 'TypeIns'):
+        assert False, "This function should be avoided because TypeClassTemp doesn't support it"
+
+    def getattr(self,
+                name: str,
+                bindlist: BindList,
+                context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        return self.getattribute(name, bindlist, context)
+
+    def call(self, applyargs: 'ApplyArgs',
+             bindlist: BindList) -> Option['TypeIns']:
+        call_option = Option(any_ins)
+        # TODO: add error for not callable
+        # call_option.add_err(...)
+        return call_option
+
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        # TODO: add error
+        return option_res
+
+    # magic operation functions(mgf is short for magic function).
+    def unaryop_mgf(self, bindlist: BindList, op: str,
+                    node: ast.UnaryOp) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        func = self.getattribute(op, bindlist)
+        if not func or not isinstance(func, TypeFuncIns):
+            # TODO: add warning here
+            return option_res
+
+        else:
+            applyargs = ApplyArgs()
+            return func.call(applyargs)
+
+    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
+                  node: ast.BinOp) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        func = self.getattribute(op, bindlist)
+        if not func or not isinstance(func, TypeFuncIns):
+            # TODO: add warning here
+            return option_res
+
+        else:
+            applyargs = ApplyArgs()
+            applyargs.add_arg(other, node)
+            return func.call(applyargs)
+
+    # some helper methods
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
 
@@ -107,62 +163,6 @@ class TypeTemp:
         """
         # TODO: check consistency
         return self.getins(bindlist)
-
-    # magic operation functions(mgf is short for magic function).
-    def unaryop_mgf(self, bindlist: BindList, op: str,
-                    node: ast.UnaryOp) -> Option['TypeIns']:
-        option_res = Option(any_ins)
-        func = self.getattribute(op, bindlist)
-        if not func or not isinstance(func, TypeFuncIns):
-            # TODO: add warning here
-            return option_res
-
-        else:
-            applyargs = ApplyArgs()
-            return func.call(applyargs)
-
-    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
-                  node: ast.BinOp) -> Option['TypeIns']:
-        option_res = Option(any_ins)
-        func = self.getattribute(op, bindlist)
-        if not func or not isinstance(func, TypeFuncIns):
-            # TODO: add warning here
-            return option_res
-
-        else:
-            applyargs = ApplyArgs()
-            applyargs.add_arg(other, node)
-            return func.call(applyargs)
-
-    # basic
-    def getattribute(
-            self,
-            name: str,
-            bindlist: BindList,
-            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        return None
-
-    def setattr(self, name: str, attr_type: 'TypeIns'):
-        assert False, "This function should be avoided because TypeClassTemp doesn't support it"
-
-    def getattr(self,
-                name: str,
-                bindlist: BindList,
-                context: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        return self.getattribute(name, bindlist, context)
-
-    def call(self, applyargs: 'ApplyArgs',
-             bindlist: BindList) -> Option['TypeIns']:
-        call_option = Option(any_ins)
-        # TODO: add error for not callable
-        # call_option.add_err(...)
-        return call_option
-
-    def getitem(self, item: GetItemType,
-                bindlist: BindList) -> Option['TypeIns']:
-        option_res = Option(any_ins)
-        # TODO: add error
-        return option_res
 
     # string expression
     def str_expr(self,
@@ -494,14 +494,38 @@ class TypeAnyTemp(TypeTemp):
     def __init__(self):
         super().__init__('Any', 'typing')
 
-    def get_default_typetype(self) -> 'TypeType':
-        return any_type
-
-    def get_default_ins(self) -> 'TypeIns':
+    # basic
+    def getattribute(self, name: str, bindlist: BindList,
+                     context: Optional[TypeContext]) -> Optional['TypeIns']:
         return any_ins
 
+    def call(self, applyargs: 'ApplyArgs',
+             bindlist: BindList) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    # magic operation functions
+    def unaryop_mgf(self, bindlist: BindList, op: str,
+                    node: ast.UnaryOp) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
+                  node: ast.BinOp) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    # some helper functions
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
         return Option(any_ins)
+
+    def get_typetype(self, bindlist: Optional[BindList],
+                     item: Optional[GetItemType]) -> Option['TypeType']:
+        return Option(any_type)
+
+    def get_default_typetype(self) -> 'TypeType':
+        return any_type
 
 
 class TypeNoneTemp(TypeTemp):
