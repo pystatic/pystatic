@@ -151,7 +151,7 @@ def update_symtable_import_cache(symtable: 'SymTable',
             cur_ins = TypePackageIns(temp)
         else:
             assert isinstance(temp, TypeModuleTemp)
-            cur_ins = temp.get_default_ins()
+            cur_ins = temp.get_default_ins().value
 
         cache.set_moduleins(cur_uri, cur_ins)
 
@@ -172,7 +172,7 @@ def update_symtable_import_cache(symtable: 'SymTable',
             else:
                 if i != len(urilist) - 1:
                     return None
-                res_ins = temp.get_default_ins()
+                res_ins = temp.get_default_ins().value
                 cur_ins.add_submodule(urilist[i], res_ins)
                 return res_ins
 
@@ -192,6 +192,6 @@ def update_symtable_import_cache(symtable: 'SymTable',
 
             if temp:
                 cur_ins.add_submodule(entry.origin_name,
-                                      temp.get_default_ins())
+                                      temp.get_default_ins().value)
 
     return cur_ins

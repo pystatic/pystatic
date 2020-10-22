@@ -1,4 +1,5 @@
 import ast
+from ast import dump
 import enum
 import copy
 from typing import (Any, Optional, Dict, List, Tuple, Union, TYPE_CHECKING,
@@ -54,24 +55,32 @@ class TypeTemp:
                      bindlist: Optional[BindList] = None,
                      item: Optional[GetItemType] = None) -> Option['TypeType']:
         """Mainly used for TypeType to generate correct TypeType"""
+        res_option = Option(any_type)
         if not item:
             return Option(TypeType(self, None))
         else:
             if isinstance(item.ins, (tuple, list)):
                 tpins_list: List[TypeIns] = []
-                for item in item.ins:
-                    if isinstance(item.ins, TypeIns):
-                        tpins_list.append(item.ins)
+                for singleitem in item.ins:
+                    cur_ins = singleitem.ins
+                    if isinstance(cur_ins, TypeType):
+                        tpins = cur_ins.getins(res_option)  # type: ignore
+                        tpins_list.append(tpins)
+                    elif isinstance(cur_ins, TypeIns):
+                        tpins_list.append(cur_ins)
                     else:
                         # TODO: add warning here
                         pass
-                return Option(TypeType(self, tpins_list))
+                res_option.value = TypeType(self, tpins_list)
+
             else:
                 if isinstance(item.ins, TypeIns):
-                    return Option(TypeType(self, [item.ins]))
+                    res_option.value = TypeType(self, [item.ins])
                 else:
                     # TODO: add warning here
-                    return Option(TypeType(self, None))
+                    res_option.value = TypeType(self, None)
+
+        return res_option
 
     def get_default_typetype(self) -> 'TypeType':
         return self.get_typetype(None, None).value
@@ -242,9 +251,15 @@ class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
         super().__init__(temp, bindlist)
 
-    def getins(self) -> Option['TypeIns']:
-        """Get TypeIns from TypeType"""
-        return self.temp.getins(self.bindlist)
+    def getins(self, typetype_option: Option['TypeIns']) -> 'TypeIns':
+        """Get TypeIns from TypeType
+
+        all errors will be stored in typetype_option.
+        """
+        ins_option = self.temp.getins(self.bindlist)
+        typetype_option.combine_error(ins_option)
+
+        return ins_option.value
 
     def getattribute(
             self,
@@ -321,9 +336,8 @@ class TypeVarTemp(TypeTemp):
             default_ins.bound = None
             for rangenode in applyargs.args[args_rear:]:
                 assert isinstance(rangenode.ins, TypeType), "expect typetype"
-                range_option = rangenode.ins.getins()
-                ins_option.combine_error(range_option)
-                default_ins.constrains.append(range_option.value)
+                rangeins = rangenode.ins.getins(ins_option)
+                default_ins.constrains.append(rangeins)
 
         cova = applyargs.kwargs.get('covariant')
         if not cova:
@@ -486,8 +500,8 @@ class TypeAnyTemp(TypeTemp):
     def get_default_ins(self) -> 'TypeIns':
         return any_ins
 
-    def getins(self, bindlist: BindList) -> 'TypeIns':
-        return any_ins
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        return Option(any_ins)
 
 
 class TypeNoneTemp(TypeTemp):
@@ -587,7 +601,7 @@ class TypePackageType(TypeType):
     def __init__(self, temp: TypePackageTemp) -> None:
         super().__init__(temp, None)
 
-    def getins(self) -> 'TypeIns':
+    def getins(self, typetype_option: Option['TypeIns']) -> 'TypeIns':
         assert isinstance(self.temp, TypePackageTemp)
         return TypePackageIns(self.temp)
 

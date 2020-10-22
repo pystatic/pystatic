@@ -266,7 +266,9 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
         if is_classmethod:
             argument.args[0].ann = clstemp.get_default_typetype()
         elif not is_staticmethod:
-            argument.args[0].ann = clstemp.get_default_ins()
+            default_ins_option = clstemp.get_default_ins()
+            default_ins_option.dump_to_box(mbox)
+            argument.args[0].ann = default_ins_option.value
 
     def add_def(node: ast.FunctionDef) -> TypeFuncIns:
         nonlocal symtable, new_fun_defs, mbox

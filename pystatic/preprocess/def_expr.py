@@ -28,9 +28,8 @@ def eval_typedef_annotation(node: TypeDefNode,
     res_option = eval_typedef_expr(node, symtable)
     res_type = res_option.value
     if isinstance(res_type, TypeType):
-        ins_option = res_type.getins()
-        res_option.value = ins_option.value
-        res_option.combine_error(ins_option)
+        tpins = res_type.getins(res_option)
+        res_option.value = tpins
     return res_option
 
 
