@@ -12,7 +12,7 @@ from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer import op_map
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
-from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any
+from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any, type_consistent
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,7 @@ class InferVisitor(BaseVisitor):
         return option.value
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
-        res = self.type_comparator.TypeCompatible(ltype, rtype)
-        print(f"type compatible of '{ltype}' and '{rtype}' is {res}")
-        return res
+        return type_consistent(ltype, rtype)
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
@@ -92,12 +90,13 @@ class InferVisitor(BaseVisitor):
 
     def check_name_node_of_annassign(self, target: ast.Name, rnode, rtype):
         name = target.id
-        ltype = self.recorder.get_comment_type(name)
+        comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):  # var appear first time
-            self.recorder.set_type(name, ltype)
+            self.recorder.set_type(name, comment)
 
-        if not self.type_consistent(ltype, rtype):
-            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
+        if not self.type_consistent(comment, rtype):
+            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.recorder.set_type(name, comment)
         else:
             self.recorder.set_type(name, rtype)
 

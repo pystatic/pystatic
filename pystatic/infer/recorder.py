@@ -10,19 +10,9 @@ class Scope:
     def __init__(self, tp: TypeIns):
         self.type_map: Dict[str, TypeIns] = {}
         self.tp = tp
-        self.buffer: Dict[str, TypeIns] = {}
 
     def set_type(self, name: str, tp: TypeIns):
         self.type_map[name] = tp
-
-    def add_buffer(self, name, tp):
-        old_tp = self.type_map[name]
-        self.type_map[name] = tp
-        self.buffer[name] = old_tp
-
-    def release_buffer(self, name):
-        self.type_map[name] = self.buffer[name]
-
 
 class FuncScope(Scope):
     def __init__(self, tp: TypeIns, args: Dict[str, TypeIns],
@@ -95,18 +85,10 @@ class SymbolRecorder:
     def set_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)
 
-    def add_buffer(self, name, tp):
-        self.cur_scope.add_buffer(name, tp)
-
-    def release_buffer(self, name):
-        self.cur_scope.release_buffer(name)
-
     def get_comment_type(self, name) -> TypeIns:
         scope = self.cur_scope
         table: SymTable = scope.tp.get_inner_symtable()
         tp = table.legb_lookup(name)
-        # if isinstance(scope.tp, TypeFuncIns):
-        #     print(table.local)
         if tp:
             return tp
         assert False, f"undefined {name}"
@@ -129,8 +111,6 @@ class SymbolRecorder:
 
     def getattribute(self, name, node: ast.AST) -> Option:
         tp = self.get_run_time_type(name)
-        if name == "self":
-            print(tp.getattribute("hj", None).value)
         if tp:
             return Option(tp)
         else:

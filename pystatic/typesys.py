@@ -573,6 +573,7 @@ class TypeLiteralIns(TypeIns):
         self.value = value
 
     def __str__(self):
+        # return f"literal[{type(self.value).__name__}]"
         return type(self.value).__name__
 
 
