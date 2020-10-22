@@ -225,7 +225,7 @@ class TypeDefVisitor(BaseVisitor):
                     typing_temp = self.worker.get_module_temp('typing')
 
                 if typing_temp:
-                    if infoitem.is_import_module:
+                    if infoitem.is_import_module():
                         self.symtable.add_entry(
                             'typing', Entry(typing_temp.get_default_ins(),
                                             node))
