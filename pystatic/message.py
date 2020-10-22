@@ -1,6 +1,6 @@
 import ast
 from typing import Optional, List, TYPE_CHECKING
-from pystatic.errorcode import ErrorCode
+from pystatic.errorcode import ErrorCode, CodeUnreachable
 from pystatic.option import Option
 
 if TYPE_CHECKING:
@@ -98,5 +98,12 @@ class ErrorMaker:
     def exsit_error(self, option: Option) -> bool:
         return len(option.errors) != 0
 
-    def generate_code_unreachable_error(self, code_frag: List[ast.AST]):
-        pass
+    def generate_code_unreachable_error(self, code_frag: List[ast.stmt]):
+        if len(code_frag) == 0:
+            return
+
+        begin = code_frag[0]
+        end = code_frag[-1]
+        begin.end_lineno = end.end_lineno
+        begin.end_col_offset = end.end_col_offset
+        self.add_err(CodeUnreachable(begin))
