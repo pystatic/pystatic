@@ -25,11 +25,13 @@ def eval_typedef_expr(node: TypeDefNode,
 
 def eval_typedef_annotation(node: TypeDefNode,
                             symtable: SymTable) -> Option[TypeIns]:
-    option_res = eval_typedef_expr(node, symtable)
-    res_type = option_res.value
+    res_option = eval_typedef_expr(node, symtable)
+    res_type = res_option.value
     if isinstance(res_type, TypeType):
-        option_res.value = res_type.getins()
-    return option_res
+        ins_option = res_type.getins()
+        res_option.value = ins_option.value
+        res_option.combine_error(ins_option)
+    return res_option
 
 
 def eval_str_type(s: str, symtable: SymTable) -> Option[TypeIns]:
@@ -38,13 +40,13 @@ def eval_str_type(s: str, symtable: SymTable) -> Option[TypeIns]:
         if hasattr(treenode, 'body'):
             return eval_expr(treenode.body, symtable)  # type: ignore
         else:
-            option_res = Option(any_ins)
+            res_option = Option(any_ins)
             # TODO: add error here
-            return option_res
+            return res_option
     except SyntaxError:
-        option_res = Option(any_ins)
+        res_option = Option(any_ins)
         # TODO: add error here
-        return option_res
+        return res_option
 
 
 def eval_assign_type(node: Union[ast.Assign, ast.AnnAssign],
@@ -65,25 +67,25 @@ def eval_assign_type(node: Union[ast.Assign, ast.AnnAssign],
 def eval_func_type(node: ast.FunctionDef,
                    symtable: SymTable) -> Option[TypeIns]:
     """Get a function's type according to a ast.FunctionDef node"""
-    option_argument = eval_argument_type(node.args, symtable)
-    argument = option_argument.value
+    argument_option = eval_argument_type(node.args, symtable)
+    argument = argument_option.value
 
     inner_sym = symtable.new_symtable(node.name, TableScope.FUNC)
     fun_ins = TypeFuncIns(node.name, symtable.glob_uri, inner_sym, argument,
                           any_ins)
 
     if node.returns:
-        option_return = eval_typedef_annotation(node.returns, symtable)
-        ret_ins = option_return.value
+        return_option = eval_typedef_annotation(node.returns, symtable)
+        ret_ins = return_option.value
     else:
         ret_ins = any_ins
 
     fun_ins = TypeFuncIns(node.name, symtable.glob_uri, inner_sym, argument,
                           ret_ins)
-    option_res = Option(fun_ins)
-    option_res.combine_error(option_argument)
+    res_option = Option(fun_ins)
+    res_option.combine_error(argument_option)
 
-    return option_res
+    return res_option
 
 
 def eval_return_type(node: Optional[TypeDefNode],
@@ -105,14 +107,14 @@ def eval_argument_type(node: ast.arguments,
     order_arg: List[Arg] = []
     order_kwarg: List[Arg] = []
 
-    option_res = Option(new_args)
+    res_option = Option(new_args)
 
     # parse a list of args
     def add_to_list(target_list, order_list, args):
-        nonlocal option_res
+        nonlocal res_option
         for arg in args:
             option_gen_arg = eval_arg_type(arg, symtable)
-            option_res.combine_error(option_gen_arg)
+            res_option.combine_error(option_gen_arg)
             gen_arg = option_gen_arg.value
             assert isinstance(gen_arg, Arg)
             target_list.append(gen_arg)
@@ -125,16 +127,16 @@ def eval_argument_type(node: ast.arguments,
     # *args exists
     if node.vararg:
         option_vararg = eval_arg_type(node.vararg, symtable)
-        option_res.combine_error(option_vararg)
+        res_option.combine_error(option_vararg)
         result = option_vararg.value
         result.name = '*' + result.name
         new_args.vararg = result
 
     # **kwargs exists
     if node.kwarg:
-        option_kwarg = eval_arg_type(node.kwarg, symtable)
-        option_res.combine_error(option_kwarg)
-        result = option_kwarg.value
+        kwarg_option = eval_arg_type(node.kwarg, symtable)
+        res_option.combine_error(kwarg_option)
+        result = kwarg_option.value
         result.name = '**' + result.name
         new_args.kwarg = result
 
@@ -146,18 +148,18 @@ def eval_argument_type(node: ast.arguments,
         arg.valid = True
         arg.default = value  # TODO: add type check here(here value is a node represent an expression)
 
-    return option_res
+    return res_option
 
 
 def eval_arg_type(node: ast.arg, symtable: SymTable) -> Option[Arg]:
     """Generate an Arg instance according to an ast.arg node"""
     new_arg = Arg(node.arg)
-    option_res = Option(new_arg)
+    res_option = Option(new_arg)
     if node.annotation:
-        option_ann = eval_typedef_annotation(node.annotation, symtable)
-        option_res.combine_error(option_ann)
-        new_arg.ann = option_ann.value
-    return option_res
+        ann_option = eval_typedef_annotation(node.annotation, symtable)
+        res_option.combine_error(ann_option)
+        new_arg.ann = ann_option.value
+    return res_option
 
 
 TAddFunDef = Callable[[ast.FunctionDef], TypeFuncIns]
@@ -171,11 +173,11 @@ def template_resolve_fun(symtable: 'SymTable', add_func_define: TAddFunDef,
     """Template to resolve functions"""
     def get_arg_ret(node: ast.FunctionDef):
         """Get the argument and return type of the function"""
-        option_argument = eval_argument_type(node.args, symtable)
-        option_return = eval_return_type(node.returns, symtable)
-        option_argument.dump_to_box(mbox)
-        option_return.dump_to_box(mbox)
-        return option_argument.value, option_return.value
+        argument_option = eval_argument_type(node.args, symtable)
+        return_option = eval_return_type(node.returns, symtable)
+        argument_option.dump_to_box(mbox)
+        return_option.dump_to_box(mbox)
+        return argument_option.value, return_option.value
 
     fake_data = get_fake_data(symtable)
     for name, entry in fake_data.fun.items():

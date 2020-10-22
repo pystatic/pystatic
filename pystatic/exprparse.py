@@ -60,9 +60,9 @@ class ExprParser(NoGenVisitor):
         self.errors = []
         tpins = self.visit(node)
         assert isinstance(tpins, TypeIns)
-        option_res = Option(tpins)
-        option_res.add_errlist(self.errors)
-        return option_res
+        res_option = Option(tpins)
+        res_option.add_errlist(self.errors)
+        return res_option
 
     def visit_Name(self, node: ast.Name) -> TypeIns:
         name_option = self.consultant.getattribute(node.id, node)
@@ -106,7 +106,6 @@ class ExprParser(NoGenVisitor):
             applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
         call_option = left_ins.call(applyargs)
 
-
         self.add_err(call_option.errors)
 
         self.add_to_container(call_option.value, node)
@@ -118,12 +117,12 @@ class ExprParser(NoGenVisitor):
 
         op = unaryop_map.get(type(node.op))
         assert op, f"{node.op} is not supported now"
-        option_res = operand_ins.unaryop_mgf(op, node)
+        res_option = operand_ins.unaryop_mgf(op, node)
 
-        self.add_err(option_res.errors)
+        self.add_err(res_option.errors)
 
-        self.add_to_container(option_res.value, node)
-        return option_res.value
+        self.add_to_container(res_option.value, node)
+        return res_option.value
 
     def visit_BinOp(self, node: ast.BinOp) -> TypeIns:
         left_ins = self.visit(node.left)
@@ -133,12 +132,12 @@ class ExprParser(NoGenVisitor):
 
         op = binop_map.get(type(node.op))
         assert op, f"{node.op} is not supported now"
-        option_res = left_ins.binop_mgf(op, right_ins, node)
+        res_option = left_ins.binop_mgf(op, right_ins, node)
 
-        self.add_err(option_res.errors)
+        self.add_err(res_option.errors)
 
-        self.add_to_container(option_res.value, node)
-        return option_res.value
+        self.add_to_container(res_option.value, node)
+        return res_option.value
 
     def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
         left_ins = self.visit(node.value)

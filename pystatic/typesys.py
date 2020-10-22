@@ -75,10 +75,10 @@ class TypeTemp:
     def get_default_typetype(self) -> 'TypeType':
         return self.get_typetype(None, None).value
 
-    def getins(self, bindlist: BindList) -> 'TypeIns':
-        return TypeIns(self, bindlist)
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        return Option(TypeIns(self, bindlist))
 
-    def get_default_ins(self) -> 'TypeIns':
+    def get_default_ins(self) -> Option['TypeIns']:
         return self.getins(None)
 
     def get_type_attribute(
@@ -91,7 +91,12 @@ class TypeTemp:
 
     def init_ins(self, applyargs: 'ApplyArgs',
                  bindlist: BindList) -> Option['TypeIns']:
-        return Option(self.getins(bindlist))
+        """Initialize an instance
+
+        used when __init__ method should be called.
+        """
+        # TODO: check consistency
+        return self.getins(bindlist)
 
     # magic operation functions(mgf is short for magic function).
     def unaryop_mgf(self, bindlist: BindList, op: str,
@@ -236,11 +241,9 @@ class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
         super().__init__(temp, bindlist)
 
-    def getins(self) -> 'TypeIns':
+    def getins(self) -> Option['TypeIns']:
+        """Get TypeIns from TypeType"""
         return self.temp.getins(self.bindlist)
-
-    def call(self, args) -> 'TypeIns':
-        return self.getins()
 
     def getattribute(
             self,
@@ -317,6 +320,7 @@ class TypeVarTemp(TypeTemp):
             default_ins.bound = None
             for rangenode in applyargs.args[args_rear:]:
                 assert isinstance(rangenode.ins, TypeType), "expect typetype"
+                option_range = 
                 default_ins.constrains.append(rangenode.ins.getins())
 
         cova = applyargs.kwargs.get('covariant')

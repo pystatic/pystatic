@@ -113,9 +113,9 @@ def _resolve_cls_inh(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     defnode = get_cls_defnode(clstemp)
 
     for base_node in defnode.bases:
-        option_base = eval_typedef_expr(base_node, symtable)
-        option_base.dump_to_box(mbox)
-        res_type = option_base.value
+        base_option = eval_typedef_expr(base_node, symtable)
+        base_option.dump_to_box(mbox)
+        res_type = base_option.value
         assert isinstance(res_type, TypeType)
         if res_type:
             add_baseclass(clstemp, res_type)
@@ -201,18 +201,18 @@ class _TypeVarVisitor(BaseVisitor):
                 self.typevars.append(tpvarins)
 
     def visit_Name(self, node: ast.Name):
-        option_name = eval_expr(node, self.symtable)
-        if isinstance(option_name.value, TypeVarIns):
-            self.add_tpvar(option_name.value)
-        option_name.dump_to_box(self.mbox)
-        return option_name.value
+        name_option = eval_expr(node, self.symtable)
+        if isinstance(name_option.value, TypeVarIns):
+            self.add_tpvar(name_option.value)
+        name_option.dump_to_box(self.mbox)
+        return name_option.value
 
     def visit_Attribute(self, node: ast.Attribute):
         left_value = self.visit(node.value)
         assert isinstance(left_value, TypeIns)
-        option_res = left_value.getattribute(node.attr, node)
-        option_res.dump_to_box(self.mbox)
-        res = option_res.value
+        res_option = left_value.getattribute(node.attr, node)
+        res_option.dump_to_box(self.mbox)
+        res = res_option.value
         if isinstance(res, TypeVarIns):
             self.add_tpvar(res)
         return res
@@ -270,14 +270,14 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
 
     def add_def(node: ast.FunctionDef) -> TypeFuncIns:
         nonlocal symtable, new_fun_defs, mbox
-        option_argument = eval_argument_type(node.args, symtable)
-        option_return = eval_return_type(node.returns, symtable)
+        argument_option = eval_argument_type(node.args, symtable)
+        return_option = eval_return_type(node.returns, symtable)
 
-        option_argument.dump_to_box(mbox)
-        option_return.dump_to_box(mbox)
+        argument_option.dump_to_box(mbox)
+        return_option.dump_to_box(mbox)
 
-        argument = option_argument.value
-        ret_ins = option_return.value
+        argument = argument_option.value
+        ret_ins = return_option.value
 
         name = node.name
         is_classmethod, is_staticmethod = get_method_kind(node)
@@ -324,10 +324,10 @@ def _resolve_cls_attr(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
         symtb = tp_attr.get('symtable')  # type: ignore
         assert typenode
         assert symtb
-        option_var = eval_typedef_expr(typenode, symtb)
-        var_ins = option_var.value
+        var_option = eval_typedef_expr(typenode, symtb)
+        var_ins = var_option.value
 
-        option_var.dump_to_box(mbox)
+        var_option.dump_to_box(mbox)
 
         true_var_attr[name] = var_ins
 

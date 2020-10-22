@@ -155,13 +155,13 @@ class SymTable:
         support the getattribute interface.
         """
         from pystatic.typesys import any_ins  # avoid import circle
-        option_res = Option(any_ins)
+        res_option = Option(any_ins)
         res = self.lookup(name)
         if not res:
-            option_res.add_err(SymbolUndefined(node, name))
+            res_option.add_err(SymbolUndefined(node, name))
         else:
-            option_res.set_value(res)
-        return option_res
+            res_option.set_value(res)
+        return res_option
 
     def lookup_local_entry(self, name: str) -> Optional['Entry']:
         return self.local.get(name)
