@@ -1,6 +1,6 @@
 import ast
 import logging
-from typing import Optional
+from typing import Optional, Set
 from pystatic.typesys import *
 from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
@@ -134,11 +134,14 @@ class InferVisitor(BaseVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.cond_infer.accept(node)
+
         func_type: TypeIns = self.recorder.get_comment_type(node.name)
         self.recorder.set_type(node.name, func_type)
         argument, ret_annotation = self.err_maker.dump_option(func_type.call(None))
         self.recorder.enter_func(func_type, self.infer_argument(argument), ret_annotation)
         self.accept_condition_stmt_list(node.body, ConditionStmtType.FUNC)
+
+        self.infer_return_value_of_func(node.returns)
         self.recorder.leave_func()
         self.cond_infer.pop()
 
@@ -157,6 +160,17 @@ class InferVisitor(BaseVisitor):
         if vararg:
             args[vararg.name] = vararg.ann
         return args
+
+    def infer_return_value_of_func(self, node):
+        ret_set = self.recorder.get_ret_type()
+        ret_list = list(ret_set)
+        ret_annotation = self.recorder.get_ret_annotation()
+        num = len(ret_list)
+        if num == 0:
+            self.err_maker.add_err(ReturnValueExpected(node))
+        else:
+            # TODO
+            pass
 
     def visit_Return(self, node: ast.Return):
         self.cond_infer.accept(node)
@@ -224,7 +238,7 @@ class InferStarter:
     def start_infer(self):
         for uri, target in self.sources.items():
             logger.info(f'Type infer in module \'{uri}\'')
-            print(target.module_temp.getattribute('A', None).getattribute('hj', None).value)
+            # print(target.module_temp.getattribute('A', None).getattribute('hj', None).value)
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox)
             infer_visitor.infer()

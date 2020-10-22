@@ -3,7 +3,7 @@ import contextlib
 from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
-from pystatic.typesys import TypeIns, TypeLiteralIns
+from pystatic.typesys import TypeIns, TypeLiteralIns, none_type
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map
@@ -183,3 +183,8 @@ class ExprParser(NoGenVisitor):
 
     def visit_Index(self, node: ast.Index):
         return self.visit(node.value)
+
+    def visit_NoneType(self, node):
+        return none_type
+
+
