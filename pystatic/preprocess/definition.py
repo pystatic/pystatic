@@ -77,6 +77,9 @@ class TypeDefVisitor(BaseVisitor):
             if attr in inner_sym.local:
                 return
 
+            if attr in self.clstemp.var_attr:
+                return
+
             tmp_attr = {
                 'node': node,
                 'symtable': self.symtable,
