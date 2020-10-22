@@ -14,8 +14,6 @@ from pystatic.message import MessageBox
 from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,
                                           template_resolve_fun)
 
-logger = logging.getLogger(__name__)
-
 
 def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
     """Resolve local symbols' TypeIns"""
@@ -34,7 +32,6 @@ def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
         option_tpins.dump_to_box(mbox)
 
         new_entry[name] = Entry(tpins, defnode)
-        logger.debug(f'({symtable.uri}) {name}: {tpins}')
 
     symtable.local.update(new_entry)
 
@@ -61,15 +58,11 @@ def resolve_local_func(symtable: 'SymTable', mbox: 'MessageBox'):
         new_func_defs[name] = func_ins
 
         symtable.local[name] = Entry(func_ins, node)
-        logger.debug(f'({symtable.uri}) {name}: {func_ins.str_expr(None)}')
         return func_ins
 
     def add_func_overload(func_ins: TypeFuncIns, argument: Argument,
                           ret: TypeIns, node: ast.FunctionDef):
         func_ins.add_overload(argument, ret)
-        logger.debug(
-            f'overload ({symtable.uri}) {node.name}: {func_ins.str_expr(None)}'
-        )
 
     template_resolve_fun(symtable, add_func_define, add_func_overload, mbox)
     symtable._func_defs = new_func_defs

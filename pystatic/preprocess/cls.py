@@ -27,8 +27,6 @@ if TYPE_CHECKING:
     from pystatic.symtable import SymTable
     from pystatic.preprocess.main import Preprocessor
 
-logger = logging.getLogger(__name__)
-
 
 def resolve_cls_def(targets: List['BlockTarget'], worker: 'Preprocessor'):
     """Get class definition information(inheritance, placeholders)"""
@@ -298,7 +296,6 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
             targets.append(MethodTarget(method_uri, symtb, clstemp, node,
                                         mbox))
 
-        logger.debug(f'({symtable.uri}) {name}: {func_ins}')
         return func_ins
 
     def add_overload(ins: TypeFuncIns, args: Argument, ret: TypeIns,
@@ -306,8 +303,6 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(args, is_classmethod, is_staticmethod)
         ins.add_overload(args, ret)
-        logger.debug(
-            f'overload ({symtable.uri}) {node.name}: {ins.str_expr(None)}')
 
     template_resolve_fun(symtable, add_def, add_overload, mbox)
     symtable._func_defs = new_fun_defs
@@ -335,6 +330,5 @@ def _resolve_cls_attr(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
         option_var.dump_to_box(mbox)
 
         true_var_attr[name] = var_ins
-        logger.debug(
-            f'add attribute {name}: {var_ins} to {clstemp.str_expr(None)}')
+
     clstemp.var_attr = true_var_attr

@@ -70,6 +70,15 @@ class Preprocessor:
 
         self.process_block(fresh_targets, True)  # type: ignore
 
+    def is_module(self, uri: 'Uri') -> bool:
+        """Whether a uri represents a module"""
+        find_res = self.finder.find(uri)
+
+        if not find_res:
+            return False
+        else:
+            return True
+
     def get_module_temp(self, uri: 'Uri') -> Optional[TypeModuleTemp]:
         if uri in self.targets:
             return self.targets[uri].module_temp

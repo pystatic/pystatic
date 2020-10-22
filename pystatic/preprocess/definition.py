@@ -15,8 +15,6 @@ if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
     from pystatic.target import BlockTarget, MethodTarget
 
-logger = logging.getLogger(__name__)
-
 
 def get_definition(target: 'BlockTarget', worker: 'Preprocessor',
                    mbox: 'MessageBox'):
@@ -73,7 +71,7 @@ class TypeDefVisitor(BaseVisitor):
             # on class template's var_attr
             assert self.clstemp
             inner_sym = self.clstemp.get_inner_symtable()
-            fake_data = try_fake_data(inner_sym)
+            fake_data = try_get_fake_data(inner_sym)
             if fake_data and attr in fake_data.local:
                 return
             if attr in inner_sym.local:
@@ -140,14 +138,12 @@ class TypeDefVisitor(BaseVisitor):
 
             tpvarins.tpvar_name = last_target.id
             self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
-            logger.debug(f'TypeVar {tpvarins.tpvar_name}')
 
         else:
             for target in node.targets:
                 name = self._is_new_def(target)
                 if name:
                     add_local_var(self.symtable, name, node)
-                    logger.debug(f'add variable {name}')
                 elif self._is_method:
                     self._try_attr(node, target)
 
@@ -205,12 +201,15 @@ class TypeDefVisitor(BaseVisitor):
         self._add_import_info(node, info_list)
 
     def _add_import_info(self, node: 'ImportNode',
-                         info_list: List[ImportInfoItem]):
+                         info_list: List[fake_impt_entry]):
         """Add import information to the symtable.
 
         info_list:
             import information dict returned by split_import_stmt.
         """
+        fake_data = get_fake_data(self.symtable)
+        self.symtable.import_cache.add_import_node(node)
+
         read_typing = False  # flag, if True typing module has been read
         typing_temp = None
         for infoitem in info_list:
@@ -236,8 +235,14 @@ class TypeDefVisitor(BaseVisitor):
                             self.symtable.add_entry(infoitem.asname,
                                                     Entry(tpins, node))
                             continue
+
             self.worker.add_cache_target_uri(infoitem.uri)
-            add_import(self.symtable, infoitem, node)
+            if not infoitem.is_import_module():
+                origin_uri = infoitem.uri + f'.{infoitem.origin_name}'
+                if self.worker.is_module(origin_uri):
+                    self.worker.add_cache_target_uri(origin_uri)
+
+            fake_data.impt[infoitem.asname] = infoitem
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         add_fun_def(self.symtable, node.name, node)
