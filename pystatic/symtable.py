@@ -1,5 +1,6 @@
 import ast
 import enum
+from pystatic.uri import Uri, uri2list
 from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
 from pystatic.option import Option
 from pystatic.errorcode import *
@@ -7,7 +8,6 @@ from pystatic.errorcode import *
 if TYPE_CHECKING:
     from pystatic.typesys import (TypeIns, TypeClassTemp, TypeTemp,
                                   TypeFuncIns)
-    from pystatic.uri import Uri
 
 
 class TableScope(enum.Enum):
@@ -36,7 +36,45 @@ class Entry:
         return self._defnode
 
     def __str__(self):
-        return str(self._tp)
+        return str(self.get_type())
+
+
+class ImportCache:
+    __slots__ = ['import_nodes', 'import_map']
+
+    def __init__(self) -> None:
+        self.import_nodes: List['ImportNode'] = []
+        self.import_map: Dict[str, 'TypeIns'] = {}
+
+    def get_moduleins(self, absuri: 'Uri') -> Optional['TypeIns']:
+        from pystatic.typesys import TypePackageIns, TypeModuleTemp
+
+        urilist = uri2list(absuri)
+        if not urilist:
+            return None
+        cur_ins = self.import_map.get(urilist[0], None)
+
+        for i in range(1, len(urilist)):
+            if not cur_ins:
+                return None
+
+            if isinstance(cur_ins, TypePackageIns):
+                cur_ins = cur_ins.submodule.get(urilist[i], None)
+            else:
+                assert isinstance(cur_ins.temp, TypeModuleTemp)
+                if i == len(urilist) - 1:
+                    return cur_ins
+                else:
+                    return None
+
+        return cur_ins
+
+    def set_moduleins(self, absuri: 'Uri', modins: 'TypeIns'):
+        self.import_map[absuri] = modins
+
+    def add_import_node(self, node: 'ImportNode'):
+        self.import_nodes.append(node)
+
 
 class SymTable:
     def __init__(self, uri: 'Uri', glob: 'SymTable',
@@ -51,14 +89,13 @@ class SymTable:
 
         self.scope = scope
 
+        self.import_cache = ImportCache()
+
         # inner data structure to store important information about this
         # symtable, used heavily in the preprocess stage.
         self._cls_defs: Dict[str, 'TypeClassTemp'] = {}
         self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
         self._func_defs: Dict[str, 'TypeFuncIns'] = {}
-
-        self._import_nodes: List[ImportNode] = []
-        self._import_tree: Dict[str, 'TypeIns'] = {}
 
     @property
     def glob_uri(self):
