@@ -34,7 +34,7 @@ class Config:
                                            sys.version_info.minor)
 
         # cwd
-        self.cwd: str = os.getcwd()
+        self.cwd: str = get('cwd', str) or os.getcwd()
 
         # manual path
         self.manual_path: List[str] = get('manual_path') or []

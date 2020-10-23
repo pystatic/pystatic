@@ -1,11 +1,13 @@
 import os
+from os.path import abspath
 from pystatic.config import PY_VERSION
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pystatic.symid import symid2list, absolute_symidlist, list2symid
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeModuleTemp
-    from pystatic.config import PY_VERSION
+    from pystatic.config import PY_VERSION, Config
+    from pystatic.symid import SymId
 
 FilePath = str
 
@@ -30,7 +32,7 @@ class Node:
         self.child: Dict[str, Node] = {}
 
 
-class ModuleFinder:
+class Filesys:
     """PEP 561
 
     - Stubs or Python source manually put at the beginning of the path($MYPYPATH)
@@ -39,26 +41,42 @@ class ModuleFinder:
     - Inline packages.
     - Typeshed.
     """
-    def __init__(self, manual_path: List[str], sitepkg: List[str],
-                 typeshed: Optional[str], py_version: PY_VERSION):
-        self.manual_path = manual_path
+    def __init__(self, config: 'Config') -> None:
+        self.manual_path = config.manual_path
         self.user_path = []
-        self.sitepkg = sitepkg
+        self.sitepkg = config.sitepkg
+        self.py_version = config.python_version
 
-        if typeshed:
-            self.typeshed = _resolve_typeshed(typeshed, py_version)
+        if config.typeshed:
+            self.typeshed = _resolve_typeshed(config.typeshed, self.py_version)
         else:
             self.typeshed = []
+
+        self.cwd = config.cwd
 
         # dummy namespace on the root
         self.dummy_ns = ModuleFindRes(ModuleFindRes.Namespace, [], None)
         self.root = Node(self.dummy_ns)
 
+        self.path_symid_map: Dict[FilePath, 'SymId'] = {}
+
+    def abspath(self, path: FilePath) -> FilePath:
+        return os.path.normpath(os.path.join(self.cwd, path))
+
+    def realpath(self, path: FilePath) -> FilePath:
+        return os.path.realpath(self.abspath(path))
+
+    def add_path_symid_map(self, path: FilePath, symid: 'SymId'):
+        self.path_symid_map[path] = symid
+
+    def path_to_symid(self, path: FilePath) -> Optional['SymId']:
+        return self.path_symid_map.get(self.abspath(path))
+
     def add_userpath(self, path: str):
         if path not in self.user_path:
             self.user_path.append(path)
 
-    def find(self, symid: str) -> Optional[ModuleFindRes]:
+    def find_module(self, symid: str) -> Optional[ModuleFindRes]:
         symidlist = symid2list(symid)
         if not symidlist:
             return None
@@ -81,10 +99,11 @@ class ModuleFinder:
 
         return cur_res
 
-    def relative_find(self, symid: str,
-                      module: 'TypeModuleTemp') -> Optional[ModuleFindRes]:
+    def relative_find_module(
+            self, symid: str,
+            module: 'TypeModuleTemp') -> Optional[ModuleFindRes]:
         abs_symid = symidlist_from_impitem(symid, module)
-        return self.find(list2symid(abs_symid))
+        return self.find_module(list2symid(abs_symid))
 
 
 def _walk_single(subsymid: str, paths: List[str]) -> Optional[ModuleFindRes]:

@@ -2,14 +2,14 @@ import os
 import logging
 from collections import deque
 from typing import Optional, Dict, TYPE_CHECKING
-from pystatic.typesys import TypeModuleTemp, TypePackageTemp
+from pystatic.typesys import TypeModuleTemp, TypePackageTemp, TypeIns
 from pystatic.message import MessageBox
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
                                  get_init_module_symtable)
 from pystatic.config import Config
-from pystatic.fsys import ModuleFinder, FilePath, ModuleFindRes
-from pystatic.symid import SymId, relpath2symid
+from pystatic.fsys import Filesys, FilePath, ModuleFindRes
+from pystatic.symid import SymId, relpath2symid, symid2list
 from pystatic.target import BlockTarget, Target, Stage
 from pystatic.infer.infer import InferStarter
 from pystatic.option import Option
@@ -25,11 +25,8 @@ class Manager:
     def __init__(self, config: Config):
         self.config = config
 
-        self.module_finder = ModuleFinder(self.config.manual_path,
-                                          self.config.sitepkg,
-                                          self.config.typeshed,
-                                          self.config.python_version)
-        self.path_symid_map: Dict[FilePath, 'SymId'] = {}
+        self.fsys = Filesys(config)
+
         self.pre_proc = Preprocessor(self)
         self.targets: Dict[str, Target] = {}
 
@@ -48,7 +45,7 @@ class Manager:
                           symid: 'SymId',
                           default_symtable: Optional['SymTable'] = None,
                           oldpath: Optional[FilePath] = None) -> Option[bool]:
-        find_res = self.module_finder.find(symid)
+        find_res = self.fsys.find_module(symid)
         add_option = Option(True)
         if not find_res:
             add_option.value = False
@@ -71,7 +68,7 @@ class Manager:
                 return add_option
 
             new_target = Target(symid, symtable, mbox,
-                                os.path.realpath(find_res.target_file))
+                                self.fsys.realpath(find_res.target_file))
 
             if find_res.res_type == ModuleFindRes.Module:
                 self.__add_target(new_target, find_res.target_file)
@@ -79,7 +76,7 @@ class Manager:
             elif find_res.res_type == ModuleFindRes.Package:
                 new_target.module_temp = TypePackageTemp(
                     find_res.paths, new_target.symtable, new_target.symid)
-                new_target.path = os.path.realpath(find_res.paths[0])
+                new_target.path = self.fsys.realpath(find_res.paths[0])
 
                 self.__add_target(new_target, find_res.target_file)
 
@@ -101,13 +98,13 @@ class Manager:
 
         target.ast = path2ast(analyse_path)
         self.targets[target.symid] = target
-        self.path_symid_map[target.path] = target.symid
+        self.fsys.add_path_symid_map(target.path, target.symid)
 
         self.add_to_queue(target, Stage.Preprocess)
 
     def is_module(self, symid: 'SymId') -> bool:
         """symid represents a valid module?"""
-        find_res = self.module_finder.find(symid)
+        find_res = self.fsys.find_module(symid)
         if not find_res:
             return False
         else:
@@ -126,7 +123,7 @@ class Manager:
             return self.targets[symid].module_temp
 
     def add_check_file(self, path: FilePath) -> Option[bool]:
-        path = os.path.realpath(path)
+        path = self.fsys.realpath(path)
 
         if not os.path.exists(path):
             add_option = Option(False)
@@ -134,7 +131,7 @@ class Manager:
             return add_option
         else:
             rt_path = crawl_path(os.path.dirname(path))
-            self.module_finder.add_userpath(rt_path)
+            self.fsys.add_userpath(rt_path)
             symid = relpath2symid(rt_path, path)
 
             return self.__add_check_symid(symid, None, path)
@@ -150,8 +147,7 @@ class Manager:
             return None
 
     def get_mbox(self, path: FilePath) -> Optional[MessageBox]:
-        path = os.path.realpath(path)
-        symid = self.path_symid_map.get(path, None)
+        symid = self.fsys.path_to_symid(path)
         if symid:
             return self.get_mbox_by_symid(symid)
         return None
@@ -168,6 +164,20 @@ class Manager:
     def infer(self):
         self.preprocess()
         pass
+
+    def get_sym_type(self, module_symid: SymId,
+                     var_symid: SymId) -> Optional['TypeIns']:
+        target = self.targets.get(module_symid)
+        if target:
+            varid_list = symid2list(var_symid)
+            cur_ins = target.module_temp.get_default_ins().value
+            for subid in varid_list:
+                res_option = cur_ins.getattribute(subid, None)
+                if res_option.haserr():
+                    return None
+                cur_ins = res_option.value
+            return cur_ins
+        return None
 
 
 def path2ast(path: FilePath) -> ast.AST:

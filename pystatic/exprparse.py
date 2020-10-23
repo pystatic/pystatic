@@ -132,7 +132,7 @@ class ExprParser(NoGenVisitor):
 
         op = binop_map.get(type(node.op))
         assert op, f"{node.op} is not supported now"
-        res_option = left_ins.binop_mgf(op, right_ins, node)
+        res_option = left_ins.binop_mgf(right_ins, op, node)
 
         self.add_err(res_option.errors)
 

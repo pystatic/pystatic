@@ -35,3 +35,6 @@ class Option(Generic[T]):
         if self.errors:
             for error in self.errors:
                 mbox.make(error)
+
+    def haserr(self):
+        return self.errors and len(self.errors) > 0
