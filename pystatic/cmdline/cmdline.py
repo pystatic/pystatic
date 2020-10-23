@@ -4,6 +4,7 @@ from pystatic.config import Config
 from typing import TextIO
 from pystatic.manager import Manager
 from pystatic.message import MessageBox
+from pystatic.cmdline.shell import run_shell
 
 
 def cmdline_parse():
@@ -32,7 +33,7 @@ def cmdline_parse():
     return parse_res
 
 
-def cmdline_main(stdout: TextIO, stderr: TextIO):
+def cmdline_main():
     cmd_res = cmdline_parse()
     if not cmd_res.module:
         cmd_res.module = []
@@ -41,7 +42,7 @@ def cmdline_main(stdout: TextIO, stderr: TextIO):
     manager = Manager(config)
 
     if cmd_res.shell:
-        pass
+        run_shell(config)
     elif cmd_res.stubgen:
         pass
     else:
@@ -54,10 +55,10 @@ def cmdline_main(stdout: TextIO, stderr: TextIO):
         manager.preprocess()
 
         for err in cmdline_mbox.error:
-            stdout.write(f'{err}\n')
+            print(f'{err}\n')
 
         for mod in cmd_res.module:
             mbox = manager.get_mbox(mod)
 
             for err in mbox.error:
-                stdout.write(f'{err}\n')
+                print(f'{err}\n')
