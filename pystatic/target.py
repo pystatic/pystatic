@@ -37,7 +37,7 @@ class MethodTarget(BlockTarget):
                  clstemp: 'TypeClassTemp',
                  astnode: 'ast.AST',
                  mbox: 'MessageBox',
-                 stage: Stage = Stage.Parse) -> None:
+                 stage: Stage = Stage.Preprocess) -> None:
         super().__init__(symid, symtable, mbox, stage)
         self.clstemp = clstemp
         self.ast = astnode

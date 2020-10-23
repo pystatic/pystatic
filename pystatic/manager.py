@@ -9,7 +9,7 @@ from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
 from pystatic.config import Config
 from pystatic.fsys import ModuleFinder, FilePath, ModuleFindRes
 from pystatic.symid import SymId, relpath2symid
-from pystatic.target import Target, Stage
+from pystatic.target import BlockTarget, Target, Stage
 from pystatic.infer.infer import InferStarter
 from pystatic.option import Option
 from pystatic.errorcode import *
@@ -146,10 +146,12 @@ class Manager:
         return None
 
     def preprocess(self):
-        self.pre_proc.process_module()
+        self.pre_proc.process()
         pass
 
-    def preprocess_block(self):
+    def preprocess_block(self, blk_target: BlockTarget):
+        self.pre_proc.add_to_process_queue(blk_target)
+        self.pre_proc.process()
         pass
 
 

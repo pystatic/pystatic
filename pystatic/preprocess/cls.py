@@ -232,9 +232,9 @@ def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
                        mbox: 'MessageBox'):
     # symid here is not set correctly
     for tp_temp in symtable._cls_defs.values():
-        mt = _resolve_cls_method(symid, tp_temp, mbox)
-        if mt:
-            assert False, "Process Block is not supported currently"
+        method_targets = _resolve_cls_method(symid, tp_temp, mbox)
+        for blk_target in method_targets:
+            manager.preprocess_block(blk_target)
 
     for tp_temp in symtable._cls_defs.values():
         new_symid = '.'.join([symid, tp_temp.basename])

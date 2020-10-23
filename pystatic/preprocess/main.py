@@ -34,18 +34,7 @@ class Preprocessor:
     def add_to_process_queue(self, target: BlockTarget):
         self.q_parse.append(target)
 
-    def process_block(self, blocks: List[BlockTarget], added: bool = False):
-        """Process a block level target.
-
-        added:
-            whether these blocks are added to the q_parse before(default: False)
-        """
-        if not added:
-            for block in blocks:
-                self.q_parse.append(block)
-        self._deal()
-
-    def process_module(self):
+    def process(self):
         self._deal()
 
     def _deal(self):
