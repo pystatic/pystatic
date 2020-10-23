@@ -1,6 +1,6 @@
 import ast
-import enum
 import copy
+from enum import Enum, auto, IntEnum
 from typing import (Any, Optional, Dict, List, Tuple, Union, TYPE_CHECKING,
                     Final)
 from pystatic.option import Option
@@ -19,16 +19,16 @@ BindList = Optional[List[Any]]
 DEFAULT_TYPEVAR_NAME: Final[str] = '__unknown_typevar_name__'
 
 
-class TpVarKind(enum.IntEnum):
-    INVARIANT = 0
-    COVARIANT = 1
-    CONTRAVARIANT = 2
+class TpVarKind(Enum):
+    INVARIANT = auto()
+    COVARIANT = auto()
+    CONTRAVARIANT = auto()
 
 
-class TpState(enum.IntEnum):
-    FRESH = 0
-    ON = 1
-    OVER = 2
+class TpState(IntEnum):
+    FRESH = 1
+    ON = 2
+    OVER = 3
 
 
 class TypeTemp:

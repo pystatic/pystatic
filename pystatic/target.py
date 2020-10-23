@@ -1,5 +1,5 @@
-import enum
 import ast
+from enum import IntEnum
 from typing import TYPE_CHECKING, Optional
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp
 from pystatic.message import MessageBox
@@ -9,11 +9,11 @@ if TYPE_CHECKING:
     from pystatic.symtable import SymTable
 
 
-class Stage(enum.IntEnum):
+class Stage(IntEnum):
     """Number ascends as the analysis going deeper"""
-    Parse = 0
-    Preprocess = 1
-    Infer = 2
+    Parse = 1
+    Preprocess = 2
+    Infer = 3
 
 
 class BlockTarget:
