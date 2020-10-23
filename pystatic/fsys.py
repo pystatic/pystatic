@@ -1,5 +1,4 @@
 import os
-import logging
 from pystatic.config import PY_VERSION
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pystatic.symid import symid2list, absolute_symidlist, list2symid
@@ -7,6 +6,8 @@ from pystatic.symid import symid2list, absolute_symidlist, list2symid
 if TYPE_CHECKING:
     from pystatic.typesys import TypeModuleTemp
     from pystatic.config import PY_VERSION
+
+FilePath = str
 
 
 class ModuleFindRes:
@@ -38,21 +39,27 @@ class ModuleFinder:
     - Inline packages.
     - Typeshed.
     """
-    def __init__(self, manual_path: List[str], user_path: List[str],
-                 sitepkg: List[str], typeshed: Optional[str],
-                 py_version: PY_VERSION):
+    def __init__(self, manual_path: List[str], sitepkg: List[str],
+                 typeshed: Optional[str], py_version: PY_VERSION):
         self.manual_path = manual_path
-        self.user_path = user_path
+        self.user_path = []
         self.sitepkg = sitepkg
-        self.typeshed = typeshed
-        self.search_path = manual_path + user_path + sitepkg
+
         if typeshed:
-            self.search_path += _resolve_typeshed(typeshed, py_version)
+            self.typeshed = _resolve_typeshed(typeshed, py_version)
+        else:
+            self.typeshed = []
+
+        self.search_path = manual_path + self.typeshed + sitepkg
 
         # dummy namespace on the root
         dummy_ns = ModuleFindRes(ModuleFindRes.Namespace, self.search_path,
                                  None)
         self.root = Node(dummy_ns)
+
+    def add_userpath(self, path: str):
+        if path not in self.user_path:
+            self.user_path.append(path)
 
     def find(self, symid: str) -> Optional[ModuleFindRes]:
         symidlist = symid2list(symid)
@@ -136,8 +143,6 @@ def _resolve_typeshed(typeshed: str, pyv: PY_VERSION) -> List[str]:
         for curdir in [specific_dir, major_dir, two_or_three]:
             if os.path.isdir(curdir):
                 third_party_res.append(curdir)
-
-    logging.debug(f"typeshed: {stdlib_res + third_party_res}")
 
     return stdlib_res + third_party_res
 
