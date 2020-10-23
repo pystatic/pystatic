@@ -25,10 +25,10 @@ from pystatic.arg import Argument
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
     from pystatic.symtable import SymTable
-    from pystatic.preprocess.main import Preprocessor
+    from pystatic.manager import Manager
 
 
-def resolve_cls_def(targets: List['BlockTarget'], worker: 'Preprocessor'):
+def resolve_cls_def(targets: List['BlockTarget'], manager: 'Manager'):
     """Get class definition information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
@@ -36,13 +36,13 @@ def resolve_cls_def(targets: List['BlockTarget'], worker: 'Preprocessor'):
     # placeholders
     for temp in resolve_order:
         set_temp_state(temp, TpState.ON)
-        temp_mbox = worker.get_mbox(temp.module_symid)
+        temp_mbox = manager.get_mbox(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_placeholder(temp, temp_mbox)
 
     # inheritance
     for temp in resolve_order:
-        temp_mbox = worker.get_mbox(temp.module_symid)
+        temp_mbox = manager.get_mbox(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_inh(temp, temp_mbox)
         set_temp_state(temp, TpState.OVER)
@@ -229,17 +229,18 @@ class _TypeVarVisitor(BaseVisitor):
         return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(symtable: 'SymTable', symid: str,
-                       worker: 'Preprocessor', mbox: 'MessageBox'):
+def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
+                       mbox: 'MessageBox'):
     # symid here is not set correctly
     for tp_temp in symtable._cls_defs.values():
         mt = _resolve_cls_method(symid, tp_temp, mbox)
         if mt:
-            worker.process_block(mt, False)
+            assert False, "Process Block is not supported currently"
+            manager.process_block(mt, False)
 
     for tp_temp in symtable._cls_defs.values():
         new_symid = '.'.join([symid, tp_temp.basename])
-        resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, worker,
+        resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, manager,
                            mbox)
 
 

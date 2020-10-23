@@ -7,7 +7,7 @@ from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:
-    from pystatic.preprocess.main import Preprocessor
+    from pystatic.manager import Manager
 
 
 class FakeData:
@@ -128,7 +128,7 @@ def get_temp_state(temp: TypeTemp) -> TpState:
 
 def update_symtable_import_cache(symtable: 'SymTable',
                                  entry: 'fake_impt_entry',
-                                 worker: 'Preprocessor') -> Optional[TypeIns]:
+                                 manager: 'Manager') -> Optional[TypeIns]:
     """Update symtable's import cache"""
     symid = entry.symid
 
@@ -143,7 +143,7 @@ def update_symtable_import_cache(symtable: 'SymTable',
     cur_ins = cache.get_moduleins(cur_symid)
 
     if not cur_ins:
-        temp = worker.get_module_temp(symidlist[0])
+        temp = manager.get_module_temp(symidlist[0])
         if not temp:
             return None
 
@@ -162,7 +162,7 @@ def update_symtable_import_cache(symtable: 'SymTable',
 
         cur_symid += f'.{symidlist[i]}'
         if symidlist[i] not in cur_ins.submodule:
-            temp = worker.get_module_temp(cur_symid)
+            temp = manager.get_module_temp(cur_symid)
             if not temp:
                 return None
 
@@ -188,7 +188,7 @@ def update_symtable_import_cache(symtable: 'SymTable',
     if isinstance(cur_ins, TypePackageIns):
         if not entry.is_import_module():
             cur_symid += f'.{entry.origin_name}'
-            temp = worker.get_module_temp(cur_symid)
+            temp = manager.get_module_temp(cur_symid)
 
             if temp:
                 cur_ins.add_submodule(entry.origin_name,

@@ -12,33 +12,33 @@ from pystatic.exprparse import eval_expr
 from pystatic.preprocess.sym_util import *
 
 if TYPE_CHECKING:
-    from pystatic.preprocess.main import Preprocessor
+    from pystatic.manager import Manager
     from pystatic.target import BlockTarget, MethodTarget
 
 
-def get_definition(target: 'BlockTarget', worker: 'Preprocessor',
+def get_definition(target: 'BlockTarget', manager: 'Manager',
                    mbox: 'MessageBox'):
     cur_ast = target.ast
     symtable = target.symtable
     symid = target.symid
     assert cur_ast
-    return TypeDefVisitor(worker, symtable, mbox, symid).accept(cur_ast)
+    return TypeDefVisitor(manager, symtable, mbox, symid).accept(cur_ast)
 
 
-def get_definition_in_method(target: 'MethodTarget', worker: 'Preprocessor',
+def get_definition_in_method(target: 'MethodTarget', manager: 'Manager',
                              mbox: 'MessageBox'):
     cur_ast = target.ast
     symtable = target.symtable
     clstemp = target.clstemp
     symid = target.symid
     assert isinstance(cur_ast, ast.FunctionDef)
-    return TypeDefVisitor(worker, symtable, mbox, symid, clstemp,
+    return TypeDefVisitor(manager, symtable, mbox, symid, clstemp,
                           True).accept_func(cur_ast)
 
 
 class TypeDefVisitor(BaseVisitor):
     def __init__(self,
-                 worker: 'Preprocessor',
+                 manager: 'Manager',
                  symtable: 'SymTable',
                  mbox: 'MessageBox',
                  symid: SymId,
@@ -47,7 +47,7 @@ class TypeDefVisitor(BaseVisitor):
         super().__init__()
         self.symtable = symtable
         self.mbox = mbox
-        self.worker = worker
+        self.manager = manager
         self.symid = symid
 
         self.clstemp: Optional['TypeClassTemp'] = clstemp
@@ -223,7 +223,7 @@ class TypeDefVisitor(BaseVisitor):
             # statement stands for a special type definition or not.
             if infoitem.symid == 'typing':
                 if not read_typing:
-                    typing_temp = self.worker.get_module_temp('typing')
+                    typing_temp = self.manager.get_module_temp('typing')
 
                 if typing_temp:
                     if infoitem.is_import_module():
@@ -240,11 +240,11 @@ class TypeDefVisitor(BaseVisitor):
                                                     Entry(tpins, node))
                             continue
 
-            self.worker.add_cache_target_symid(infoitem.symid)
+            self.manager.add_check_symid(infoitem.symid)
             if not infoitem.is_import_module():
                 origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
-                if self.worker.is_module(origin_symid):
-                    self.worker.add_cache_target_symid(origin_symid)
+                if self.manager.is_module(origin_symid):
+                    self.manager.add_check_symid(origin_symid)
 
             fake_data.impt[infoitem.asname] = infoitem
 

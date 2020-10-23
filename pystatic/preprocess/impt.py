@@ -14,10 +14,10 @@ from pystatic.preprocess.sym_util import (fake_impt_entry,
                                           get_fake_data, try_get_fake_data)
 
 if TYPE_CHECKING:
-    from pystatic.preprocess.main import Preprocessor
+    from pystatic.manager import Manager
 
 
-def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
+def resolve_import_type(symtable: SymTable, manager: 'Manager'):
     """Resolve types(class definition) imported from other module"""
     new_impt_dict: Dict[str, fake_impt_entry] = {}
     fake_data = get_fake_data(symtable)
@@ -31,7 +31,7 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
         asname = entry.asname
         origin_name = entry.origin_name
 
-        update_symtable_import_cache(symtable, entry, worker)
+        update_symtable_import_cache(symtable, entry, manager)
 
         if isinstance(impt_node, ast.Import):
             module_ins = cache.get_moduleins(symid)
@@ -53,7 +53,7 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
                 symtable.local[asname] = Entry(module_ins, impt_node)
 
         else:
-            is_module = _resolve_import_chain(symtable, asname, worker, True)
+            is_module = _resolve_import_chain(symtable, asname, manager, True)
             if not is_module:
                 new_impt_dict[asname] = entry
 
@@ -62,26 +62,25 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
     for tp_def in symtable._cls_defs.values():
         assert isinstance(tp_def, TypeClassTemp)
         inner_symtable = tp_def.get_inner_symtable()
-        resolve_import_type(inner_symtable, worker)
+        resolve_import_type(inner_symtable, manager)
 
 
-def resolve_import_ins(symtable: SymTable, worker: 'Preprocessor'):
+def resolve_import_ins(symtable: SymTable, manager: 'Manager'):
     fake_data = get_fake_data(symtable)
     iter_impt = copy.copy(fake_data.impt)
 
     for _, entry in iter_impt.items():
         asname = entry.asname
         assert asname
-        _resolve_import_chain(symtable, asname, worker, False)
+        _resolve_import_chain(symtable, asname, manager, False)
 
     for tp_def in symtable._cls_defs.values():
         assert isinstance(tp_def, TypeClassTemp)
         inner_symtable = tp_def.get_inner_symtable()
-        resolve_import_ins(inner_symtable, worker)
+        resolve_import_ins(inner_symtable, manager)
 
 
-def _resolve_import_chain(symtable: 'SymTable', name: str,
-                          worker: 'Preprocessor',
+def _resolve_import_chain(symtable: 'SymTable', name: str, manager: 'Manager',
                           is_import_type: bool) -> bool:
     """Resolve type from an import chaine
 
@@ -109,7 +108,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
         name_in_mod = cur_state[1]  # name in the current module
         state_set.add(cur_state)
 
-        module_temp = worker.get_module_temp(mod_symid)
+        module_temp = manager.get_module_temp(mod_symid)
         # TODO: warning here
         assert isinstance(
             module_temp, TypeModuleTemp

@@ -36,21 +36,3 @@ def cmdline(stdout: TextIO, stderr: TextIO, load_typeshed=True):
         manager.stubgen()
     else:
         manager.start_check()
-
-
-def test_pystatic(config: dict, src: List[str], load_typeshed: bool = True):
-    manager = Manager(config, src, [], sys.stdout, sys.stderr, load_typeshed)
-    manager.start_check()
-
-
-def test_stubgen(config: dict, src: List[str], load_typeshed: bool = True):
-    manager = Manager(config, src, [], sys.stdout, sys.stderr, load_typeshed)
-    manager.stubgen()
-
-
-def test_manager(config: dict, src: List[str], load_typeshed: bool = True):
-    return Manager(config, src, [], sys.stdout, sys.stderr, load_typeshed)
-
-
-if __name__ == '__main__':
-    cmdline(sys.stdout, sys.stderr)
