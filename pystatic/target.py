@@ -23,12 +23,12 @@ class BlockTarget:
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',
-                 mbox: Optional[MessageBox] = None,
+                 mbox: MessageBox,
                  stage: Stage = Stage.PreParse) -> None:
         self.symid = symid
         self.symtable = symtable
         self.stage = stage
-        self.mbox: 'MessageBox' = mbox  # type: ignore
+        self.mbox: 'MessageBox' = mbox
         self.ast: Optional[ast.AST] = None
 
 
@@ -50,8 +50,8 @@ class Target(BlockTarget):
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',
-                 mbox: Optional['MessageBox'] = None,
-                 path: Optional[str] = None,
+                 mbox: 'MessageBox',
+                 path: str,
                  stage: Stage = Stage.PreParse):
         super().__init__(symid, symtable, mbox, stage)
         # NOTE: TpStage.OVER may be wrong.
