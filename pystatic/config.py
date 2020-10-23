@@ -29,12 +29,14 @@ class Config:
                     return None
             return None
 
+        # python_version
         self.python_version: PY_VERSION = (sys.version_info.major,
                                            sys.version_info.minor)
 
-        # set cwd
-        self.cwd = os.getcwd()
+        # cwd
+        self.cwd: str = os.getcwd()
 
+        # manual path
         self.manual_path: List[str] = get('manual_path') or []
         mypy_path = os.getenv('MYPYPATH')
         if mypy_path:
@@ -42,8 +44,10 @@ class Config:
                 if path not in self.manual_path:
                     self.manual_path.append(path)
 
+        # sitepkg path
         self.sitepkg: List[str] = get_sitepkg()
 
+        # typeshed path
         if get('typeshed', str):
             self.typeshed: Optional[str] = get('typeshed')
         else:
@@ -51,3 +55,6 @@ class Config:
                 self.typeshed = os.path.join(pystatic_dir, typeshed)
             else:
                 self.typeshed = None
+
+        # load_typeshed
+        self.load_typeshed: bool = get('load_typeshed') or False
