@@ -1,6 +1,6 @@
 import ast
 import enum
-from pystatic.uri import Uri, uri2list
+from pystatic.symid import SymId, symid2list
 from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
 from pystatic.option import Option
 from pystatic.errorcode import *
@@ -46,41 +46,41 @@ class ImportCache:
         self.import_nodes: List['ImportNode'] = []
         self.import_map: Dict[str, 'TypeIns'] = {}
 
-    def get_moduleins(self, absuri: 'Uri') -> Optional['TypeIns']:
+    def get_moduleins(self, abssymid: 'SymId') -> Optional['TypeIns']:
         from pystatic.typesys import TypePackageIns, TypeModuleTemp
 
-        urilist = uri2list(absuri)
-        if not urilist:
+        symidlist = symid2list(abssymid)
+        if not symidlist:
             return None
-        cur_ins = self.import_map.get(urilist[0], None)
+        cur_ins = self.import_map.get(symidlist[0], None)
 
-        for i in range(1, len(urilist)):
+        for i in range(1, len(symidlist)):
             if not cur_ins:
                 return None
 
             if isinstance(cur_ins, TypePackageIns):
-                cur_ins = cur_ins.submodule.get(urilist[i], None)
+                cur_ins = cur_ins.submodule.get(symidlist[i], None)
             else:
                 assert isinstance(cur_ins.temp, TypeModuleTemp)
-                if i == len(urilist) - 1:
+                if i == len(symidlist) - 1:
                     return cur_ins
                 else:
                     return None
 
         return cur_ins
 
-    def set_moduleins(self, absuri: 'Uri', modins: 'TypeIns'):
-        self.import_map[absuri] = modins
+    def set_moduleins(self, abssymid: 'SymId', modins: 'TypeIns'):
+        self.import_map[abssymid] = modins
 
     def add_import_node(self, node: 'ImportNode'):
         self.import_nodes.append(node)
 
 
 class SymTable:
-    def __init__(self, uri: 'Uri', glob: 'SymTable',
+    def __init__(self, symid: 'SymId', glob: 'SymTable',
                  non_local: Optional['SymTable'], builtins: 'SymTable',
                  scope: 'TableScope') -> None:
-        self.uri = uri
+        self.symid = symid
 
         self.local: Dict[str, Entry] = {}
         self.non_local = non_local
@@ -98,8 +98,8 @@ class SymTable:
         self._func_defs: Dict[str, 'TypeFuncIns'] = {}
 
     @property
-    def glob_uri(self):
-        return self.glob.uri
+    def glob_symid(self):
+        return self.glob.symid
 
     def _legb_lookup(self, name: str, find):
         curtable = self
@@ -179,8 +179,8 @@ class SymTable:
         else:
             non_local = self
         glob = self.glob
-        new_uri = self.uri + '.' + name
-        return SymTable(new_uri, glob, non_local, builtins, new_scope)
+        new_symid = self.symid + '.' + name
+        return SymTable(new_symid, glob, non_local, builtins, new_scope)
 
     def legb_lookup(self, name):
         return self._legb_lookup(name, SymTable.lookup_local)

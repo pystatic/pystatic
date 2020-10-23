@@ -36,13 +36,13 @@ def resolve_cls_def(targets: List['BlockTarget'], worker: 'Preprocessor'):
     # placeholders
     for temp in resolve_order:
         set_temp_state(temp, TpState.ON)
-        temp_mbox = worker.get_mbox(temp.module_uri)
+        temp_mbox = worker.get_mbox(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_placeholder(temp, temp_mbox)
 
     # inheritance
     for temp in resolve_order:
-        temp_mbox = worker.get_mbox(temp.module_uri)
+        temp_mbox = worker.get_mbox(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_inh(temp, temp_mbox)
         set_temp_state(temp, TpState.OVER)
@@ -229,20 +229,21 @@ class _TypeVarVisitor(BaseVisitor):
         return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(symtable: 'SymTable', uri: str, worker: 'Preprocessor',
-                       mbox: 'MessageBox'):
-    # uri here is not set correctly
+def resolve_cls_method(symtable: 'SymTable', symid: str,
+                       worker: 'Preprocessor', mbox: 'MessageBox'):
+    # symid here is not set correctly
     for tp_temp in symtable._cls_defs.values():
-        mt = _resolve_cls_method(uri, tp_temp, mbox)
+        mt = _resolve_cls_method(symid, tp_temp, mbox)
         if mt:
             worker.process_block(mt, False)
 
     for tp_temp in symtable._cls_defs.values():
-        new_uri = '.'.join([uri, tp_temp.basename])
-        resolve_cls_method(tp_temp.get_inner_symtable(), new_uri, worker, mbox)
+        new_symid = '.'.join([symid, tp_temp.basename])
+        resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, worker,
+                           mbox)
 
 
-def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
+def _resolve_cls_method(symid: str, clstemp: 'TypeClassTemp',
                         mbox: 'MessageBox'):
     targets = []
     new_fun_defs = {}
@@ -286,7 +287,7 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
         modify_argument(argument, is_classmethod, is_staticmethod)
 
         inner_symtable = symtable.new_symtable(name, TableScope.FUNC)
-        func_ins = TypeFuncIns(name, symtable.glob_uri, inner_symtable,
+        func_ins = TypeFuncIns(name, symtable.glob_symid, inner_symtable,
                                argument, ret_ins)
         symtable.add_entry(name, Entry(func_ins, node))
         new_fun_defs[name] = func_ins
@@ -294,9 +295,9 @@ def _resolve_cls_method(uri: str, clstemp: 'TypeClassTemp',
         # get attribute because of assignment of self
         if not is_staticmethod:
             symtb = func_ins.get_inner_symtable()
-            method_uri = '.'.join([uri, name])
-            targets.append(MethodTarget(method_uri, symtb, clstemp, node,
-                                        mbox))
+            method_symid = '.'.join([symid, name])
+            targets.append(
+                MethodTarget(method_symid, symtb, clstemp, node, mbox))
 
         return func_ins
 

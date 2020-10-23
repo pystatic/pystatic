@@ -12,7 +12,6 @@ class Message(object):
 
     from_node: generate an error message for the position implied by the node
     """
-
     def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
                  end_col_offset: Optional[int], msg: str):
         self.lineno = lineno
@@ -53,8 +52,8 @@ class TypeNode:
 
 
 class MessageBox(object):
-    def __init__(self, module_uri: str):
-        self.module_uri = module_uri
+    def __init__(self, module_symid: str):
+        self.module_symid = module_symid
         self.error: List[Message] = []
         self.types: List[TypeNode] = []
 

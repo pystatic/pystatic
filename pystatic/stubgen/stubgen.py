@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from pystatic.arg import Arg, Argument
 from typing import List, Tuple
 from pystatic.target import Target
-from pystatic.uri import uri2list
+from pystatic.symid import symid2list
 # from pystatic.util import split_import_stmt
 from pystatic.typesys import TypeClassTemp, TypeFuncTemp, TypeIns, TypeTemp, TypeType
 from pystatic.symtable import SymTable
@@ -47,13 +47,13 @@ def mkstub_dir(dir: str):
 
 
 def filepath(target: Target, rt_dir: str):
-    urilist = uri2list(target.uri)
+    symidlist = symid2list(target.symid)
     cur_dir = rt_dir
 
-    for i, name in enumerate(urilist):
+    for i, name in enumerate(symidlist):
         next_dir = os.path.join(cur_dir, name)
         if not os.path.exists(next_dir):
-            if i != len(urilist) - 1:
+            if i != len(symidlist) - 1:
                 os.mkdir(next_dir)
 
         cur_dir = next_dir
@@ -67,9 +67,9 @@ def stubgen_main(target: Target) -> str:
 
 
 class Node:
-    def __init__(self, uri: str):
-        self.uri = uri
-        self.suburi = {}
+    def __init__(self, symid: str):
+        self.symid = symid
+        self.subsymid = {}
         self.alias = None
 
     def set_alias(self, alias: str):
@@ -77,39 +77,39 @@ class Node:
 
 
 class NameTree:
-    def __init__(self, module_uri: str):
+    def __init__(self, module_symid: str):
         self.root = Node('')
-        self.module_uri = module_uri
+        self.module_symid = module_symid
 
     def ask(self, temp: TypeTemp) -> str:
-        module_uri = temp.module_uri
-        uri = temp.name
+        module_symid = temp.module_symid
+        symid = temp.name
 
-        urilist = uri2list(module_uri) + uri2list(uri)
+        symidlist = symid2list(module_symid) + symid2list(symid)
         cur_node = self.root
         namelist = []
-        for subname in urilist:
-            if subname in cur_node.suburi:
-                cur_node = cur_node.suburi[subname]
+        for subname in symidlist:
+            if subname in cur_node.subsymid:
+                cur_node = cur_node.subsymid[subname]
                 if cur_node.alias:
                     namelist = [cur_node.alias]
                 else:
                     namelist.append(subname)
             else:
-                return '.'.join(urilist)
+                return '.'.join(symidlist)
         return '.'.join(namelist)
 
-    def add_import(self, module_uri: str, uri: str, asname: str):
-        urilist = uri2list(module_uri) + uri2list(uri)
+    def add_import(self, module_symid: str, symid: str, asname: str):
+        symidlist = symid2list(module_symid) + symid2list(symid)
         cur_node = self.root
 
-        for subname in urilist:
+        for subname in symidlist:
             if not subname:
                 continue
-            if subname in cur_node.suburi:
-                cur_node = cur_node.suburi[subname]
+            if subname in cur_node.subsymid:
+                cur_node = cur_node.subsymid[subname]
             else:
-                cur_node.suburi[subname] = Node(subname)
+                cur_node.subsymid[subname] = Node(subname)
 
         if asname:
             cur_node.alias = asname
@@ -118,14 +118,14 @@ class NameTree:
 class StubGen:
     def __init__(self, target: Target):
         self.target = target
-        self.name_tree = NameTree(target.uri)
+        self.name_tree = NameTree(target.symid)
         self.in_class = False
         self.from_typing = set()
-        self.cur_uri = ''
+        self.cur_symid = ''
 
     @property
-    def module_uri(self):
-        return self.target.uri
+    def module_symid(self):
+        return self.target.symid
 
     @staticmethod
     def scoped_list_to_str(lst: List[Tuple[str, int]]):
@@ -157,14 +157,14 @@ class StubGen:
 
     @contextmanager
     def enter_class(self, clsname: str):
-        old_uri = self.cur_uri
+        old_symid = self.cur_symid
         old_in_class = self.in_class
-        if not self.cur_uri:
-            self.cur_uri = f'{clsname}'
+        if not self.cur_symid:
+            self.cur_symid = f'{clsname}'
         else:
-            self.cur_uri += f'.{clsname}'
+            self.cur_symid += f'.{clsname}'
         yield
-        self.cur_uri = old_uri
+        self.cur_symid = old_symid
         self.in_class = old_in_class
 
     def indent_prefix(self, level: int) -> str:
@@ -196,17 +196,17 @@ class StubGen:
     def stubgen_import(self, symtable: 'SymTable', level: int) -> str:
         results = []
         for impt_node in symtable._import_nodes:
-            impt_dict = split_import_stmt(impt_node, symtable.glob_uri)
+            impt_dict = split_import_stmt(impt_node, symtable.glob_symid)
             if isinstance(impt_node, ast.Import):
                 import_stmt = 'import '
                 import_subitem = []
-                for uri, infolist in impt_dict.items():
-                    module_name = uri
+                for symid, infolist in impt_dict.items():
+                    module_name = symid
 
                     for asname, origin_name in infolist:
                         assert not origin_name
                         if asname == module_name:
-                            top_name = uri2list(asname)[0]
+                            top_name = symid2list(asname)[0]
                             if top_name:
                                 symtable.local.pop(top_name, None)
 
@@ -225,8 +225,8 @@ class StubGen:
                 results.append((import_stmt, level))
 
             else:
-                for uri, infolist in impt_dict.items():
-                    module_name = uri
+                for symid, infolist in impt_dict.items():
+                    module_name = symid
                     from_impt: List[str] = []
 
                     for asname, origin_name in infolist:
@@ -258,23 +258,23 @@ class StubGen:
                  for stmt, ident in results]) + '\n'
 
     def stub_var_def(self, varname: str, temp: TypeTemp, level: int):
-        module_uri = temp.module_uri
-        uri = temp.name
+        module_symid = temp.module_symid
+        symid = temp.name
         type_str = ''
 
-        if module_uri == 'builtins':
-            type_str = uri
+        if module_symid == 'builtins':
+            type_str = symid
 
-        elif module_uri == 'typing':
-            self.from_typing.add(uri)
-            type_str = uri
+        elif module_symid == 'typing':
+            self.from_typing.add(symid)
+            type_str = symid
 
-        elif module_uri == self.module_uri:
-            if self.cur_uri and uri.find(
-                    self.cur_uri) == 0 and len(uri) > len(self.cur_uri):
-                type_str = uri[len(self.cur_uri) + 1:]
+        elif module_symid == self.module_symid:
+            if self.cur_symid and symid.find(
+                    self.cur_symid) == 0 and len(symid) > len(self.cur_symid):
+                type_str = symid[len(self.cur_symid) + 1:]
             else:
-                type_str = uri
+                type_str = symid
 
         else:
             type_str = self.name_tree.ask(temp)

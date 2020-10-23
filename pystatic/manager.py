@@ -7,7 +7,7 @@ from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
                                  get_init_module_symtable)
 from pystatic.config import Config
 from pystatic.modfinder import ModuleFinder
-from pystatic.uri import Uri, relpath2uri
+from pystatic.symid import SymId, relpath2symid
 from pystatic.target import Target, Stage
 from pystatic.infer.infer import InferStarter
 from pystatic.stubgen import stubgen
@@ -19,7 +19,7 @@ class Manager:
     def __init__(self, config, module_files: List[str],
                  package_files: List[str], stdout: TextIO, stderr: TextIO,
                  load_typeshed: bool):
-        self.check_targets: Dict[Uri, Target] = {}
+        self.check_targets: Dict[SymId, Target] = {}
 
         self.config = Config(config)
 
@@ -86,22 +86,21 @@ class Manager:
                 # already warned in set_user_path
                 continue
             rt_path = crawl_path(os.path.dirname(srcfile))
-            uri = relpath2uri(rt_path, srcfile)
-            target = Target(uri,
-                            get_init_module_symtable(uri),
+            symid = relpath2symid(rt_path, srcfile)
+            target = Target(symid,
+                            get_init_module_symtable(symid),
                             path=srcfile,
                             stage=Stage.PreParse)
             self.set_target_mbox(target)
-            self.check_targets[uri] = target
+            self.check_targets[symid] = target
 
     def set_target_mbox(self, target: Target):
         """Set correct mbox according to a target"""
         if not target.mbox:
-            target.mbox = MessageBox(target.uri)
+            target.mbox = MessageBox(target.symid)
 
         if target.path not in self.boxdict:
             self.boxdict[target.path] = target.mbox
-
 
 
 def crawl_path(path: str) -> str:

@@ -4,7 +4,7 @@ import copy
 from typing import (Any, Optional, Dict, List, Tuple, Union, TYPE_CHECKING,
                     Final)
 from pystatic.option import Option
-from pystatic.uri import Uri
+from pystatic.symid import SymId
 from pystatic.evalutil import (InsWithAst, ApplyArgs, GetItemType, WithAst)
 from pystatic.symtable import Entry, SymTable
 from pystatic.errorcode import NoAttribute
@@ -34,12 +34,12 @@ class TpState(enum.IntEnum):
 class TypeTemp:
     def __init__(self,
                  name: str,
-                 module_uri: str,
+                 module_symid: str,
                  resolve_state: TpState = TpState.OVER):
         self.name = name
         self.placeholders = []
 
-        self.module_uri = module_uri  # the module uri that define this type
+        self.module_symid = module_symid  # the module symid that define this type
         self._resolve_state = resolve_state
 
     @property
@@ -394,12 +394,12 @@ class TypeClassTemp(TypeTemp):
     # FIXME: remove None of symtable and defnode
     def __init__(self,
                  clsname: str,
-                 module_uri: str,
+                 module_symid: str,
                  state: TpState,
                  def_symtable: 'SymTable',
                  inner_symtable: 'SymTable',
                  defnode: ast.ClassDef = None):
-        super().__init__(clsname, module_uri, state)
+        super().__init__(clsname, module_symid, state)
 
         self.baseclass: 'List[TypeType]'
         self.baseclass = []
@@ -410,7 +410,7 @@ class TypeClassTemp(TypeTemp):
         self._def_symtable = def_symtable  # symtable where this cls is defined
         self._defnode = defnode
 
-        self._glob_uri = module_uri  # the module uri that this class is defined
+        self._glob_symid = module_symid  # the module symid that this class is defined
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         cls_defs = self._inner_symtable._cls_defs
@@ -469,12 +469,12 @@ class TypeFuncTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: Uri, symtable: 'SymTable'):
+    def __init__(self, symid: SymId, symtable: 'SymTable'):
         # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(uri, uri, TpState.OVER, symtable, symtable)
+        super().__init__(symid, symid, TpState.OVER, symtable, symtable)
 
     @property
-    def uri(self):
+    def symid(self):
         return self.name
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
@@ -482,8 +482,8 @@ class TypeModuleTemp(TypeClassTemp):
 
 
 class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], symtable: 'SymTable', uri: Uri):
-        super().__init__(uri, symtable)
+    def __init__(self, paths: List[str], symtable: 'SymTable', symid: SymId):
+        super().__init__(symid, symtable)
         self.paths = paths
 
     def get_default_typetype(self) -> 'TypeType':
@@ -643,13 +643,13 @@ class TypePackageIns(TypeIns):
 
 
 class TypeFuncIns(TypeIns):
-    def __init__(self, funname: str, module_uri: str,
+    def __init__(self, funname: str, module_symid: str,
                  inner_symtable: 'SymTable', argument: 'Argument',
                  ret: TypeIns) -> None:
         super().__init__(func_temp, None)
         self.overloads: List[Tuple['Argument', TypeIns]] = [(argument, ret)]
         self.funname = funname
-        self.module_uri = module_uri
+        self.module_symid = module_symid
 
         self._inner_symtable = inner_symtable
 

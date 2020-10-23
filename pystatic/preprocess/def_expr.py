@@ -70,7 +70,7 @@ def eval_func_type(node: ast.FunctionDef,
     argument = argument_option.value
 
     inner_sym = symtable.new_symtable(node.name, TableScope.FUNC)
-    fun_ins = TypeFuncIns(node.name, symtable.glob_uri, inner_sym, argument,
+    fun_ins = TypeFuncIns(node.name, symtable.glob_symid, inner_sym, argument,
                           any_ins)
 
     if node.returns:
@@ -79,7 +79,7 @@ def eval_func_type(node: ast.FunctionDef,
     else:
         ret_ins = any_ins
 
-    fun_ins = TypeFuncIns(node.name, symtable.glob_uri, inner_sym, argument,
+    fun_ins = TypeFuncIns(node.name, symtable.glob_symid, inner_sym, argument,
                           ret_ins)
     res_option = Option(fun_ins)
     res_option.combine_error(argument_option)
