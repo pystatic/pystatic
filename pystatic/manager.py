@@ -1,5 +1,6 @@
 import os
 import logging
+from collections import deque
 from typing import Optional, Dict, TYPE_CHECKING
 from pystatic.typesys import TypeModuleTemp, TypePackageTemp
 from pystatic.message import MessageBox
@@ -31,6 +32,9 @@ class Manager:
         self.path_symid_map: Dict[FilePath, 'SymId'] = {}
         self.pre_proc = Preprocessor(self)
         self.targets: Dict[str, Target] = {}
+
+        self.q_preprocess = deque()
+        self.q_infer = deque()
 
         if config.load_typeshed:
             self.__init_typeshed()
@@ -96,11 +100,10 @@ class Manager:
         assert os.path.isabs(target.path)
 
         target.ast = path2ast(analyse_path)
-        target.stage = Stage.Preprocess
         self.targets[target.symid] = target
         self.path_symid_map[target.path] = target.symid
 
-        self.pre_proc.add_to_process_queue(target)
+        self.add_to_queue(target, Stage.Preprocess)
 
     def is_module(self, symid: 'SymId') -> bool:
         """symid represents a valid module?"""
@@ -109,6 +112,14 @@ class Manager:
             return False
         else:
             return True
+
+    def add_to_queue(self, target: BlockTarget, stage: Stage):
+        if stage == Stage.Preprocess:
+            target.stage = Stage.Preprocess
+            self.q_preprocess.append(target)
+        elif stage == Stage.Infer:
+            target.stage = Stage.Infer
+            self.q_infer.append(target)
 
     def get_module_temp(self, symid: 'SymId') -> Optional[TypeModuleTemp]:
         if symid in self.targets:
@@ -150,8 +161,12 @@ class Manager:
         pass
 
     def preprocess_block(self, blk_target: BlockTarget):
-        self.pre_proc.add_to_process_queue(blk_target)
+        self.add_to_queue(blk_target, Stage.Preprocess)
         self.pre_proc.process()
+        pass
+
+    def infer(self):
+        self.preprocess()
         pass
 
 

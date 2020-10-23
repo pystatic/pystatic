@@ -29,19 +29,15 @@ class Preprocessor:
     def __init__(self, manager: 'Manager') -> None:
         self.manager = manager
         # dequeue that store targets waiting for get definitions in them
-        self.q_parse: Deque[BlockTarget] = deque()
-
-    def add_to_process_queue(self, target: BlockTarget):
-        self.q_parse.append(target)
 
     def process(self):
         self._deal()
 
     def _deal(self):
         to_check: List[BlockTarget] = []
-        while len(self.q_parse) > 0:
-            current = self.q_parse[0]
-            self.q_parse.popleft()
+        while len(self.manager.q_preprocess) > 0:
+            current = self.manager.q_preprocess[0]
+            self.manager.q_preprocess.popleft()
             assert current.stage == Stage.Preprocess
             assert current.ast
             to_check.append(current)
@@ -73,4 +69,4 @@ class Preprocessor:
             resolve_cls_attr(target.symtable, target.mbox)
 
             if isinstance(target, Target):
-                target.stage = Stage.Infer
+                self.manager.add_to_queue(target, Stage.Infer)
