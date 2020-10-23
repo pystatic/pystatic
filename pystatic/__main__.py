@@ -1,5 +1,5 @@
 import sys
-from pystatic.main import cmdline
+from pystatic.cmdline.cmdline import cmdline_main
 
 if __name__ == '__main__':
-    cmdline(sys.stdout, sys.stderr)
+    cmdline_main(sys.stdin, sys.stderr)

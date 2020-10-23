@@ -3,7 +3,7 @@ from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
 from pystatic.symid import absolute_symidlist, SymId, symid2list, rel2abssymid
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
                               TypePackageIns, TypeTemp, TypePackageTemp,
-                              TypeType, TpState, any_ins)
+                              TypeType, TpState)
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:

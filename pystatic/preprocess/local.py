@@ -3,9 +3,7 @@ Resolve type instance for symbols defined locally.
 """
 
 import ast
-import logging
 from pystatic.arg import Argument
-from typing import Any, Optional, overload
 from pystatic.preprocess.sym_util import *
 from pystatic.symtable import SymTable
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns)

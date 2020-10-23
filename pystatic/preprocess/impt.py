@@ -6,7 +6,7 @@ import ast
 import copy
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType, TypeVarIns
 from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
-from pystatic.symid import rel2abssymid, SymId, symid2list
+from pystatic.symid import symid2list
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
 from pystatic.preprocess.sym_util import (fake_impt_entry,

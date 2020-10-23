@@ -50,12 +50,9 @@ class ModuleFinder:
         else:
             self.typeshed = []
 
-        self.search_path = manual_path + self.typeshed + sitepkg
-
         # dummy namespace on the root
-        dummy_ns = ModuleFindRes(ModuleFindRes.Namespace, self.search_path,
-                                 None)
-        self.root = Node(dummy_ns)
+        self.dummy_ns = ModuleFindRes(ModuleFindRes.Namespace, [], None)
+        self.root = Node(self.dummy_ns)
 
     def add_userpath(self, path: str):
         if path not in self.user_path:
@@ -67,6 +64,7 @@ class ModuleFinder:
             return None
 
         cur_node = self.root
+        self.dummy_ns.paths = self.manual_path + self.user_path + self.typeshed + self.sitepkg
         i = 0
         while i < len(symidlist) and symidlist[i] in cur_node.child:
             cur_node = cur_node.child[symidlist[i]]

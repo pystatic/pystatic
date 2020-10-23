@@ -38,6 +38,7 @@ class Manager:
     def __init_typeshed(self):
         self.__add_check_symid('builtins', get_builtin_symtable())
         self.__add_check_symid('typing', get_typing_symtable())
+        self.preprocess()
 
     def __add_check_symid(self,
                           symid: 'SymId',
@@ -71,7 +72,7 @@ class Manager:
             if find_res.res_type == ModuleFindRes.Module:
                 self.__add_target(new_target, find_res.target_file)
 
-            if find_res.res_type == ModuleFindRes.Package:
+            elif find_res.res_type == ModuleFindRes.Package:
                 new_target.module_temp = TypePackageTemp(
                     find_res.paths, new_target.symtable, new_target.symid)
                 new_target.path = os.path.realpath(find_res.paths[0])
@@ -95,6 +96,7 @@ class Manager:
         assert os.path.isabs(target.path)
 
         target.ast = path2ast(analyse_path)
+        target.stage = Stage.Preprocess
         self.targets[target.symid] = target
         self.path_symid_map[target.path] = target.symid
 
@@ -113,16 +115,16 @@ class Manager:
             return self.targets[symid].module_temp
 
     def add_check_file(self, path: FilePath) -> Option[bool]:
-        srcfile = os.path.realpath(path)
+        path = os.path.realpath(path)
 
-        if not os.path.exists(srcfile):
+        if not os.path.exists(path):
             add_option = Option(False)
             add_option.add_err(FileNotFound(path))
             return add_option
         else:
-            rt_path = crawl_path(os.path.dirname(srcfile))
+            rt_path = crawl_path(os.path.dirname(path))
             self.module_finder.add_userpath(rt_path)
-            symid = relpath2symid(rt_path, srcfile)
+            symid = relpath2symid(rt_path, path)
 
             return self.__add_check_symid(symid, None, path)
 
@@ -137,6 +139,7 @@ class Manager:
             return None
 
     def get_mbox(self, path: FilePath) -> Optional[MessageBox]:
+        path = os.path.realpath(path)
         symid = self.path_symid_map.get(path, None)
         if symid:
             return self.get_mbox_by_symid(symid)
@@ -144,6 +147,7 @@ class Manager:
 
     def preprocess(self):
         self.pre_proc.process_module()
+        pass
 
     def preprocess_block(self):
         pass

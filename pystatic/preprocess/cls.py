@@ -3,7 +3,6 @@ Resolve class related type information.
 """
 
 import ast
-import logging
 import contextlib
 from pystatic.target import MethodTarget
 from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
@@ -36,13 +35,13 @@ def resolve_cls_def(targets: List['BlockTarget'], manager: 'Manager'):
     # placeholders
     for temp in resolve_order:
         set_temp_state(temp, TpState.ON)
-        temp_mbox = manager.get_mbox(temp.module_symid)
+        temp_mbox = manager.get_mbox_by_symid(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_placeholder(temp, temp_mbox)
 
     # inheritance
     for temp in resolve_order:
-        temp_mbox = manager.get_mbox(temp.module_symid)
+        temp_mbox = manager.get_mbox_by_symid(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_inh(temp, temp_mbox)
         set_temp_state(temp, TpState.OVER)
@@ -236,7 +235,6 @@ def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
         mt = _resolve_cls_method(symid, tp_temp, mbox)
         if mt:
             assert False, "Process Block is not supported currently"
-            manager.process_block(mt, False)
 
     for tp_temp in symtable._cls_defs.values():
         new_symid = '.'.join([symid, tp_temp.basename])

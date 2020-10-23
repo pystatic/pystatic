@@ -1,7 +1,6 @@
 import ast
-import logging
 from contextlib import contextmanager
-from typing import Dict, List, Tuple, Optional, TYPE_CHECKING, Union
+from typing import List, Optional, TYPE_CHECKING
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import (TypeClassTemp, TpState, TypeVarIns, TypeVarTemp,
                               TypeType)
@@ -228,8 +227,8 @@ class TypeDefVisitor(BaseVisitor):
                 if typing_temp:
                     if infoitem.is_import_module():
                         self.symtable.add_entry(
-                            'typing', Entry(typing_temp.get_default_ins(),
-                                            node))
+                            'typing',
+                            Entry(typing_temp.get_default_ins().value, node))
                     else:
                         symtb = typing_temp.get_inner_symtable()
                         entry = symtb.lookup_local_entry(infoitem.origin_name)

@@ -1,12 +1,7 @@
-import os
 import ast
 from typing import TYPE_CHECKING
 from collections import deque
-from pystatic.message import Message, MessageBox
-from pystatic.symid import symid2list, SymId
-from typing import Optional, TYPE_CHECKING, Deque, List, Dict
-from pystatic.typesys import TypeModuleTemp, TypePackageTemp
-from pystatic.predefined import get_init_module_symtable
+from typing import TYPE_CHECKING, Deque, List
 from pystatic.preprocess.definition import (get_definition,
                                             get_definition_in_method)
 from pystatic.preprocess.impt import resolve_import_type, resolve_import_ins
@@ -64,15 +59,15 @@ class Preprocessor:
 
             # get current module's class definitions.
             if isinstance(current, MethodTarget):
-                get_definition_in_method(current, self, current.mbox)
+                get_definition_in_method(current, self.manager, current.mbox)
             else:
-                get_definition(current, self, current.mbox)
+                get_definition(current, self.manager, current.mbox)
 
         # get type imported from other module.
         for target in to_check:
-            resolve_import_type(target.symtable, self)
+            resolve_import_type(target.symtable, self.manager)
 
-        resolve_cls_def(to_check, self)
+        resolve_cls_def(to_check, self.manager)
 
         # from now on, all valid types in the module should be correctly
         # identified because possible type(class) information is collected.
@@ -81,10 +76,10 @@ class Preprocessor:
             resolve_local_func(target.symtable, target.mbox)
 
         for target in to_check:
-            resolve_import_ins(target.symtable, self)
+            resolve_import_ins(target.symtable, self.manager)
 
         for target in to_check:
-            resolve_cls_method(target.symtable, target.symid, self,
+            resolve_cls_method(target.symtable, target.symid, self.manager,
                                target.mbox)
             resolve_cls_attr(target.symtable, target.mbox)
 
