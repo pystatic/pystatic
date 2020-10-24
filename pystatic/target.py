@@ -14,6 +14,7 @@ class Stage(IntEnum):
     Parse = 1
     Preprocess = 2
     Infer = 3
+    FINISH = 4
 
 
 class BlockTarget:
@@ -22,7 +23,7 @@ class BlockTarget:
                  symid: 'SymId',
                  symtable: 'SymTable',
                  mbox: MessageBox,
-                 stage: Stage = Stage.Parse) -> None:
+                 stage: Stage = Stage.Preprocess) -> None:
         self.symid = symid
         self.symtable = symtable
         self.stage = stage
@@ -54,4 +55,24 @@ class Target(BlockTarget):
         super().__init__(symid, symtable, mbox, stage)
         # NOTE: TpStage.OVER may be wrong.
         self.module_temp = TypeModuleTemp(symid, self.symtable)
-        self.path: str = path  # type: ignore
+        self.path: str = path
+
+    @property
+    def analyse_path(self):
+        return self.path
+
+
+class PackageTarget(Target):
+    def __init__(self,
+                 symid: 'SymId',
+                 symtable: 'SymTable',
+                 mbox: 'MessageBox',
+                 path: str,
+                 analyse_path: str,
+                 stage: Stage = Stage.Parse):
+        super().__init__(symid, symtable, mbox, path, stage)
+        self.__analyse_path = analyse_path
+
+    @property
+    def analyse_path(self):
+        return self.__analyse_path

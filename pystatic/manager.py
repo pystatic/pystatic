@@ -2,18 +2,20 @@ import os
 import logging
 from collections import deque
 from typing import Optional, Dict, TYPE_CHECKING
-from pystatic.typesys import TypeModuleTemp, TypePackageTemp, TypeIns
+from pystatic.config import Config
+from pystatic.exprparse import eval_expr
+from pystatic.errorcode import *
+from pystatic.fsys import Filesys, FilePath, ModuleFindRes
+from pystatic.infer.infer import InferStarter
 from pystatic.message import MessageBox
+from pystatic.option import Option
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
                                  get_init_module_symtable)
-from pystatic.config import Config
-from pystatic.fsys import Filesys, FilePath, ModuleFindRes
 from pystatic.symid import SymId, relpath2symid, symid2list
-from pystatic.target import BlockTarget, Target, Stage
-from pystatic.infer.infer import InferStarter
-from pystatic.option import Option
-from pystatic.errorcode import *
+from pystatic.typesys import (TypeModuleTemp, TypePackageTemp, TypeIns,
+                              any_ins)
+from pystatic.target import BlockTarget, Target, Stage, PackageTarget
 
 if TYPE_CHECKING:
     from pystatic.symtable import SymTable
@@ -28,12 +30,12 @@ class Manager:
         self.fsys = Filesys(config)
 
         self.pre_proc = Preprocessor(self)
-        self.targets: Dict[str, Target] = {}
+        self.targets: Dict[SymId, Target] = {}
 
         self.q_preprocess = deque()
         self.q_infer = deque()
 
-        if config.load_typeshed:
+        if not config.no_typeshed:
             self.__init_typeshed()
 
     def __init_typeshed(self):
@@ -45,6 +47,13 @@ class Manager:
                           symid: 'SymId',
                           default_symtable: Optional['SymTable'] = None,
                           oldpath: Optional[FilePath] = None) -> Option[bool]:
+        """
+        default_symtable:
+            if not None, then the symtable of the new target is set to it.
+
+        oldpath:
+            if not None, then it is the path that find_module should return.
+        """
         find_res = self.fsys.find_module(symid)
         add_option = Option(True)
         if not find_res:
@@ -60,47 +69,52 @@ class Manager:
 
             # TODO: support namespace
             assert len(find_res.paths) == 1
-            assert find_res.target_file
 
             if oldpath and oldpath != find_res.paths[0]:
                 # TODO: report name collision
                 add_option = Option(False)
                 return add_option
 
-            new_target = Target(symid, symtable, mbox,
-                                self.fsys.realpath(find_res.target_file))
-
             if find_res.res_type == ModuleFindRes.Module:
-                self.__add_target(new_target, find_res.target_file)
+                file_path = self.fsys.realpath(find_res.paths[0])
+                new_target = Target(symid, symtable, mbox, file_path)
+
+                self.__parse(new_target)
+                self.update_stage(new_target, Stage.Preprocess)
+                self.__add_target(new_target)
 
             elif find_res.res_type == ModuleFindRes.Package:
+                assert find_res.analyse_path
+                dir_path = self.fsys.realpath(find_res.paths[0])
+                analyse_path = self.fsys.realpath(find_res.analyse_path)
+
+                assert dir_path == os.path.dirname(analyse_path)
+
+                new_target = PackageTarget(symid, symtable, mbox, dir_path,
+                                           analyse_path)
                 new_target.module_temp = TypePackageTemp(
                     find_res.paths, new_target.symtable, new_target.symid)
                 new_target.path = self.fsys.realpath(find_res.paths[0])
 
-                self.__add_target(new_target, find_res.target_file)
+                self.__parse(new_target)
+                self.update_stage(new_target, Stage.Preprocess)
+                self.__add_target(new_target)
 
             elif find_res.res_type == ModuleFindRes.Namespace:
                 assert False, "Namespace package not supported yet"
 
         return add_option
 
-    def __add_target(self, target: Target, analyse_path: FilePath):
-        """Add target.
-
-        analyse_path:
-            the path of the file to be analysed. If the target represents a
-            package, then analyse_path is path of corresponding __init__.py file
-            while target.path is the path of the package.
-        
-        """
-        assert os.path.isabs(target.path)
-
-        target.ast = path2ast(analyse_path)
+    def __add_target(self, target: Target):
+        """Add target"""
         self.targets[target.symid] = target
-        self.fsys.add_path_symid_map(target.path, target.symid)
+        if target.path:
+            self.fsys.add_path_symid_map(target.path, target.symid)
 
-        self.add_to_queue(target, Stage.Preprocess)
+    def __parse(self, target: Target):
+        assert target.stage == Stage.Parse
+        assert os.path.isabs(target.analyse_path)
+        target.ast = path2ast(target.analyse_path)
 
     def is_module(self, symid: 'SymId') -> bool:
         """symid represents a valid module?"""
@@ -110,13 +124,30 @@ class Manager:
         else:
             return True
 
-    def add_to_queue(self, target: BlockTarget, stage: Stage):
-        if stage == Stage.Preprocess:
-            target.stage = Stage.Preprocess
+    def update_stage(self,
+                     target: BlockTarget,
+                     stage: Stage,
+                     isnew: bool = False):
+        """Update the stage of a target
+
+        ifnew:
+            True if target is not in self.targets.
+
+        If target's original stage is equal to the new stage and isnew is false,
+        then nothing will happen.
+        """
+        if target.stage == stage and not isnew:
+            return
+        target.stage = stage
+        if stage == Stage.Parse:
+            assert isinstance(target, Target)
+            self.__parse(target)
+        elif stage == Stage.Preprocess:
             self.q_preprocess.append(target)
         elif stage == Stage.Infer:
-            target.stage = Stage.Infer
             self.q_infer.append(target)
+        elif stage == Stage.FINISH:
+            pass
 
     def get_module_temp(self, symid: 'SymId') -> Optional[TypeModuleTemp]:
         if symid in self.targets:
@@ -133,11 +164,19 @@ class Manager:
             rt_path = crawl_path(os.path.dirname(path))
             self.fsys.add_userpath(rt_path)
             symid = relpath2symid(rt_path, path)
-
             return self.__add_check_symid(symid, None, path)
 
     def add_check_symid(self, symid: 'SymId') -> Option[bool]:
         return self.__add_check_symid(symid)
+
+    def add_check_target(self, target: 'Target'):
+        assert target not in self.targets
+        self.__add_target(target)
+        self.update_stage(target, target.stage, True)
+
+    def change_target_stage(self, target: 'Target', stage: Stage):
+        assert target == self.targets.get(target.symid)
+        self.update_stage(target, stage)
 
     def get_mbox_by_symid(self, symid: 'SymId') -> Optional[MessageBox]:
         target = self.targets.get(symid)
@@ -157,27 +196,44 @@ class Manager:
         pass
 
     def preprocess_block(self, blk_target: BlockTarget):
-        self.add_to_queue(blk_target, Stage.Preprocess)
+        self.update_stage(blk_target, Stage.Preprocess, True)
         self.pre_proc.process()
         pass
 
     def infer(self):
         self.preprocess()
+        # TODO: infer here
         pass
 
     def get_sym_type(self, module_symid: SymId,
                      var_symid: SymId) -> Optional['TypeIns']:
-        target = self.targets.get(module_symid)
-        if target:
+        module_temp = self.get_module_temp(module_symid)
+        if not module_temp:
+            return None
+        else:
             varid_list = symid2list(var_symid)
-            cur_ins = target.module_temp.get_default_ins().value
+            cur_ins = module_temp.get_default_ins().value
             for subid in varid_list:
                 res_option = cur_ins.getattribute(subid, None)
                 if res_option.haserr():
                     return None
                 cur_ins = res_option.value
             return cur_ins
-        return None
+
+    def eval_expr(self, module_symid: SymId, expr: str) -> Optional['TypeIns']:
+        try:
+            astnode = ast.parse(expr, mode='eval')
+            module_temp = self.get_module_temp(module_symid)
+            module_ins = module_temp.get_default_ins().value
+            if not module_temp:
+                return None
+            res_option = eval_expr(astnode.body, module_ins)  # type: ignore
+            if res_option.haserr():
+                return None
+            else:
+                return res_option.value
+        except SyntaxError as e:
+            return None
 
 
 def path2ast(path: FilePath) -> ast.AST:

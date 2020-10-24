@@ -69,4 +69,4 @@ class Preprocessor:
             resolve_cls_attr(target.symtable, target.mbox)
 
             if isinstance(target, Target):
-                self.manager.add_to_queue(target, Stage.Infer)
+                self.manager.update_stage(target, Stage.Infer)

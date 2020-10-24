@@ -17,13 +17,13 @@ class ModuleFindRes:
     Package = 2
     Namespace = 3
 
-    def __init__(self, res_type: int, paths: List[str],
-                 target_file: Optional[str]) -> None:
+    def __init__(self, res_type: int, paths: List[FilePath],
+                 analyse_path: Optional[FilePath]) -> None:
         self.res_type = res_type
         # For package to set correct paths attribute
         self.paths = paths
         # File to analyse, if result is a namespace package, target_file is None
-        self.target_file = target_file
+        self.analyse_path = analyse_path
 
 
 class Node:

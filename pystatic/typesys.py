@@ -291,10 +291,7 @@ class TypeType(TypeIns):
 
     def __str__(self):
         s = self.temp.str_expr(None)
-        if s == "Any":
-            return s
-        else:
-            return "type(" + s + ')'
+        return "Type[" + s + ']'
 
 
 class TypeVarTemp(TypeTemp):

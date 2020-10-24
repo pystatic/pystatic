@@ -18,7 +18,7 @@ def parse_expr(expr: str):
 def test_exprparse():
     src = 'exprparse1'
     cwd = os.path.dirname(__file__)
-    config = Config({'load_typeshed': True, 'cwd': cwd})
+    config = Config({'cwd': cwd})
     manager = Manager(config)
     res_option = manager.add_check_file(f'./src/{src}.py')
     assert res_option.value

@@ -1,4 +1,6 @@
 import ast
+from pystatic.message import MessageBox
+from pystatic.target import Stage, Target
 from pystatic.symtable import SymTable
 from pystatic.manager import Manager
 from pystatic.config import Config
@@ -84,7 +86,12 @@ class Shell:
         self.splitor = BlockSplitor()
         self.ps = '>>> '
 
-        self.symtable = get_init_module_symtable('__shell__')
+        self.symid = '__shell__'
+        self.symtable = get_init_module_symtable(self.symid)
+        self.mbox = MessageBox(self.symid)
+        self.target = Target(self.symid, self.symtable, self.mbox, '',
+                             Stage.FINISH)
+        self.manager.add_check_target(self.target)
 
     def run(self):
         while True:
@@ -100,10 +107,27 @@ class Shell:
 
             else:
                 try:
-                    astnode = ast.parse(blk_str)
+                    astnode = ast.parse(blk_str, mode='eval')
+                    # input is an expression
+                    ins = self.manager.eval_expr(self.symid, blk_str)
+                    if ins:
+                        print(f'{ins}')
+                    else:
+                        print('Expression error')
+
+                except SyntaxError:
+                    astnode = ast.parse(blk_str, type_comments=True)
                     if len(astnode.body) == 0:
                         continue
-                    astnode = astnode.body[0]
+                    self.target.ast = astnode.body[0]
+                    self.manager.change_target_stage(self.target,
+                                                     Stage.Preprocess)
+                    self.manager.preprocess()
+
+                    for err in self.mbox.error:
+                        print(err)
+
+                    self.mbox.clear()
 
                 except SyntaxError as e:
                     print(e)
@@ -111,3 +135,4 @@ class Shell:
 
 def run_shell(config: 'Config'):
     sh = Shell(config)
+    sh.run()

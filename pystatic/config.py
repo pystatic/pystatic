@@ -33,10 +33,12 @@ class Config:
         self.python_version: PY_VERSION = (sys.version_info.major,
                                            sys.version_info.minor)
 
-        # cwd
+        # cwd: current working direcotry
+        # default: return value of os.getcwd()
         self.cwd: str = get('cwd', str) or os.getcwd()
 
-        # manual path
+        # manual_path: paths specified by user that pystatic will search for.
+        # default: []
         self.manual_path: List[str] = get('manual_path') or []
         mypy_path = os.getenv('MYPYPATH')
         if mypy_path:
@@ -44,10 +46,11 @@ class Config:
                 if path not in self.manual_path:
                     self.manual_path.append(path)
 
-        # sitepkg path
+        # sitepkg: sitepkg path
         self.sitepkg: List[str] = get_sitepkg()
 
-        # typeshed path
+        # typeshed: typeshed path
+        # default: typeshed variable in this module
         if get('typeshed', str):
             self.typeshed: Optional[str] = get('typeshed')
         else:
@@ -56,5 +59,6 @@ class Config:
             else:
                 self.typeshed = None
 
-        # load_typeshed
-        self.load_typeshed: bool = get('load_typeshed') or False
+        # no_typeshed: if true, then typeshed is not automatically loaded.
+        # default: False.
+        self.no_typeshed: bool = get('no_typeshed') or False
