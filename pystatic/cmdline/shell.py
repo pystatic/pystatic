@@ -116,21 +116,22 @@ class Shell:
                         print('Expression error')
 
                 except SyntaxError:
-                    astnode = ast.parse(blk_str, type_comments=True)
-                    if len(astnode.body) == 0:
-                        continue
-                    self.target.ast = astnode.body[0]
-                    self.manager.change_target_stage(self.target,
-                                                     Stage.Preprocess)
-                    self.manager.preprocess()
+                    try:
+                        astnode = ast.parse(blk_str, type_comments=True)
+                        if len(astnode.body) == 0:
+                            continue
+                        self.target.ast = astnode.body[0]
+                        self.manager.change_target_stage(
+                            self.target, Stage.Preprocess)
+                        self.manager.preprocess()
 
-                    for err in self.mbox.error:
-                        print(err)
+                        for err in self.mbox.error:
+                            print(err)
 
-                    self.mbox.clear()
+                        self.mbox.clear()
 
-                except SyntaxError as e:
-                    print(e)
+                    except SyntaxError as e:
+                        print(e)
 
 
 def run_shell(config: 'Config'):

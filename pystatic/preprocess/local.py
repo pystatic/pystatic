@@ -34,7 +34,7 @@ def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
     symtable.local.update(new_entry)
 
     fake_data.local = {}  # empty the fake_data
-    for tp_def in symtable._cls_defs.values():
+    for tp_def in fake_data.cls_defs.values():
         assert isinstance(tp_def, TypeClassTemp)
         inner_symtable = tp_def.get_inner_symtable()
         resolve_local_typeins(inner_symtable, mbox)

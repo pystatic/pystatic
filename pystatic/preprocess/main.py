@@ -8,6 +8,7 @@ from pystatic.preprocess.impt import resolve_import_type, resolve_import_ins
 from pystatic.preprocess.cls import (resolve_cls_def, resolve_cls_method,
                                      resolve_cls_attr)
 from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
+from pystatic.preprocess.sym_util import clear_fake_data
 from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 
 if TYPE_CHECKING:
@@ -70,3 +71,6 @@ class Preprocessor:
 
             if isinstance(target, Target):
                 self.manager.update_stage(target, Stage.Infer)
+
+        for target in to_check:
+            clear_fake_data(target.symtable)

@@ -15,6 +15,7 @@ class FakeData:
         self.fun: Dict[str, 'fake_fun_entry'] = {}
         self.local: Dict[str, 'fake_local_entry'] = {}
         self.impt: Dict[str, 'fake_impt_entry'] = {}
+        self.cls_defs: Dict[str, 'TypeClassTemp'] = {}
 
 
 class fake_fun_entry:
@@ -59,7 +60,17 @@ def try_get_fake_data(symtable: 'SymTable') -> Optional[FakeData]:
     return getattr(symtable, 'fake_data', None)
 
 
+def clear_fake_data(symtable: 'SymTable'):
+    if hasattr(symtable, 'fake_data'):
+        fake_data: FakeData = symtable.fake_data  # type: ignore
+        for tp_temp in fake_data.cls_defs.values():
+            clear_fake_data(tp_temp.get_inner_symtable())
+        del symtable.fake_data  # type: ignore
+
+
 def add_cls_def(symtable: SymTable, name: str, temp: TypeClassTemp):
+    fake_data = get_fake_data(symtable)
+    fake_data.cls_defs[name] = temp
     symtable._cls_defs[name] = temp
 
 
