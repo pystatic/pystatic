@@ -51,3 +51,28 @@ def test_preprocess():
     ret_ins = f.overloads[0][1]
     assert isinstance(ret_ins, TypeIns) and not isinstance(ret_ins, TypeType)
     assert ret_ins.temp == A.temp
+
+
+def test_import():
+    src = 'preprocess_import'
+    cwd = os.path.join(os.path.dirname(__file__), 'src')
+    config = Config({'cwd': cwd, 'no_typeshed': True})
+    manager = Manager(config)
+
+    res_option = manager.add_check_file(f'./{src}.py')
+    assert res_option.value
+    manager.preprocess()
+
+    module_temp = manager.get_module_temp(src)
+    assert isinstance(module_temp, TypeModuleTemp)
+    assert module_temp.module_symid == src
+
+    banana = manager.get_sym_type(src, 'banana')
+    Banana = manager.get_sym_type(src, 'Banana')
+    assert isinstance(banana, TypeIns)
+    assert isinstance(Banana, TypeType)
+    assert banana.temp == Banana.temp
+
+    love_fruit = manager.eval_expr(src, 'love_banana(banana)')
+    assert isinstance(love_fruit, TypeIns)
+    assert love_fruit.temp == Banana.temp

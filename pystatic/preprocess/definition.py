@@ -239,7 +239,16 @@ class TypeDefVisitor(BaseVisitor):
                                                     Entry(tpins, node))
                             continue
 
-            self.manager.add_check_symid(infoitem.symid)
+            symidlist = symid2list(infoitem.symid)
+            cur_prefix = ''
+            for subid in symidlist:
+                if cur_prefix:
+                    cur_prefix += f'.{subid}'
+                else:
+                    cur_prefix = subid
+                self.manager.add_check_symid(cur_prefix)
+
+            # self.manager.add_check_symid(infoitem.symid)
             if not infoitem.is_import_module():
                 origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
                 if self.manager.is_module(origin_symid):

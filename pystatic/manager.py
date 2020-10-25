@@ -54,6 +54,9 @@ class Manager:
         oldpath:
             if not None, then it is the path that find_module should return.
         """
+        if symid in self.targets:
+            return Option(False)
+
         find_res = self.fsys.find_module(symid)
         add_option = Option(True)
         if not find_res:

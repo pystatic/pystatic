@@ -1,6 +1,6 @@
 import ast
 from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
-from pystatic.symid import absolute_symidlist, SymId, symid2list, rel2abssymid
+from pystatic.symid import absolute_symidlist, SymId, symid2list, rel2abssymid, symid_parent
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
                               TypePackageIns, TypeTemp, TypePackageTemp,
                               TypeType, TpState)
@@ -96,6 +96,7 @@ def analyse_import_stmt(node: ImportNode,
                         symid: SymId) -> List[fake_impt_entry]:
     """Extract import information stored in import ast node."""
     info_list: List[fake_impt_entry] = []
+    pkg_symid = symid_parent(symid)
     if isinstance(node, ast.Import):
         for alias in node.names:
             module_symid = alias.name
@@ -105,7 +106,7 @@ def analyse_import_stmt(node: ImportNode,
     elif isinstance(node, ast.ImportFrom):
         imp_name = '.' * node.level
         imp_name += node.module or ''
-        module_symid = rel2abssymid(symid, imp_name)
+        module_symid = rel2abssymid(pkg_symid, imp_name)
         imported = []
         for alias in node.names:
             attr_name = alias.name
@@ -140,7 +141,6 @@ def get_temp_state(temp: TypeTemp) -> TpState:
 def update_symtable_import_cache(symtable: 'SymTable',
                                  entry: 'fake_impt_entry',
                                  manager: 'Manager') -> Optional[TypeIns]:
-    """Update symtable's import cache"""
     symid = entry.symid
 
     symidlist = absolute_symidlist(symtable.glob_symid, symid)

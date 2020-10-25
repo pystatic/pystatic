@@ -5,7 +5,7 @@ Resovle import related type information.
 import ast
 import copy
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType, TypeVarIns
-from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
+from typing import TYPE_CHECKING, Tuple, List, Dict, Any
 from pystatic.symid import symid2list
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
