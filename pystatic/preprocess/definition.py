@@ -223,6 +223,7 @@ class TypeDefVisitor(BaseVisitor):
             if infoitem.symid == 'typing':
                 if not read_typing:
                     typing_temp = self.manager.get_module_temp('typing')
+                    read_typing = True
 
                 if typing_temp:
                     if infoitem.is_import_module():
@@ -231,12 +232,11 @@ class TypeDefVisitor(BaseVisitor):
                             Entry(typing_temp.get_default_ins().value, node))
                     else:
                         symtb = typing_temp.get_inner_symtable()
-                        entry = symtb.lookup_local_entry(infoitem.origin_name)
+                        typing_tpins = symtb.lookup_local(infoitem.origin_name)
 
-                        if isinstance(entry, Entry):
-                            tpins = entry.get_type()
+                        if typing_tpins:
                             self.symtable.add_entry(infoitem.asname,
-                                                    Entry(tpins, node))
+                                                    Entry(typing_tpins, node))
                             continue
 
             # must analyse all possible module that will be used when

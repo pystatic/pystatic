@@ -142,8 +142,7 @@ class _FirstClassTempVisitor(NoGenVisitor):
                    node: ast.Name,
                    symtable: Optional['SymTable'] = None):
         symtable = symtable or self.symtable
-        entry = symtable.lookup_entry(node.id)
-        return entry.get_type()
+        return symtable.lookup(node.id)
 
     def visit_Attribute(self, node: ast.Attribute):
         res = self.visit(node.value)

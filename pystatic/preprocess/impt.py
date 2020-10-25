@@ -5,9 +5,9 @@ Resovle import related type information.
 import ast
 import copy
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType, TypeVarIns
-from typing import TYPE_CHECKING, Tuple, List, Dict, Any
+from typing import TYPE_CHECKING, Tuple, List, Dict, Any, Optional
 from pystatic.symid import symid2list
-from pystatic.symtable import SymTable, Entry
+from pystatic.symtable import ImportEntry, SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
 from pystatic.preprocess.sym_util import (fake_impt_entry,
                                           update_symtable_import_cache,
@@ -38,23 +38,26 @@ def resolve_import_type(symtable: SymTable, manager: 'Manager'):
             assert module_ins, "module not found error not handled yet"
 
             if asname == symid:
-                # if there is no 'as' in the import statement then
-                # all the package along the path will be added to the
-                # symtable.
+                # no 'as' in the import statement
                 assert symid2list(symid)
                 top_symid = symid2list(symid)[0]
 
                 if top_symid not in symtable.local:
                     top_module_ins = cache.get_moduleins(top_symid)
                     assert top_module_ins, "module not found error not handled yet"
-                    symtable.local[top_symid] = Entry(top_module_ins,
-                                                      impt_node)
+                    symtable.import_cache.add_cache(top_symid, '',
+                                                    top_module_ins)
+                    symtable.add_entry(top_symid,
+                                       ImportEntry(top_symid, '', impt_node))
             else:
-                symtable.local[asname] = Entry(module_ins, impt_node)
+                symtable.import_cache.add_cache(symid, '', module_ins)
+                symtable.add_entry(symid, ImportEntry(symid, '', impt_node))
 
         else:
-            is_module = _resolve_import_chain(symtable, asname, manager, True)
-            if not is_module:
+            is_type = _resolve_import_chain(symtable, asname, manager, True)
+            # if the symbol is not a type or a module, then keep it in the
+            # fake_data's impt.
+            if not is_type:
                 new_impt_dict[asname] = entry
 
     fake_data.impt = new_impt_dict
@@ -97,7 +100,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str, manager: 'Manager',
     cur_state = (impt_entry.symid, impt_entry.origin_name)
     state_set = set()  # (symid, origin_name)
     buf_targets: List[Tuple['SymTable', str]] = [(symtable, name)]
-    result: Any = None
+    result: Optional['TypeIns'] = None
 
     while True:
         if cur_state in state_set:
@@ -153,8 +156,15 @@ def _resolve_import_chain(symtable: 'SymTable', name: str, manager: 'Manager',
 
             try:
                 origin_entry: fake_impt_entry = fake_data.impt.pop(name)
-                new_entry = Entry(result, origin_entry.defnode)
-                cur_symtable.local[name] = new_entry
+                module_symid = origin_entry.symid
+                origin_name = origin_entry.origin_name
+                defnode = origin_entry.defnode
+                assert name == origin_entry.asname
+
+                cur_symtable.import_cache.add_cache(module_symid, origin_name,
+                                                    result)
+                cur_symtable.add_entry(
+                    name, ImportEntry(module_symid, origin_name, defnode))
             except KeyError:
                 pass
 
@@ -166,8 +176,15 @@ def _resolve_import_chain(symtable: 'SymTable', name: str, manager: 'Manager',
         for cur_symtable, name in buf_targets:
             try:
                 origin_entry: fake_impt_entry = fake_data.impt.pop(name)
-                new_entry = Entry(any_ins, origin_entry.defnode)
-                cur_symtable.local[name] = new_entry
+                module_symid = origin_entry.symid
+                origin_name = origin_entry.origin_name
+                defnode = origin_entry.defnode
+                assert name == origin_entry.asname
+
+                cur_symtable.import_cache.add_cache(
+                    module_symid, origin_name, any_ins)  # default: any_ins
+                cur_symtable.add_entry(
+                    name, ImportEntry(module_symid, origin_name, defnode))
             except KeyError:
                 pass
 

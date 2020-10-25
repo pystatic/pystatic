@@ -29,22 +29,38 @@ class Entry:
         self._tp = tp
         self._defnode = defnode
 
-    def get_type(self) -> 'TypeIns':
+    def get_type(self, symtb: 'SymTable') -> 'TypeIns':
         return self._tp
 
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
 
-    def __str__(self):
-        return str(self.get_type())
+    # def __str__(self):
+    #     return str(self.get_type(None))
+
+
+class ImportEntry(Entry):
+    def __init__(self,
+                 module_symid: 'SymId',
+                 origin_name: 'SymId',
+                 defnode: Optional[ast.AST] = None) -> None:
+        self._module_symid = module_symid
+        self._origin_name = origin_name
+        self._defnode = defnode
+
+    def get_type(self, symtb: 'SymTable'):
+        return symtb.import_cache.lookup_cache(self._module_symid,
+                                               self._origin_name)
 
 
 class ImportCache:
-    __slots__ = ['import_nodes', 'import_map']
+    __slots__ = ['import_nodes', 'import_map', '_cache']
 
     def __init__(self) -> None:
         self.import_nodes: List['ImportNode'] = []
         self.import_map: Dict[str, 'TypeIns'] = {}
+
+        self._cache: Dict[SymId, Dict[SymId, 'TypeIns']] = {}
 
     def get_moduleins(self, abssymid: 'SymId') -> Optional['TypeIns']:
         from pystatic.typesys import TypePackageIns, TypeModuleTemp
@@ -74,6 +90,18 @@ class ImportCache:
 
     def add_import_node(self, node: 'ImportNode'):
         self.import_nodes.append(node)
+
+    def add_cache(self, module_symid: str, origin_name: str, ins: 'TypeIns'):
+        module_map = self._cache.setdefault(module_symid, {})
+        module_map[origin_name] = ins
+
+    def lookup_cache(self, module_symid: str,
+                     origin_name: str) -> Optional['TypeIns']:
+        module_map = self._cache.get(module_symid)
+        if not module_map:
+            return None
+        else:
+            return module_map.get(origin_name)
 
 
 class SymTable:
@@ -141,7 +169,7 @@ class SymTable:
         res = self.local.get(name)
         if not res:
             return None
-        return res.get_type()
+        return res.get_type(self)
 
     def lookup(self, name: str) -> Optional['TypeIns']:
         return self._legb_lookup(name, SymTable.lookup_local)
@@ -163,11 +191,11 @@ class SymTable:
             res_option.set_value(res)
         return res_option
 
-    def lookup_local_entry(self, name: str) -> Optional['Entry']:
-        return self.local.get(name)
+    # def lookup_local_entry(self, name: str) -> Optional['Entry']:
+    #     return self.local.get(name)
 
-    def lookup_entry(self, name: str) -> Optional['Entry']:
-        return self._legb_lookup(name, SymTable.lookup_local_entry)
+    # def lookup_entry(self, name: str) -> Optional['Entry']:
+    #     return self._legb_lookup(name, SymTable.lookup_local_entry)
 
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
