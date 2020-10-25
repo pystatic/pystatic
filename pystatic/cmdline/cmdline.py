@@ -1,7 +1,6 @@
 import argparse
 import os
 from pystatic.config import Config
-from typing import TextIO
 from pystatic.manager import Manager
 from pystatic.message import MessageBox
 from pystatic.cmdline.shell import run_shell
@@ -11,7 +10,7 @@ def cmdline_parse():
     parser = argparse.ArgumentParser('python static type checker')
     parser.add_argument('module',
                         metavar='module',
-                        nargs='+',
+                        nargs='*',
                         help='module path',
                         type=str)
     parser.add_argument('-p',
@@ -48,6 +47,10 @@ def cmdline_main():
     else:
         cmdline_mbox = MessageBox('cmdline')
         cmd_res.module = [os.path.realpath(path) for path in cmd_res.module]
+        if not cmd_res.module:
+            print('please enter module path or package path')
+            return
+
         for mod in cmd_res.module:
             add_option = manager.add_check_file(mod)
             add_option.dump_to_box(cmdline_mbox)
