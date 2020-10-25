@@ -43,7 +43,7 @@ class Filesys:
     """
     def __init__(self, config: 'Config') -> None:
         self.manual_path = config.manual_path
-        self.user_path = []
+        self.user_path = [config.cwd]
         self.sitepkg = config.sitepkg
         self.py_version = config.python_version
 
