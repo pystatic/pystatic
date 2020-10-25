@@ -239,6 +239,12 @@ class TypeDefVisitor(BaseVisitor):
                                                     Entry(tpins, node))
                             continue
 
+            # must analyse all possible module that will be used when
+            # constructing symtable's import_cache because when constructing
+            # the import_cache it rely on the manager to return the correct
+            # module.
+
+            # analyse all the package along the way
             symidlist = symid2list(infoitem.symid)
             cur_prefix = ''
             for subid in symidlist:
@@ -248,7 +254,6 @@ class TypeDefVisitor(BaseVisitor):
                     cur_prefix = subid
                 self.manager.add_check_symid(cur_prefix)
 
-            # self.manager.add_check_symid(infoitem.symid)
             if not infoitem.is_import_module():
                 origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
                 if self.manager.is_module(origin_symid):
