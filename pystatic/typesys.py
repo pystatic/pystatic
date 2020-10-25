@@ -47,6 +47,9 @@ class TypeTemp:
         rpos = self.name.rfind('.')
         return self.name[rpos + 1:]
 
+    def arity(self) -> int:
+        return len(self.placeholders)
+
     # basic
     def getattribute(
             self,
@@ -170,7 +173,7 @@ class TypeTemp:
                  context: Optional[TypeContext] = None) -> str:
         """__str__ with bindlist and context"""
         str_bindlist = []
-        slot_cnt = len(self.placeholders)
+        slot_cnt = self.arity()
         if slot_cnt == 0:
             return self.name
 
@@ -634,14 +637,28 @@ class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__('Literal', 'typing')
 
+    def arity(self) -> int:
+        return 1
+
 
 class TypeLiteralIns(TypeIns):
     def __init__(self, value):
-        super().__init__(literal_temp, None)
-        self.value = value
+        super().__init__(literal_temp, [value])
+
+    @property
+    def value(self):
+        assert self.bindlist
+        return self.bindlist[0]
 
     def __str__(self):
-        return type(self.value).__name__
+        assert self.bindlist
+        assert len(self.bindlist) == 1
+        value = self.value
+        fmt = 'Literal[{}]'
+        if isinstance(value, str):
+            return fmt.format(f"'{value}'")
+        else:
+            return fmt.format(str(value))
 
 
 class TypePackageType(TypeType):
