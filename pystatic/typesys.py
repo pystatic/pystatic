@@ -262,6 +262,38 @@ class TypeIns:
                   node: ast.BinOp) -> Option['TypeIns']:
         return self.temp.binop_mgf(self.bindlist, other, op, node)
 
+    def __eq__(self, other):
+        # note that `isinstance(other, TypeIns)` won't reject typeins and typetype
+        if other.__class__ != self.__class__:
+            return False
+
+        # Every class should have only one template globally
+        if self.temp != other.temp:
+            return False
+
+        else:
+            temp_arity = self.temp.arity()
+            # default bind is Any
+            if self.bindlist:
+                diff1 = temp_arity - len(self.bindlist)
+                ext_list1 = self.bindlist + [any_ins] * diff1
+            else:
+                ext_list1 = [any_ins] * temp_arity
+
+            if other.bindlist:
+                diff2 = temp_arity - len(other.bindlist)
+                ext_list2 = other.bindlist + [any_ins] * diff2
+            else:
+                ext_list2 = [any_ins] * temp_arity
+
+            for i in range(temp_arity):
+                if ext_list1[i] != ext_list2[i]:
+                    return False
+            return True
+
+    def __ne__(self, other):
+        return not (self == other)
+
     def __str__(self) -> str:
         return self.temp.str_expr(self.bindlist)
 
