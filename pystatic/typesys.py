@@ -169,7 +169,23 @@ class TypeTemp:
                  bindlist: BindList,
                  context: Optional[TypeContext] = None) -> str:
         """__str__ with bindlist and context"""
-        return self.name
+        str_bindlist = []
+        slot_cnt = len(self.placeholders)
+        if slot_cnt == 0:
+            return self.name
+
+        if not bindlist:
+            str_bindlist = ['Any'] * slot_cnt
+        else:
+            diff = slot_cnt - len(bindlist)
+            assert diff >= 0
+            for bind in bindlist:
+                str_bindlist.append(f'{bind}')
+
+            str_bindlist.extend(['Any'] * diff)
+
+        assert str_bindlist
+        return self.name + '[' + ', '.join(str_bindlist) + ']'
 
     def __str__(self):
         assert False, "use str_expr instead"
@@ -539,6 +555,15 @@ class TypeNoneTemp(TypeTemp):
         return False
 
 
+class TypeListTemp(TypeTemp):
+    def __init__(self) -> None:
+        super().__init__('List', 'typing')
+        self.placeholders = [_invariant_tpvar]
+
+    def get_default_typetype(self) -> 'TypeType':
+        return list_type
+
+
 class TypeTupleTemp(TypeTemp):
     def __init__(self):
         super().__init__('Tuple', 'typing')
@@ -557,6 +582,7 @@ class TypeUnionTemp(TypeTemp):
 class TypeOptionalTemp(TypeTemp):
     def __init__(self):
         super().__init__('Optional', 'typing')
+        self.placeholders = [_covariant_tpvar]
 
 
 class TypeEllipsisTemp(TypeTemp):
@@ -675,26 +701,36 @@ class TypeFuncIns(TypeIns):
         return Option(self.overloads[0][1])
 
 
-# special types (typing.py)
 any_temp = TypeAnyTemp()
-none_temp = TypeNoneTemp()
-generic_temp = TypeGenericTemp()
-ellipsis_temp = TypeEllipsisTemp()
-callable_temp = TypeCallableTemp()
-tuple_temp = TypeTupleTemp()
-optional_temp = TypeOptionalTemp()
-literal_temp = TypeLiteralTemp()
-union_temp = TypeUnionTemp()
-typevar_temp = TypeVarTemp()
+any_ins = TypeIns(any_temp, None)
+any_type = TypeType(any_temp, None)
 
-# builtins.py
+ellipsis_temp = TypeEllipsisTemp()
+ellipsis_ins = TypeIns(ellipsis_temp, None)
+ellipsis_type = TypeType(ellipsis_temp, None)
+
+none_temp = TypeNoneTemp()
+
+typevar_temp = TypeVarTemp()
+typevar_type = TypeType(typevar_temp, None)
 func_temp = TypeFuncTemp()
 
-# these typetype are shared to save memory
-ellipsis_type = TypeType(ellipsis_temp, None)
-none_type = TypeType(none_temp, None)
-any_type = TypeType(any_temp, None)
-typevar_type = TypeType(typevar_temp, None)
+_invariant_tpvar = TypeVarIns('_invariant_tpvar',
+                              bound=any_ins,
+                              kind=TpVarKind.INVARIANT)
+_covariant_tpvar = TypeVarIns('_covariant_tpvar',
+                              bound=any_ins,
+                              kind=TpVarKind.COVARIANT)
+_contravariant_tpvar = TypeVarIns('_contravariant_tpvar',
+                                  bound=any_ins,
+                                  kind=TpVarKind.CONTRAVARIANT)
 
-any_ins = TypeIns(any_temp, None)
-ellipsis_ins = TypeIns(ellipsis_temp, None)
+list_temp = TypeListTemp()
+list_type = TypeType(list_temp, None)
+
+optional_temp = TypeOptionalTemp()
+tuple_temp = TypeTupleTemp()
+union_temp = TypeUnionTemp()
+callable_temp = TypeCallableTemp()
+generic_temp = TypeGenericTemp()
+literal_temp = TypeLiteralTemp()

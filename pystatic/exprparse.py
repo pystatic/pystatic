@@ -3,7 +3,7 @@ import contextlib
 from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
-from pystatic.typesys import TypeIns, TypeLiteralIns
+from pystatic.typesys import TypeIns, TypeLiteralIns, any_ins, list_temp
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map
@@ -53,6 +53,7 @@ class ExprParser(NoGenVisitor):
             self.errors.extend(errlist)
 
     def add_to_container(self, item, node: ast.AST):
+        """If under subscript node, then will add item to current container"""
         if self.in_subs:
             self.container.append(WithAst(item, node))
 
@@ -163,7 +164,14 @@ class ExprParser(NoGenVisitor):
             self.add_to_container(lst, node)
             return lst
         else:
-            assert False, "TODO"
+            inner_type = None
+            for subnode in node.elts:
+                typeins = self.visit(subnode)
+                assert isinstance(typeins, TypeIns)
+                inner_type = typeins
+
+            inner_type = inner_type or any_ins
+            return list_temp.getins([inner_type]).value
 
     def visit_Tuple(self, node: ast.Tuple):
         if self.in_subs:
@@ -175,7 +183,8 @@ class ExprParser(NoGenVisitor):
             self.add_to_container(tp, node)
             return tp
         else:
-            assert False, "TODO"
+            for subnode in node.elts:
+                pass
 
     def visit_Slice(self, node: ast.Slice):
         assert False, "TODO"
