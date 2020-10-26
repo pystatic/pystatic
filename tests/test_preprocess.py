@@ -21,7 +21,8 @@ def test_preprocess():
     config = Config({'cwd': cwd})
     manager = Manager(config)
 
-    res_option = manager.add_check_file(f'./src/{src}.py')
+    filepath = os.path.join(cwd, 'src', f'{src}.py')
+    res_option = manager.add_check_file(filepath)
     assert res_option.value
     manager.preprocess()
 
@@ -59,7 +60,8 @@ def test_import():
     config = Config({'cwd': cwd, 'no_typeshed': True})
     manager = Manager(config)
 
-    res_option = manager.add_check_file(f'./{src}.py')
+    filepath = os.path.join(cwd, f'{src}.py')
+    res_option = manager.add_check_file(filepath)
     assert res_option.value
     manager.preprocess()
 
