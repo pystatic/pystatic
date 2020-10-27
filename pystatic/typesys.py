@@ -1,9 +1,10 @@
 import ast
 import enum
 import copy
-from typing import (Optional, Dict, List, Tuple, Union, TYPE_CHECKING, Final)
+from typing import (Any, Optional, Dict, List, Tuple, Union, TYPE_CHECKING,
+                    Final)
 from pystatic.option import Option
-from pystatic.uri import Uri
+from pystatic.symid import SymId
 from pystatic.evalutil import (InsWithAst, ApplyArgs, GetItemType, WithAst)
 from pystatic.symtable import Entry, SymTable
 from pystatic.errorcode import NoAttribute
@@ -11,9 +12,9 @@ from pystatic.errorcode import NoAttribute
 if TYPE_CHECKING:
     from pystatic.arg import Argument
 
-TypeContext = Dict['TypeVarIns', 'TypeType']
+TypeContext = Dict['TypeVarIns', 'TypeIns']
 TypeVarList = List['TypeVarIns']
-BindList = Optional[List[Union['TypeType', List['TypeType'], 'TypeIns']]]
+BindList = Optional[List[Any]]
 
 DEFAULT_TYPEVAR_NAME: Final[str] = '__unknown_typevar_name__'
 
@@ -33,91 +34,18 @@ class TpState(enum.IntEnum):
 class TypeTemp:
     def __init__(self,
                  name: str,
-                 module_uri: str,
+                 module_symid: str,
                  resolve_state: TpState = TpState.OVER):
         self.name = name
         self.placeholders = []
 
-        self.module_uri = module_uri  # the module uri that define this type
+        self.module_symid = module_symid  # the module symid that define this type
         self._resolve_state = resolve_state
 
     @property
     def basename(self) -> str:
         rpos = self.name.rfind('.')
         return self.name[rpos + 1:]
-
-    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
-        return None
-
-    def get_typetype(self,
-                     bindlist: Optional[BindList] = None,
-                     item: Optional[GetItemType] = None) -> Option['TypeType']:
-        """Mainly used for TypeType to generate correct TypeType"""
-        if not item:
-            return Option(TypeType(self, None))
-        else:
-            if isinstance(item.ins, (tuple, list)):
-                tpins_list = []
-                for item in item.ins:
-                    if isinstance(item.ins, TypeIns):
-                        tpins_list.append(item.ins)
-                    else:
-                        # TODO: add warning here
-                        pass
-                return Option(TypeType(self, tpins_list))
-            else:
-                if isinstance(item.ins, TypeIns):
-                    return Option(TypeType(self, [item.ins]))
-                else:
-                    # TODO: add warning here
-                    return Option(TypeType(self, None))
-
-    def get_default_typetype(self) -> 'TypeType':
-        return self.get_typetype(None, None).value
-
-    def getins(self, bindlist: BindList) -> 'TypeIns':
-        return TypeIns(self, bindlist)
-
-    def get_default_ins(self) -> 'TypeIns':
-        return self.getins(None)
-
-    def get_type_attribute(
-            self,
-            name: str,
-            bindlist: BindList,
-            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
-        """Get attribute that belong to the Type itself, mainly used for typetype"""
-        return self.getattribute(name, bindlist, context)
-
-    def init_ins(self, applyargs: 'ApplyArgs',
-                 bindlist: BindList) -> Option['TypeIns']:
-        return Option(self.getins(bindlist))
-
-    # magic operation functions(mgf is short for magic function).
-    def unaryop_mgf(self, bindlist: BindList, op: str,
-                    node: ast.UnaryOp) -> Option['TypeIns']:
-        option_res = Option(any_ins)
-        func = self.getattribute(op, bindlist)
-        if not func or not isinstance(func, TypeFuncIns):
-            # TODO: add warning here
-            return option_res
-
-        else:
-            applyargs = ApplyArgs()
-            return func.call(applyargs)
-
-    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
-                  node: ast.BinOp) -> Option['TypeIns']:
-        option_res = Option(any_ins)
-        func = self.getattribute(op, bindlist)
-        if not func or not isinstance(func, TypeFuncIns):
-            # TODO: add warning here
-            return option_res
-
-        else:
-            applyargs = ApplyArgs()
-            applyargs.add_arg(other, node)
-            return func.call(applyargs)
 
     # basic
     def getattribute(
@@ -149,6 +77,93 @@ class TypeTemp:
         # TODO: add error
         return option_res
 
+    # magic operation functions(mgf is short for magic function).
+    def unaryop_mgf(self, bindlist: BindList, op: str,
+                    node: ast.UnaryOp) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        func = self.getattribute(op, bindlist)
+        if not func or not isinstance(func, TypeFuncIns):
+            # TODO: add warning here
+            return option_res
+
+        else:
+            applyargs = ApplyArgs()
+            return func.call(applyargs)
+
+    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
+                  node: ast.BinOp) -> Option['TypeIns']:
+        option_res = Option(any_ins)
+        func = self.getattribute(op, bindlist)
+        if not func or not isinstance(func, TypeFuncIns):
+            # TODO: add warning here
+            return option_res
+
+        else:
+            applyargs = ApplyArgs()
+            applyargs.add_arg(other, node)
+            return func.call(applyargs)
+
+    # some helper methods
+    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
+        return None
+
+    def get_typetype(self,
+                     bindlist: Optional[BindList] = None,
+                     item: Optional[GetItemType] = None) -> Option['TypeType']:
+        """Mainly used for TypeType to generate correct TypeType"""
+        res_option = Option(any_type)
+        if not item:
+            return Option(TypeType(self, None))
+        else:
+            if isinstance(item.ins, (tuple, list)):
+                tpins_list: List[TypeIns] = []
+                for singleitem in item.ins:
+                    cur_ins = singleitem.ins
+                    if isinstance(cur_ins, TypeType):
+                        tpins = cur_ins.getins(res_option)  # type: ignore
+                        tpins_list.append(tpins)
+                    elif isinstance(cur_ins, TypeIns):
+                        tpins_list.append(cur_ins)
+                    else:
+                        # TODO: add warning here
+                        pass
+                res_option.value = TypeType(self, tpins_list)
+
+            else:
+                if isinstance(item.ins, TypeIns):
+                    res_option.value = TypeType(self, [item.ins])
+                else:
+                    # TODO: add warning here
+                    res_option.value = TypeType(self, None)
+
+        return res_option
+
+    def get_default_typetype(self) -> 'TypeType':
+        return self.get_typetype(None, None).value
+
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        return Option(TypeIns(self, bindlist))
+
+    def get_default_ins(self) -> Option['TypeIns']:
+        return self.getins(None)
+
+    def get_type_attribute(
+            self,
+            name: str,
+            bindlist: BindList,
+            context: Optional[TypeContext] = None) -> Optional['TypeIns']:
+        """Get attribute that belong to the Type itself, mainly used for typetype"""
+        return self.getattribute(name, bindlist, context)
+
+    def init_ins(self, applyargs: 'ApplyArgs',
+                 bindlist: BindList) -> Option['TypeIns']:
+        """Initialize an instance
+
+        used when __init__ method should be called.
+        """
+        # TODO: check consistency
+        return self.getins(bindlist)
+
     # string expression
     def str_expr(self,
                  bindlist: BindList,
@@ -171,7 +186,7 @@ class TypeIns:
         new_bindlist = []
         bindlist = self.bindlist or []
         for item in bindlist:
-            if isinstance(item, TypeVarTemp) and item in context:
+            if isinstance(item, TypeVarIns) and item in context:
                 # TODO: check consistence here
                 new_bindlist.append(context[item])
             else:
@@ -236,11 +251,15 @@ class TypeType(TypeIns):
     def __init__(self, temp: TypeTemp, bindlist: BindList):
         super().__init__(temp, bindlist)
 
-    def getins(self) -> 'TypeIns':
-        return self.temp.getins(self.bindlist)
+    def getins(self, typetype_option: Option['TypeIns']) -> 'TypeIns':
+        """Get TypeIns from TypeType
 
-    def call(self, args) -> 'TypeIns':
-        return self.getins()
+        all errors will be stored in typetype_option.
+        """
+        ins_option = self.temp.getins(self.bindlist)
+        typetype_option.combine_error(ins_option)
+
+        return ins_option.value
 
     def getattribute(
             self,
@@ -316,8 +335,9 @@ class TypeVarTemp(TypeTemp):
         if len(applyargs.args) > args_rear:
             default_ins.bound = None
             for rangenode in applyargs.args[args_rear:]:
-                assert isinstance(rangenode.ins, TypeType), "TODO"
-                default_ins.constrains.append(rangenode.ins)
+                assert isinstance(rangenode.ins, TypeType), "expect typetype"
+                rangeins = rangenode.ins.getins(ins_option)
+                default_ins.constrains.append(rangeins)
 
         cova = applyargs.kwargs.get('covariant')
         if not cova:
@@ -362,6 +382,7 @@ class TypeVarIns(TypeIns):
                  *args: 'TypeIns',
                  bound: Optional['TypeIns'] = None,
                  kind: TpVarKind = TpVarKind.INVARIANT):
+        super().__init__(typevar_temp, None)
         self.tpvar_name = tpvar_name
         self.bound = bound
         assert kind == TpVarKind.INVARIANT or kind == TpVarKind.COVARIANT or kind == TpVarKind.CONTRAVARIANT
@@ -373,12 +394,12 @@ class TypeClassTemp(TypeTemp):
     # FIXME: remove None of symtable and defnode
     def __init__(self,
                  clsname: str,
-                 module_uri: str,
+                 module_symid: str,
                  state: TpState,
                  def_symtable: 'SymTable',
                  inner_symtable: 'SymTable',
                  defnode: ast.ClassDef = None):
-        super().__init__(clsname, module_uri, state)
+        super().__init__(clsname, module_symid, state)
 
         self.baseclass: 'List[TypeType]'
         self.baseclass = []
@@ -389,7 +410,7 @@ class TypeClassTemp(TypeTemp):
         self._def_symtable = def_symtable  # symtable where this cls is defined
         self._defnode = defnode
 
-        self._glob_uri = module_uri  # the module uri that this class is defined
+        self._glob_symid = module_symid  # the module symid that this class is defined
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         cls_defs = self._inner_symtable._cls_defs
@@ -448,12 +469,12 @@ class TypeFuncTemp(TypeTemp):
 
 
 class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, uri: Uri, symtable: 'SymTable'):
+    def __init__(self, symid: SymId, symtable: 'SymTable'):
         # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(uri, uri, TpState.OVER, symtable, symtable)
+        super().__init__(symid, symid, TpState.OVER, symtable, symtable)
 
     @property
-    def uri(self):
+    def symid(self):
         return self.name
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
@@ -461,8 +482,8 @@ class TypeModuleTemp(TypeClassTemp):
 
 
 class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], symtable: 'SymTable', uri: Uri):
-        super().__init__(uri, symtable)
+    def __init__(self, paths: List[str], symtable: 'SymTable', symid: SymId):
+        super().__init__(symid, symtable)
         self.paths = paths
 
     def get_default_typetype(self) -> 'TypeType':
@@ -473,14 +494,38 @@ class TypeAnyTemp(TypeTemp):
     def __init__(self):
         super().__init__('Any', 'typing')
 
+    # basic
+    def getattribute(self, name: str, bindlist: BindList,
+                     context: Optional[TypeContext]) -> Optional['TypeIns']:
+        return any_ins
+
+    def call(self, applyargs: 'ApplyArgs',
+             bindlist: BindList) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    # magic operation functions
+    def unaryop_mgf(self, bindlist: BindList, op: str,
+                    node: ast.UnaryOp) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
+                  node: ast.BinOp) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    # some helper functions
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        return Option(any_ins)
+
+    def get_typetype(self, bindlist: Optional[BindList],
+                     item: Optional[GetItemType]) -> Option['TypeType']:
+        return Option(any_type)
+
     def get_default_typetype(self) -> 'TypeType':
         return any_type
-
-    def get_default_ins(self) -> 'TypeIns':
-        return any_ins
-
-    def getins(self, bindlist: BindList) -> 'TypeIns':
-        return any_ins
 
 
 class TypeNoneTemp(TypeTemp):
@@ -581,7 +626,7 @@ class TypePackageType(TypeType):
     def __init__(self, temp: TypePackageTemp) -> None:
         super().__init__(temp, None)
 
-    def getins(self) -> 'TypeIns':
+    def getins(self, typetype_option: Option['TypeIns']) -> 'TypeIns':
         assert isinstance(self.temp, TypePackageTemp)
         return TypePackageIns(self.temp)
 
@@ -599,13 +644,13 @@ class TypePackageIns(TypeIns):
 
 
 class TypeFuncIns(TypeIns):
-    def __init__(self, funname: str, module_uri: str,
+    def __init__(self, funname: str, module_symid: str,
                  inner_symtable: 'SymTable', argument: 'Argument',
                  ret: TypeIns) -> None:
         super().__init__(func_temp, None)
         self.overloads: List[Tuple['Argument', TypeIns]] = [(argument, ret)]
         self.funname = funname
-        self.module_uri = module_uri
+        self.module_symid = module_symid
 
         self._inner_symtable = inner_symtable
 

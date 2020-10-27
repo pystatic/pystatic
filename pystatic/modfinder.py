@@ -2,7 +2,7 @@ import os
 import logging
 from pystatic.config import PY_VERSION
 from typing import List, Dict, Optional, TYPE_CHECKING
-from pystatic.uri import uri2list, absolute_urilist, list2uri
+from pystatic.symid import symid2list, absolute_symidlist, list2symid
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeModuleTemp
@@ -54,41 +54,41 @@ class ModuleFinder:
                                  None)
         self.root = Node(dummy_ns)
 
-    def find(self, uri: str) -> Optional[ModuleFindRes]:
-        urilist = uri2list(uri)
-        if not urilist:
+    def find(self, symid: str) -> Optional[ModuleFindRes]:
+        symidlist = symid2list(symid)
+        if not symidlist:
             return None
 
         cur_node = self.root
         i = 0
-        while i < len(urilist) and urilist[i] in cur_node.child:
-            cur_node = cur_node.child[urilist[i]]
+        while i < len(symidlist) and symidlist[i] in cur_node.child:
+            cur_node = cur_node.child[symidlist[i]]
             i += 1
 
         cur_res = cur_node.res
-        for suburi in urilist[i:]:
+        for subsymid in symidlist[i:]:
             if cur_res.res_type == ModuleFindRes.Module:
                 return None
-            walk_res = _walk_single(suburi, cur_res.paths)
+            walk_res = _walk_single(subsymid, cur_res.paths)
             if not walk_res:
                 return None
             cur_res = walk_res
 
         return cur_res
 
-    def relative_find(self, uri: str,
+    def relative_find(self, symid: str,
                       module: 'TypeModuleTemp') -> Optional[ModuleFindRes]:
-        abs_uri = urilist_from_impitem(uri, module)
-        return self.find(list2uri(abs_uri))
+        abs_symid = symidlist_from_impitem(symid, module)
+        return self.find(list2symid(abs_symid))
 
 
-def _walk_single(suburi: str, paths: List[str]) -> Optional[ModuleFindRes]:
+def _walk_single(subsymid: str, paths: List[str]) -> Optional[ModuleFindRes]:
     assert paths
     ns_paths = []
     target = None
     target_file = None
     for path in paths:
-        sub_target = os.path.normpath(os.path.join(path, suburi))
+        sub_target = os.path.normpath(os.path.join(path, subsymid))
         pyi_file = sub_target + '.pyi'
         py_file = sub_target + '.py'
         if os.path.isfile(pyi_file):
@@ -142,10 +142,12 @@ def _resolve_typeshed(typeshed: str, pyv: PY_VERSION) -> List[str]:
     return stdlib_res + third_party_res
 
 
-def uri_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> str:
-    return list2uri(urilist_from_impitem(uri, curmodule))
+def symid_from_impitem(symid: str, curmodule: 'TypeModuleTemp') -> str:
+    return list2symid(symidlist_from_impitem(symid, curmodule))
 
 
-def urilist_from_impitem(uri: str, curmodule: 'TypeModuleTemp') -> List[str]:
-    package = uri2list(curmodule.uri)[:-1]  # the package that cur_module in
-    return absolute_urilist(list2uri(package), uri)
+def symidlist_from_impitem(symid: str,
+                           curmodule: 'TypeModuleTemp') -> List[str]:
+    package = symid2list(
+        curmodule.symid)[:-1]  # the package that cur_module in
+    return absolute_symidlist(list2symid(package), symid)

@@ -26,10 +26,10 @@ def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
         # resolved here.
         defnode = entry.defnode
 
-        option_tpins = eval_typedef_expr(defnode, symtable)
-        tpins = option_tpins.value
+        tpins_option = eval_typedef_expr(defnode, symtable)
+        tpins = tpins_option.value
 
-        option_tpins.dump_to_box(mbox)
+        tpins_option.dump_to_box(mbox)
 
         new_entry[name] = Entry(tpins, defnode)
 
@@ -47,11 +47,11 @@ def resolve_local_func(symtable: 'SymTable', mbox: 'MessageBox'):
 
     def add_func_define(node: ast.FunctionDef):
         nonlocal symtable, new_func_defs, mbox
-        option_fun = eval_func_type(node, symtable)
-        func_ins = option_fun.value
+        fun_option = eval_func_type(node, symtable)
+        func_ins = fun_option.value
         assert isinstance(func_ins, TypeFuncIns)
 
-        option_fun.dump_to_box(mbox)
+        fun_option.dump_to_box(mbox)
 
         name = node.name
 
