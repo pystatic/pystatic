@@ -9,6 +9,7 @@ from pystatic.errorcode import *
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH
+from pystatic.TypeCompatibe.simpleType import type_consistent
 
 
 class ConditionStmtType(Enum):
@@ -78,7 +79,6 @@ class ConditionInfer(BaseVisitor):
             if outer_state == ConditionStmtType.FUNC:
                 self.break_flag = BreakFlag.NORMAL
             elif self.cur_condition.reach == Reach.UNKNOWN:
-                # print("ejre")
                 self.break_flag = BreakFlag.NORMAL
 
     def get_break_node(self):
@@ -131,12 +131,17 @@ class ConditionInfer(BaseVisitor):
             name = test.func.id
             args = test.args
             if name == "isinstance":
-                option = eval_expr(test, self.recorder)
-                if self.err_maker.exsit_error(option):
-                    self.err_maker.dump_option(option)
+                # option = eval_expr(test, self.recorder)
+                # if self.err_maker.exsit_error(option):
+                #     self.err_maker.dump_option(option)
                 first_type = self.err_maker.dump_option(eval_expr(args[0], self.recorder))
                 second_type = self.err_maker.dump_option(eval_expr(args[1], self.recorder))
-                pass
+                
+                if type_consistent(first_type, self.err_maker.dump_option(second_type.call(None))):
+                    return Reach.RUNTIME_TRUE
+                else:
+                    return Reach.RUNTIME_FALSE
+                # TODO
             elif name == "issubclass":
                 pass
 
