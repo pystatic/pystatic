@@ -1,6 +1,6 @@
 import ast
 import logging
-from typing import Optional
+from typing import Optional, Set
 from pystatic.typesys import *
 from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
@@ -12,7 +12,7 @@ from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer import op_map
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
-from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any
+from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any, type_consistent
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,7 @@ class InferVisitor(BaseVisitor):
         return option.value
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
-        res = self.type_comparator.TypeCompatible(ltype, rtype)
-        print(f"type compatible of '{ltype}' and '{rtype}' is {res}")
-        return res
+        return type_consistent(ltype, rtype)
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
@@ -96,13 +94,14 @@ class InferVisitor(BaseVisitor):
 
     def check_name_node_of_annassign(self, target: ast.Name, rnode, rtype):
         name = target.id
-        ltype = self.recorder.get_comment_type(name)
+        comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):  # var appear first time
-            self.recorder.set_type(name, ltype)
+            self.recorder.set_type(name, comment)
 
-        if not self.type_consistent(ltype, rtype):
+        if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(
-                IncompatibleTypeInAssign(rnode, ltype, rtype))
+                IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.recorder.set_type(name, comment)
         else:
             self.recorder.set_type(name, rtype)
 
@@ -143,6 +142,7 @@ class InferVisitor(BaseVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.cond_infer.accept(node)
+
         func_type: TypeIns = self.recorder.get_comment_type(node.name)
         self.recorder.set_type(node.name, func_type)
         argument, ret_annotation = self.err_maker.dump_option(
@@ -150,6 +150,8 @@ class InferVisitor(BaseVisitor):
         self.recorder.enter_func(func_type, self.infer_argument(argument),
                                  ret_annotation)
         self.accept_condition_stmt_list(node.body, ConditionStmtType.FUNC)
+
+        self.infer_return_value_of_func(node.returns)
         self.recorder.leave_func()
         self.cond_infer.pop()
 
@@ -168,6 +170,17 @@ class InferVisitor(BaseVisitor):
         if vararg:
             args[vararg.name] = vararg.ann
         return args
+
+    def infer_return_value_of_func(self, node):
+        ret_set = self.recorder.get_ret_type()
+        ret_list = list(ret_set)
+        ret_annotation = self.recorder.get_ret_annotation()
+        num = len(ret_list)
+        if num == 0:
+            self.err_maker.add_err(ReturnValueExpected(node))
+        else:
+            # TODO
+            pass
 
     def visit_Return(self, node: ast.Return):
         self.cond_infer.accept(node)

@@ -759,6 +759,8 @@ ellipsis_ins = TypeIns(ellipsis_temp, None)
 ellipsis_type = TypeType(ellipsis_temp, None)
 
 none_temp = TypeNoneTemp()
+none_ins = TypeIns(none_temp, None)
+none_type = TypeType(none_temp, None)
 
 typevar_temp = TypeVarTemp()
 typevar_type = TypeType(typevar_temp, None)

@@ -9,6 +9,7 @@ from pystatic.errorcode import *
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH
+from pystatic.TypeCompatibe.simpleType import type_consistent
 
 
 class ConditionStmtType(Enum):
@@ -32,16 +33,18 @@ class Condition:
 
 
 class ConditionInfer(BaseVisitor):
-    def __init__(self,
-                 recorder: SymbolRecorder,
-                 # reach_map: Dict[ast.AST, Reach],
-                 err_maker: ErrorMaker):
+    def __init__(
+        self,
+        recorder: SymbolRecorder,
+        # reach_map: Dict[ast.AST, Reach],
+        err_maker: ErrorMaker):
         super().__init__()
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}
         self.err_maker = err_maker
-        self.reach_stack: List[Condition] = [Condition(ConditionStmtType.GLOBAL,
-                                                       Reach.RUNTIME_TRUE)]
+        self.reach_stack: List[Condition] = [
+            Condition(ConditionStmtType.GLOBAL, Reach.RUNTIME_TRUE)
+        ]
         self.break_flag = BreakFlag.NORMAL
         self.break_node: Optional[ast.stmt] = None
 
@@ -78,14 +81,14 @@ class ConditionInfer(BaseVisitor):
             if outer_state == ConditionStmtType.FUNC:
                 self.break_flag = BreakFlag.NORMAL
             elif self.cur_condition.reach == Reach.UNKNOWN:
-                # print("ejre")
                 self.break_flag = BreakFlag.NORMAL
 
     def get_break_node(self):
         return self.break_node
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.reach_stack.append(Condition(ConditionStmtType.FUNC, Reach.RUNTIME_TRUE))
+        self.reach_stack.append(
+            Condition(ConditionStmtType.FUNC, Reach.RUNTIME_TRUE))
 
     def visit_While(self, node: ast.While):
         reach = self.infer_value_of_condition(node.test)
@@ -131,12 +134,21 @@ class ConditionInfer(BaseVisitor):
             name = test.func.id
             args = test.args
             if name == "isinstance":
-                option = eval_expr(test, self.recorder)
-                if self.err_maker.exsit_error(option):
-                    self.err_maker.dump_option(option)
-                first_type = self.err_maker.dump_option(eval_expr(args[0], self.recorder))
-                second_type = self.err_maker.dump_option(eval_expr(args[1], self.recorder))
-                pass
+                # option = eval_expr(test, self.recorder)
+                # if self.err_maker.exsit_error(option):
+                #     self.err_maker.dump_option(option)
+                first_type = self.err_maker.dump_option(
+                    eval_expr(args[0], self.recorder))
+                second_type = self.err_maker.dump_option(
+                    eval_expr(args[1], self.recorder))
+
+                if type_consistent(
+                        first_type,
+                        self.err_maker.dump_option(second_type.call(None))):
+                    return Reach.RUNTIME_TRUE
+                else:
+                    return Reach.RUNTIME_FALSE
+                # TODO
             elif name == "issubclass":
                 pass
 

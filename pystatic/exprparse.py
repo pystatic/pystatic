@@ -3,7 +3,8 @@ import contextlib
 from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
-from pystatic.typesys import TypeIns, TypeLiteralIns, any_ins, list_temp
+from pystatic.typesys import (TypeIns, TypeLiteralIns, any_ins, list_temp,
+                              none_ins)
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map
@@ -76,6 +77,8 @@ class ExprParser(NoGenVisitor):
         return name_option.value
 
     def visit_Constant(self, node: ast.Constant) -> TypeIns:
+        if node.value is None:
+            return none_ins
         tpins = TypeLiteralIns(node.value)
         self.add_to_container(tpins, node)
         return tpins
