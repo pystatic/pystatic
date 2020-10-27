@@ -20,7 +20,8 @@ def test_exprparse():
     cwd = os.path.dirname(__file__)
     config = Config({'cwd': cwd})
     manager = Manager(config)
-    res_option = manager.add_check_file(f'./src/{src}.py')
+    file_path = os.path.join(cwd, 'src', f'{src}.py')
+    res_option = manager.add_check_file(file_path)
     assert res_option.value
     manager.preprocess()
 
