@@ -580,14 +580,41 @@ class TypeNoneTemp(TypeTemp):
     def __init__(self):
         super().__init__('None', 'typing')
 
+    def getattribute(self, name: str, bindlist: BindList,
+                     context: Optional[TypeContext]) -> Optional['TypeIns']:
+        return None
+
+    def call(self, applyargs: 'ApplyArgs',
+             bindlist: BindList) -> Option['TypeIns']:
+        # TODO: warning
+        return Option(none_ins)
+
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        # TODO: warning
+        return Option(none_ins)
+
+    def unaryop_mgf(self, bindlist: BindList, op: str,
+                    node: ast.UnaryOp) -> Option['TypeIns']:
+        res_option = Option(none_ins)
+        res_option.add_err(NoAttribute(node, none_ins, 'None'))
+        return res_option
+
+    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
+                  node: ast.BinOp) -> Option['TypeIns']:
+        res_option = Option(none_ins)
+        res_option.add_err(NoAttribute(node, none_ins, 'None'))
+        return res_option
+
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        return Option(none_ins)
+
+    def get_typetype(self, bindlist: Optional[BindList],
+                     item: Optional[GetItemType]) -> Option['TypeType']:
+        return Option(none_type)
+
     def get_default_typetype(self) -> 'TypeType':
         return none_type
-
-    def has_method(self, name: str) -> bool:
-        return False
-
-    def has_attribute(self, name: str) -> bool:
-        return False
 
 
 class TypeListTemp(TypeTemp):
