@@ -29,12 +29,8 @@ def path2ast(path: str) -> ast.AST:
 class Preprocessor:
     def __init__(self, manager: 'Manager') -> None:
         self.manager = manager
-        # dequeue that store targets waiting for get definitions in them
 
     def process(self):
-        self._deal()
-
-    def _deal(self):
         to_check: List[BlockTarget] = []
         while len(self.manager.q_preprocess) > 0:
             current = self.manager.q_preprocess[0]

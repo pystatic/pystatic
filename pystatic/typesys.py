@@ -741,19 +741,27 @@ class TypePackageIns(TypeIns):
         inner_sym.add_entry(name, Entry(ins))
 
 
+class OverloadItem:
+    __slots__ = ['argument', 'ret_type']
+
+    def __init__(self, argument: 'Argument', ret_type: 'TypeIns') -> None:
+        self.argument = argument
+        self.ret_type = ret_type
+
+
 class TypeFuncIns(TypeIns):
     def __init__(self, funname: str, module_symid: str,
                  inner_symtable: 'SymTable', argument: 'Argument',
                  ret: TypeIns) -> None:
         super().__init__(func_temp, None)
-        self.overloads: List[Tuple['Argument', TypeIns]] = [(argument, ret)]
+        self.overloads: List[OverloadItem] = [OverloadItem(argument, ret)]
         self.funname = funname
         self.module_symid = module_symid
 
         self._inner_symtable = inner_symtable
 
     def add_overload(self, argument: 'Argument', ret: TypeIns):
-        self.overloads.append((argument, ret))
+        self.overloads.append(OverloadItem(argument, ret))
 
     def get_inner_symtable(self) -> 'SymTable':
         return self._inner_symtable
@@ -766,15 +774,15 @@ class TypeFuncIns(TypeIns):
         else:
             fun_fmt = "@overload {}{} -> {}"
         lst = [
-            fun_fmt.format(self.funname, argument, ret)
-            for argument, ret in self.overloads
+            fun_fmt.format(self.funname, item.argument, item.ret_type)
+            for item in self.overloads
         ]
         return '\n'.join(lst)
 
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         # TODO: deal with arguments
         assert self.overloads
-        return Option(self.overloads[0][1])
+        return Option(self.overloads[0].ret_type)
 
 
 any_temp = TypeAnyTemp()

@@ -49,7 +49,7 @@ def test_preprocess():
     assert isinstance(f, TypeFuncIns)
 
     assert len(f.overloads) == 1
-    ret_ins = f.overloads[0][1]
+    ret_ins = f.overloads[0].ret_type
     assert isinstance(ret_ins, TypeIns) and not isinstance(ret_ins, TypeType)
     assert ret_ins.temp == A.temp
 
