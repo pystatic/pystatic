@@ -12,10 +12,10 @@ from pystatic.exprparse import eval_expr
 
 def test_class():
     symid = 'preproc_cls'
-    cwd = os.path.dirname(__file__)
+    cwd = os.path.dirname(os.path.dirname(__file__))
     config = Config({'cwd': cwd})
     manager = Manager(config)
-    file_path = os.path.join(cwd, 'src', f'{symid}.py')
+    file_path = os.path.join(cwd, 'src', 'preprocess', f'{symid}.py')
     res_option = manager.add_check_file(file_path)
     assert res_option.value
     manager.preprocess()

@@ -17,11 +17,11 @@ def parse_expr(expr: str):
 
 def test_preprocess():
     src = 'preprocess1'
-    cwd = os.path.dirname(__file__)
+    cwd = os.path.dirname(os.path.dirname(__file__))
     config = Config({'cwd': cwd})
     manager = Manager(config)
 
-    filepath = os.path.join(cwd, 'src', f'{src}.py')
+    filepath = os.path.join(cwd, 'src', 'preprocess', f'{src}.py')
     res_option = manager.add_check_file(filepath)
     assert res_option.value
     manager.preprocess()
@@ -56,7 +56,8 @@ def test_preprocess():
 
 def test_import():
     src = 'preprocess_import'
-    cwd = os.path.join(os.path.dirname(__file__), 'src')
+    cwd = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src',
+                       'preprocess')  # tests/src/preprocess/preprocess_import
     config = Config({'cwd': cwd, 'no_typeshed': True})
     manager = Manager(config)
 
