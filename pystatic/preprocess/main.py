@@ -2,7 +2,7 @@ import os
 import ast
 from collections import deque
 from pystatic.message import Message, MessageBox
-from pystatic.uri import uri2list
+from pystatic.symid import symid2list, SymId
 from typing import Optional, TYPE_CHECKING, Deque, List, Dict
 from pystatic.typesys import TypeModuleTemp, TypePackageTemp
 from pystatic.modfinder import ModuleFinder
@@ -15,9 +15,6 @@ from pystatic.preprocess.cls import (resolve_cls_def, resolve_cls_method,
 from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
 from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 from pystatic.modfinder import ModuleFinder, ModuleFindRes
-
-if TYPE_CHECKING:
-    from pystatic.uri import Uri
 
 
 class ReadNsAst(Exception):
@@ -37,16 +34,16 @@ class Preprocessor:
         self.finder = finder
         self.boxdict = boxdict
 
-        self._uri_boxdict = {}
+        self._symid_boxdict = {}
 
         # dequeue that store targets waiting for get definitions in them
         self.q_parse: Deque[BlockTarget] = deque()
 
-        self.targets: Dict[Uri, Target] = {}
+        self.targets: Dict[SymId, Target] = {}
 
-    def add_mbox(self, uri: 'Uri', path: str, mbox: MessageBox):
+    def add_mbox(self, symid: 'SymId', path: str, mbox: MessageBox):
         self.boxdict[path] = mbox
-        self._uri_boxdict[uri] = mbox
+        self._symid_boxdict[symid] = mbox
 
     def process_block(self, blocks: List[BlockTarget], added: bool = False):
         """Process a block level target.
@@ -70,44 +67,44 @@ class Preprocessor:
 
         self.process_block(fresh_targets, True)  # type: ignore
 
-    def is_module(self, uri: 'Uri') -> bool:
-        """Whether a uri represents a module"""
-        find_res = self.finder.find(uri)
+    def is_module(self, symid: 'SymId') -> bool:
+        """Whether a symid represents a module"""
+        find_res = self.finder.find(symid)
 
         if not find_res:
             return False
         else:
             return True
 
-    def get_module_temp(self, uri: 'Uri') -> Optional[TypeModuleTemp]:
-        if uri in self.targets:
-            return self.targets[uri].module_temp
+    def get_module_temp(self, symid: 'SymId') -> Optional[TypeModuleTemp]:
+        if symid in self.targets:
+            return self.targets[symid].module_temp
 
-    def _add_cache_target_uri(self, uri: 'Uri'):
-        if uri not in self.targets:
-            new_target = Target(uri, get_init_module_symtable(uri))
-            self.targets[uri] = new_target
+    def _add_cache_target_symid(self, symid: 'SymId'):
+        if symid not in self.targets:
+            new_target = Target(symid, get_init_module_symtable(symid))
+            self.targets[symid] = new_target
             self.q_parse.append(new_target)
             return True
         return False
 
-    def add_cache_target_uri(self, uri: 'Uri'):
-        """Add and cache target through its uri"""
-        urilist = uri2list(uri)
-        assert urilist
-        cur_uri = urilist[0]
-        self._add_cache_target_uri(cur_uri)
-        for i in range(1, len(urilist)):
-            cur_uri += f'.{urilist[i]}'
-            self._add_cache_target_uri(cur_uri)
+    def add_cache_target_symid(self, symid: 'SymId'):
+        """Add and cache target through its symid"""
+        symidlist = symid2list(symid)
+        assert symidlist
+        cur_symid = symidlist[0]
+        self._add_cache_target_symid(cur_symid)
+        for i in range(1, len(symidlist)):
+            cur_symid += f'.{symidlist[i]}'
+            self._add_cache_target_symid(cur_symid)
 
     def add_cache_target(self, target: 'Target'):
         """Add and cache target"""
         assert isinstance(target, Target)
-        uri = target.uri
-        if uri not in self.targets:
+        symid = target.symid
+        if symid not in self.targets:
             assert target.stage == Stage.PreParse
-            self.targets[uri] = target
+            self.targets[symid] = target
             self.q_parse.append(target)
             return True
         return False
@@ -144,7 +141,8 @@ class Preprocessor:
             resolve_import_ins(target.symtable, self)
 
         for target in to_check:
-            resolve_cls_method(target.symtable, target.uri, self, target.mbox)
+            resolve_cls_method(target.symtable, target.symid, self,
+                               target.mbox)
             resolve_cls_attr(target.symtable, target.mbox)
 
             if isinstance(target, Target):
@@ -153,21 +151,21 @@ class Preprocessor:
     def set_target_mbox(self, target: Target):
         """Set correct mbox according to a target"""
         if not target.mbox:
-            target.mbox = MessageBox(target.uri)
+            target.mbox = MessageBox(target.symid)
 
         if target.path not in self.boxdict:
             self.boxdict[target.path] = target.mbox
 
-        if target.uri not in self._uri_boxdict:
-            self._uri_boxdict[target.uri] = target.mbox
+        if target.symid not in self._symid_boxdict:
+            self._symid_boxdict[target.symid] = target.mbox
 
-    def get_mbox(self, uri: 'Uri'):
-        return self._uri_boxdict.get(uri)
+    def get_mbox(self, symid: 'SymId'):
+        return self._symid_boxdict.get(symid)
 
     def parse_target(self, target: Target):
         # TODO: error handling
         assert target.stage == Stage.PreParse
-        find_res = self.finder.find(target.uri)
+        find_res = self.finder.find(target.symid)
 
         if not find_res:
             raise FileNotFoundError
@@ -188,7 +186,7 @@ class Preprocessor:
             assert find_res.target_file
             target.ast = path2ast(find_res.target_file)
             target.module_temp = TypePackageTemp(find_res.paths,
-                                                 target.symtable, target.uri)
+                                                 target.symtable, target.symid)
             assert len(find_res.paths) == 1
             target.path = os.path.realpath(find_res.paths[0])
 
@@ -208,8 +206,8 @@ class Preprocessor:
                 assert target.ast
             target.stage = Stage.PreSymtable
 
-    def is_valid_uri(self, uri: 'Uri') -> bool:
-        find_res = self.finder.find(uri)
+    def is_valid_symid(self, symid: 'SymId') -> bool:
+        find_res = self.finder.find(symid)
         if find_res:
             return True
         else:

@@ -6,7 +6,7 @@ import ast
 import copy
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType, TypeVarIns
 from typing import TYPE_CHECKING, Union, Tuple, List, Dict, Any
-from pystatic.uri import rel2absuri, Uri, uri2list
+from pystatic.symid import rel2abssymid, SymId, symid2list
 from pystatic.symtable import SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
 from pystatic.preprocess.sym_util import (fake_impt_entry,
@@ -27,27 +27,28 @@ def resolve_import_type(symtable: SymTable, worker: 'Preprocessor'):
 
     for _, entry in iter_impt.items():
         impt_node = entry.defnode
-        uri = entry.uri
+        symid = entry.symid
         asname = entry.asname
         origin_name = entry.origin_name
 
         update_symtable_import_cache(symtable, entry, worker)
 
         if isinstance(impt_node, ast.Import):
-            module_ins = cache.get_moduleins(uri)
+            module_ins = cache.get_moduleins(symid)
             assert module_ins, "module not found error not handled yet"
 
-            if asname == uri:
+            if asname == symid:
                 # if there is no 'as' in the import statement then
                 # all the package along the path will be added to the
                 # symtable.
-                assert uri2list(uri)
-                top_uri = uri2list(uri)[0]
+                assert symid2list(symid)
+                top_symid = symid2list(symid)[0]
 
-                if top_uri not in symtable.local:
-                    top_module_ins = cache.get_moduleins(top_uri)
+                if top_symid not in symtable.local:
+                    top_module_ins = cache.get_moduleins(top_symid)
                     assert top_module_ins, "module not found error not handled yet"
-                    symtable.local[top_uri] = Entry(top_module_ins, impt_node)
+                    symtable.local[top_symid] = Entry(top_module_ins,
+                                                      impt_node)
             else:
                 symtable.local[asname] = Entry(module_ins, impt_node)
 
@@ -94,8 +95,8 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
     """
     fake_data = get_fake_data(symtable)
     impt_entry = fake_data.impt.get(name)
-    cur_state = (impt_entry.uri, impt_entry.origin_name)
-    state_set = set()  # (uri, origin_name)
+    cur_state = (impt_entry.symid, impt_entry.origin_name)
+    state_set = set()  # (symid, origin_name)
     buf_targets: List[Tuple['SymTable', str]] = [(symtable, name)]
     result: Any = None
 
@@ -104,11 +105,11 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
             # FIXME: import loop, eliminate loop and warning here
             assert False, "import loop"
 
-        mod_uri = cur_state[0]  # module uri
+        mod_symid = cur_state[0]  # module symid
         name_in_mod = cur_state[1]  # name in the current module
         state_set.add(cur_state)
 
-        module_temp = worker.get_module_temp(mod_uri)
+        module_temp = worker.get_module_temp(mod_symid)
         # TODO: warning here
         assert isinstance(
             module_temp, TypeModuleTemp
@@ -137,7 +138,7 @@ def _resolve_import_chain(symtable: 'SymTable', name: str,
             if cur_fake_data:
                 cur_entry = cur_fake_data.impt.get(name_in_mod)
                 if cur_entry:
-                    cur_state = (cur_entry.uri, cur_entry.origin_name)
+                    cur_state = (cur_entry.symid, cur_entry.origin_name)
                     buf_targets.append((cur_symtable, name_in_mod))
                     flag = True
 

@@ -7,7 +7,7 @@ from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TpState
 from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
-    from pystatic.uri import Uri
+    from pystatic.symid import SymId
     from pystatic.symtable import SymTable
 
 
@@ -21,11 +21,11 @@ class Stage(enum.IntEnum):
 class BlockTarget:
     """Block target mainly used for function"""
     def __init__(self,
-                 uri: 'Uri',
+                 symid: 'SymId',
                  symtable: 'SymTable',
                  mbox: Optional[MessageBox] = None,
                  stage: Stage = Stage.PreParse) -> None:
-        self.uri = uri
+        self.symid = symid
         self.symtable = symtable
         self.stage = stage
         self.mbox: 'MessageBox' = mbox  # type: ignore
@@ -34,13 +34,13 @@ class BlockTarget:
 
 class MethodTarget(BlockTarget):
     def __init__(self,
-                 uri: 'Uri',
+                 symid: 'SymId',
                  symtable: 'SymTable',
                  clstemp: 'TypeClassTemp',
                  astnode: 'ast.AST',
                  mbox: 'MessageBox',
                  stage: Stage = Stage.PreParse) -> None:
-        super().__init__(uri, symtable, mbox, stage)
+        super().__init__(symid, symtable, mbox, stage)
         self.clstemp = clstemp
         self.ast = astnode
 
@@ -48,12 +48,12 @@ class MethodTarget(BlockTarget):
 class Target(BlockTarget):
     """Module level block target"""
     def __init__(self,
-                 uri: 'Uri',
+                 symid: 'SymId',
                  symtable: 'SymTable',
                  mbox: Optional['MessageBox'] = None,
                  path: Optional[str] = None,
                  stage: Stage = Stage.PreParse):
-        super().__init__(uri, symtable, mbox, stage)
+        super().__init__(symid, symtable, mbox, stage)
         # NOTE: TpStage.OVER may be wrong.
-        self.module_temp = TypeModuleTemp(uri, self.symtable)
+        self.module_temp = TypeModuleTemp(symid, self.symtable)
         self.path: str = path  # type: ignore
