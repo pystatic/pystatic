@@ -675,8 +675,7 @@ class TypeFuncIns(TypeIns):
 
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         # TODO: deal with arguments
-        for argument,tp in self.overloads:
-
+        assert self.overloads
         return Option(self.overloads[0])
 
 
