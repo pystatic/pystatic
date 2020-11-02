@@ -69,6 +69,9 @@ class MessageBox(object):
             return
         self.add_err(node, msg)
 
+    def clear(self):
+        self.error = []
+
     def report(self):
         for err in self.error:
             print(err)

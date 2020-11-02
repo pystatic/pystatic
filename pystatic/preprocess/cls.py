@@ -3,7 +3,6 @@ Resolve class related type information.
 """
 
 import ast
-import logging
 import contextlib
 from pystatic.target import MethodTarget
 from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
@@ -19,16 +18,17 @@ from pystatic.message import MessageBox
 from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
 from pystatic.preprocess.sym_util import (add_baseclass, get_cls_defnode,
-                                          get_temp_state, set_temp_state)
+                                          get_fake_data, get_temp_state,
+                                          set_temp_state)
 from pystatic.arg import Argument
 
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
     from pystatic.symtable import SymTable
-    from pystatic.preprocess.main import Preprocessor
+    from pystatic.manager import Manager
 
 
-def resolve_cls_def(targets: List['BlockTarget'], worker: 'Preprocessor'):
+def resolve_cls_def(targets: List['BlockTarget'], manager: 'Manager'):
     """Get class definition information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
@@ -36,13 +36,13 @@ def resolve_cls_def(targets: List['BlockTarget'], worker: 'Preprocessor'):
     # placeholders
     for temp in resolve_order:
         set_temp_state(temp, TpState.ON)
-        temp_mbox = worker.get_mbox(temp.module_symid)
+        temp_mbox = manager.get_mbox_by_symid(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_placeholder(temp, temp_mbox)
 
     # inheritance
     for temp in resolve_order:
-        temp_mbox = worker.get_mbox(temp.module_symid)
+        temp_mbox = manager.get_mbox_by_symid(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_inh(temp, temp_mbox)
         set_temp_state(temp, TpState.OVER)
@@ -52,7 +52,8 @@ def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
     """Build dependency graph"""
     graph = DependencyGraph()
     for target in targets:
-        for temp in target.symtable._cls_defs.values():
+        fake_data = get_fake_data(target.symtable)
+        for temp in fake_data.cls_defs.values():
             assert isinstance(temp, TypeClassTemp)
             _build_graph_cls(temp, graph)
     return graph
@@ -61,10 +62,11 @@ def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
 def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
     """Add dependency relations about a class"""
     inner_sym = clstemp.get_inner_symtable()
+    fake_data = get_fake_data(inner_sym)
 
     _build_graph_inh(clstemp, graph)
 
-    for subtemp in inner_sym._cls_defs.values():
+    for subtemp in fake_data.cls_defs.values():
         assert isinstance(subtemp, TypeClassTemp)
         _build_graph_cls(subtemp, graph)
         # add dependency relations due to containment
@@ -140,8 +142,7 @@ class _FirstClassTempVisitor(NoGenVisitor):
                    node: ast.Name,
                    symtable: Optional['SymTable'] = None):
         symtable = symtable or self.symtable
-        entry = symtable.lookup_entry(node.id)
-        return entry.get_type()
+        return symtable.lookup(node.id)
 
     def visit_Attribute(self, node: ast.Attribute):
         res = self.visit(node.value)
@@ -229,17 +230,18 @@ class _TypeVarVisitor(BaseVisitor):
         return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(symtable: 'SymTable', symid: str,
-                       worker: 'Preprocessor', mbox: 'MessageBox'):
+def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
+                       mbox: 'MessageBox'):
     # symid here is not set correctly
-    for tp_temp in symtable._cls_defs.values():
-        mt = _resolve_cls_method(symid, tp_temp, mbox)
-        if mt:
-            worker.process_block(mt, False)
+    fake_data = get_fake_data(symtable)
+    for tp_temp in fake_data.cls_defs.values():
+        method_targets = _resolve_cls_method(symid, tp_temp, mbox)
+        for blk_target in method_targets:
+            manager.preprocess_block(blk_target)
 
-    for tp_temp in symtable._cls_defs.values():
+    for tp_temp in fake_data.cls_defs.values():
         new_symid = '.'.join([symid, tp_temp.basename])
-        resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, worker,
+        resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, manager,
                            mbox)
 
 
@@ -314,7 +316,8 @@ def _resolve_cls_method(symid: str, clstemp: 'TypeClassTemp',
 
 
 def resolve_cls_attr(symtable: 'SymTable', mbox: 'MessageBox'):
-    for tp_temp in symtable._cls_defs.values():
+    fake_data = get_fake_data(symtable)
+    for tp_temp in fake_data.cls_defs.values():
         _resolve_cls_attr(tp_temp, mbox)
         resolve_cls_attr(tp_temp.get_inner_symtable(), mbox)
 
