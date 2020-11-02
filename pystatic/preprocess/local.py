@@ -3,9 +3,7 @@ Resolve type instance for symbols defined locally.
 """
 
 import ast
-import logging
 from pystatic.arg import Argument
-from typing import Any, Optional, overload
 from pystatic.preprocess.sym_util import *
 from pystatic.symtable import SymTable
 from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns)
@@ -35,7 +33,8 @@ def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
 
     symtable.local.update(new_entry)
 
-    for tp_def in symtable._cls_defs.values():
+    fake_data.local = {}  # empty the fake_data
+    for tp_def in fake_data.cls_defs.values():
         assert isinstance(tp_def, TypeClassTemp)
         inner_symtable = tp_def.get_inner_symtable()
         resolve_local_typeins(inner_symtable, mbox)

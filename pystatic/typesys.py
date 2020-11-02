@@ -1,6 +1,6 @@
 import ast
-import enum
 import copy
+from enum import Enum, auto, IntEnum
 from typing import (Any, Optional, Dict, List, Tuple, Union, TYPE_CHECKING,
                     Final)
 from pystatic.option import Option
@@ -19,16 +19,16 @@ BindList = Optional[List[Any]]
 DEFAULT_TYPEVAR_NAME: Final[str] = '__unknown_typevar_name__'
 
 
-class TpVarKind(enum.IntEnum):
-    INVARIANT = 0
-    COVARIANT = 1
-    CONTRAVARIANT = 2
+class TpVarKind(Enum):
+    INVARIANT = auto()
+    COVARIANT = auto()
+    CONTRAVARIANT = auto()
 
 
-class TpState(enum.IntEnum):
-    FRESH = 0
-    ON = 1
-    OVER = 2
+class TpState(IntEnum):
+    FRESH = 1
+    ON = 2
+    OVER = 3
 
 
 class TypeTemp:
@@ -46,6 +46,9 @@ class TypeTemp:
     def basename(self) -> str:
         rpos = self.name.rfind('.')
         return self.name[rpos + 1:]
+
+    def arity(self) -> int:
+        return len(self.placeholders)
 
     # basic
     def getattribute(
@@ -169,7 +172,23 @@ class TypeTemp:
                  bindlist: BindList,
                  context: Optional[TypeContext] = None) -> str:
         """__str__ with bindlist and context"""
-        return self.name
+        str_bindlist = []
+        slot_cnt = self.arity()
+        if slot_cnt == 0:
+            return self.name
+
+        if not bindlist:
+            str_bindlist = ['Any'] * slot_cnt
+        else:
+            diff = slot_cnt - len(bindlist)
+            assert diff >= 0
+            for bind in bindlist:
+                str_bindlist.append(f'{bind}')
+
+            str_bindlist.extend(['Any'] * diff)
+
+        assert str_bindlist
+        return self.name + '[' + ', '.join(str_bindlist) + ']'
 
     def __str__(self):
         assert False, "use str_expr instead"
@@ -243,6 +262,38 @@ class TypeIns:
                   node: ast.BinOp) -> Option['TypeIns']:
         return self.temp.binop_mgf(self.bindlist, other, op, node)
 
+    def __eq__(self, other):
+        # note that `isinstance(other, TypeIns)` won't reject typeins and typetype
+        if other.__class__ != self.__class__:
+            return False
+
+        # Every class should have only one template globally
+        if self.temp != other.temp:
+            return False
+
+        else:
+            temp_arity = self.temp.arity()
+            # default bind is Any
+            if self.bindlist:
+                diff1 = temp_arity - len(self.bindlist)
+                ext_list1 = self.bindlist + [any_ins] * diff1
+            else:
+                ext_list1 = [any_ins] * temp_arity
+
+            if other.bindlist:
+                diff2 = temp_arity - len(other.bindlist)
+                ext_list2 = other.bindlist + [any_ins] * diff2
+            else:
+                ext_list2 = [any_ins] * temp_arity
+
+            for i in range(temp_arity):
+                if ext_list1[i] != ext_list2[i]:
+                    return False
+            return True
+
+    def __ne__(self, other):
+        return not (self == other)
+
     def __str__(self) -> str:
         return self.temp.str_expr(self.bindlist)
 
@@ -291,10 +342,7 @@ class TypeType(TypeIns):
 
     def __str__(self):
         s = self.temp.str_expr(None)
-        if s == "Any":
-            return s
-        else:
-            return "type(" + s + ')'
+        return "Type[" + s + ']'
 
 
 class TypeVarTemp(TypeTemp):
@@ -532,14 +580,50 @@ class TypeNoneTemp(TypeTemp):
     def __init__(self):
         super().__init__('None', 'typing')
 
+    def getattribute(self, name: str, bindlist: BindList,
+                     context: Optional[TypeContext]) -> Optional['TypeIns']:
+        return None
+
+    def call(self, applyargs: 'ApplyArgs',
+             bindlist: BindList) -> Option['TypeIns']:
+        # TODO: warning
+        return Option(none_ins)
+
+    def getitem(self, item: GetItemType,
+                bindlist: BindList) -> Option['TypeIns']:
+        # TODO: warning
+        return Option(none_ins)
+
+    def unaryop_mgf(self, bindlist: BindList, op: str,
+                    node: ast.UnaryOp) -> Option['TypeIns']:
+        res_option = Option(none_ins)
+        res_option.add_err(NoAttribute(node, none_ins, 'None'))
+        return res_option
+
+    def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
+                  node: ast.BinOp) -> Option['TypeIns']:
+        res_option = Option(none_ins)
+        res_option.add_err(NoAttribute(node, none_ins, 'None'))
+        return res_option
+
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        return Option(none_ins)
+
+    def get_typetype(self, bindlist: Optional[BindList],
+                     item: Optional[GetItemType]) -> Option['TypeType']:
+        return Option(none_type)
+
     def get_default_typetype(self) -> 'TypeType':
         return none_type
 
-    def has_method(self, name: str) -> bool:
-        return False
 
-    def has_attribute(self, name: str) -> bool:
-        return False
+class TypeListTemp(TypeTemp):
+    def __init__(self) -> None:
+        super().__init__('List', 'typing')
+        self.placeholders = [_invariant_tpvar]
+
+    def get_default_typetype(self) -> 'TypeType':
+        return list_type
 
 
 class TypeTupleTemp(TypeTemp):
@@ -560,6 +644,7 @@ class TypeUnionTemp(TypeTemp):
 class TypeOptionalTemp(TypeTemp):
     def __init__(self):
         super().__init__('Optional', 'typing')
+        self.placeholders = [_covariant_tpvar]
 
 
 class TypeEllipsisTemp(TypeTemp):
@@ -611,15 +696,28 @@ class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__('Literal', 'typing')
 
+    def arity(self) -> int:
+        return 1
+
 
 class TypeLiteralIns(TypeIns):
     def __init__(self, value):
-        super().__init__(literal_temp, None)
-        self.value = value
+        super().__init__(literal_temp, [value])
+
+    @property
+    def value(self):
+        assert self.bindlist
+        return self.bindlist[0]
 
     def __str__(self):
-        # return f"literal[{type(self.value).__name__}]"
-        return type(self.value).__name__
+        assert self.bindlist
+        assert len(self.bindlist) == 1
+        value = self.value
+        fmt = 'Literal[{}]'
+        if isinstance(value, str):
+            return fmt.format(f"'{value}'")
+        else:
+            return fmt.format(str(value))
 
 
 class TypePackageType(TypeType):
@@ -643,19 +741,27 @@ class TypePackageIns(TypeIns):
         inner_sym.add_entry(name, Entry(ins))
 
 
+class OverloadItem:
+    __slots__ = ['argument', 'ret_type']
+
+    def __init__(self, argument: 'Argument', ret_type: 'TypeIns') -> None:
+        self.argument = argument
+        self.ret_type = ret_type
+
+
 class TypeFuncIns(TypeIns):
     def __init__(self, funname: str, module_symid: str,
                  inner_symtable: 'SymTable', argument: 'Argument',
                  ret: TypeIns) -> None:
         super().__init__(func_temp, None)
-        self.overloads: List[Tuple['Argument', TypeIns]] = [(argument, ret)]
+        self.overloads: List[OverloadItem] = [OverloadItem(argument, ret)]
         self.funname = funname
         self.module_symid = module_symid
 
         self._inner_symtable = inner_symtable
 
     def add_overload(self, argument: 'Argument', ret: TypeIns):
-        self.overloads.append((argument, ret))
+        self.overloads.append(OverloadItem(argument, ret))
 
     def get_inner_symtable(self) -> 'SymTable':
         return self._inner_symtable
@@ -668,37 +774,49 @@ class TypeFuncIns(TypeIns):
         else:
             fun_fmt = "@overload {}{} -> {}"
         lst = [
-            fun_fmt.format(self.funname, argument, ret)
-            for argument, ret in self.overloads
+            fun_fmt.format(self.funname, item.argument, item.ret_type)
+            for item in self.overloads
         ]
         return '\n'.join(lst)
 
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         # TODO: deal with arguments
         assert self.overloads
-        return Option(self.overloads[0])
+        return Option(self.overloads[0].ret_type)
 
 
-# special types (typing.py)
 any_temp = TypeAnyTemp()
-none_temp = TypeNoneTemp()
-generic_temp = TypeGenericTemp()
-ellipsis_temp = TypeEllipsisTemp()
-callable_temp = TypeCallableTemp()
-tuple_temp = TypeTupleTemp()
-optional_temp = TypeOptionalTemp()
-literal_temp = TypeLiteralTemp()
-union_temp = TypeUnionTemp()
-typevar_temp = TypeVarTemp()
+any_ins = TypeIns(any_temp, None)
+any_type = TypeType(any_temp, None)
 
-# builtins.py
+ellipsis_temp = TypeEllipsisTemp()
+ellipsis_ins = TypeIns(ellipsis_temp, None)
+ellipsis_type = TypeType(ellipsis_temp, None)
+
+none_temp = TypeNoneTemp()
+none_ins = TypeIns(none_temp, None)
+none_type = TypeType(none_temp, None)
+
+typevar_temp = TypeVarTemp()
+typevar_type = TypeType(typevar_temp, None)
 func_temp = TypeFuncTemp()
 
-# these typetype are shared to save memory
-ellipsis_type = TypeType(ellipsis_temp, None)
-none_type = TypeType(none_temp, None)
-any_type = TypeType(any_temp, None)
-typevar_type = TypeType(typevar_temp, None)
+_invariant_tpvar = TypeVarIns('_invariant_tpvar',
+                              bound=any_ins,
+                              kind=TpVarKind.INVARIANT)
+_covariant_tpvar = TypeVarIns('_covariant_tpvar',
+                              bound=any_ins,
+                              kind=TpVarKind.COVARIANT)
+_contravariant_tpvar = TypeVarIns('_contravariant_tpvar',
+                                  bound=any_ins,
+                                  kind=TpVarKind.CONTRAVARIANT)
 
-any_ins = TypeIns(any_temp, None)
-ellipsis_ins = TypeIns(ellipsis_temp, None)
+list_temp = TypeListTemp()
+list_type = TypeType(list_temp, None)
+
+optional_temp = TypeOptionalTemp()
+tuple_temp = TypeTupleTemp()
+union_temp = TypeUnionTemp()
+callable_temp = TypeCallableTemp()
+generic_temp = TypeGenericTemp()
+literal_temp = TypeLiteralTemp()

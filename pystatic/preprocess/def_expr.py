@@ -1,9 +1,7 @@
 import ast
 from pystatic.symtable import SymTable, TableScope, TypeDefNode
 from typing import Callable, List, Optional, Union
-from pystatic.visitor import BaseVisitor
-from pystatic.typesys import (TypeFuncIns, TypeIns, ellipsis_type, TypeType,
-                              any_type, none_type)
+from pystatic.typesys import (TypeFuncIns, TypeIns, TypeType, any_ins)
 from pystatic.arg import Argument, Arg
 from pystatic.option import Option
 from pystatic.exprparse import eval_expr

@@ -1,9 +1,12 @@
 import ast
+from pystatic.option import Option
 from typing import Tuple, Optional, TYPE_CHECKING
 from pystatic.error_register import *
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
+    from pystatic.fsys import FilePath
+    from pystatic.symid import SymId
 
 
 class ErrorCode:
@@ -174,3 +177,21 @@ class CodeUnreachable(ErrorCode):
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, CODE_UNREACHABLE
 
+
+# Errors that have nothing to do with type inconsistency
+class FileNotFound(ErrorCode):
+    def __init__(self, path: 'FilePath') -> None:
+        super().__init__()
+        self.path = path
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return None, FILE_NOT_FOUND.format(self.path)
+
+
+class ModuleNotFound(ErrorCode):
+    def __init__(self, symid: 'SymId') -> None:
+        super().__init__()
+        self.symid = symid
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return None, MODULE_NOT_FOUND.format(self.symid)

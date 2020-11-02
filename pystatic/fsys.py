@@ -1,12 +1,15 @@
 import os
-import logging
+from os.path import abspath
 from pystatic.config import PY_VERSION
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pystatic.symid import symid2list, absolute_symidlist, list2symid
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeModuleTemp
-    from pystatic.config import PY_VERSION
+    from pystatic.config import PY_VERSION, Config
+    from pystatic.symid import SymId
+
+FilePath = str
 
 
 class ModuleFindRes:
@@ -14,13 +17,13 @@ class ModuleFindRes:
     Package = 2
     Namespace = 3
 
-    def __init__(self, res_type: int, paths: List[str],
-                 target_file: Optional[str]) -> None:
+    def __init__(self, res_type: int, paths: List[FilePath],
+                 analyse_path: Optional[FilePath]) -> None:
         self.res_type = res_type
         # For package to set correct paths attribute
         self.paths = paths
         # File to analyse, if result is a namespace package, target_file is None
-        self.target_file = target_file
+        self.analyse_path = analyse_path
 
 
 class Node:
@@ -29,7 +32,7 @@ class Node:
         self.child: Dict[str, Node] = {}
 
 
-class ModuleFinder:
+class Filesys:
     """PEP 561
 
     - Stubs or Python source manually put at the beginning of the path($MYPYPATH)
@@ -38,28 +41,48 @@ class ModuleFinder:
     - Inline packages.
     - Typeshed.
     """
-    def __init__(self, manual_path: List[str], user_path: List[str],
-                 sitepkg: List[str], typeshed: Optional[str],
-                 py_version: PY_VERSION):
-        self.manual_path = manual_path
-        self.user_path = user_path
-        self.sitepkg = sitepkg
-        self.typeshed = typeshed
-        self.search_path = manual_path + user_path + sitepkg
-        if typeshed:
-            self.search_path += _resolve_typeshed(typeshed, py_version)
+    def __init__(self, config: 'Config') -> None:
+        self.manual_path = config.manual_path
+        self.user_path = [config.cwd]
+        self.sitepkg = config.sitepkg
+        self.py_version = config.python_version
+
+        if config.typeshed:
+            self.typeshed = _resolve_typeshed(config.typeshed, self.py_version)
+        else:
+            self.typeshed = []
+
+        self.cwd = config.cwd
 
         # dummy namespace on the root
-        dummy_ns = ModuleFindRes(ModuleFindRes.Namespace, self.search_path,
-                                 None)
-        self.root = Node(dummy_ns)
+        self.dummy_ns = ModuleFindRes(ModuleFindRes.Namespace, [], None)
+        self.root = Node(self.dummy_ns)
 
-    def find(self, symid: str) -> Optional[ModuleFindRes]:
+        self.path_symid_map: Dict[FilePath, 'SymId'] = {}
+
+    def abspath(self, path: FilePath) -> FilePath:
+        return os.path.normpath(os.path.join(self.cwd, path))
+
+    def realpath(self, path: FilePath) -> FilePath:
+        return os.path.realpath(self.abspath(path))
+
+    def add_path_symid_map(self, path: FilePath, symid: 'SymId'):
+        self.path_symid_map[path] = symid
+
+    def path_to_symid(self, path: FilePath) -> Optional['SymId']:
+        return self.path_symid_map.get(self.abspath(path))
+
+    def add_userpath(self, path: str):
+        if path not in self.user_path:
+            self.user_path.append(path)
+
+    def find_module(self, symid: str) -> Optional[ModuleFindRes]:
         symidlist = symid2list(symid)
         if not symidlist:
             return None
 
         cur_node = self.root
+        self.dummy_ns.paths = self.manual_path + self.user_path + self.typeshed + self.sitepkg
         i = 0
         while i < len(symidlist) and symidlist[i] in cur_node.child:
             cur_node = cur_node.child[symidlist[i]]
@@ -76,10 +99,11 @@ class ModuleFinder:
 
         return cur_res
 
-    def relative_find(self, symid: str,
-                      module: 'TypeModuleTemp') -> Optional[ModuleFindRes]:
+    def relative_find_module(
+            self, symid: str,
+            module: 'TypeModuleTemp') -> Optional[ModuleFindRes]:
         abs_symid = symidlist_from_impitem(symid, module)
-        return self.find(list2symid(abs_symid))
+        return self.find_module(list2symid(abs_symid))
 
 
 def _walk_single(subsymid: str, paths: List[str]) -> Optional[ModuleFindRes]:
@@ -136,8 +160,6 @@ def _resolve_typeshed(typeshed: str, pyv: PY_VERSION) -> List[str]:
         for curdir in [specific_dir, major_dir, two_or_three]:
             if os.path.isdir(curdir):
                 third_party_res.append(curdir)
-
-    logging.debug(f"typeshed: {stdlib_res + third_party_res}")
 
     return stdlib_res + third_party_res
 

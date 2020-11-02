@@ -33,16 +33,18 @@ class Condition:
 
 
 class ConditionInfer(BaseVisitor):
-    def __init__(self,
-                 recorder: SymbolRecorder,
-                 # reach_map: Dict[ast.AST, Reach],
-                 err_maker: ErrorMaker):
+    def __init__(
+        self,
+        recorder: SymbolRecorder,
+        # reach_map: Dict[ast.AST, Reach],
+        err_maker: ErrorMaker):
         super().__init__()
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}
         self.err_maker = err_maker
-        self.reach_stack: List[Condition] = [Condition(ConditionStmtType.GLOBAL,
-                                                       Reach.RUNTIME_TRUE)]
+        self.reach_stack: List[Condition] = [
+            Condition(ConditionStmtType.GLOBAL, Reach.RUNTIME_TRUE)
+        ]
         self.break_flag = BreakFlag.NORMAL
         self.break_node: Optional[ast.stmt] = None
 
@@ -85,7 +87,8 @@ class ConditionInfer(BaseVisitor):
         return self.break_node
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.reach_stack.append(Condition(ConditionStmtType.FUNC, Reach.RUNTIME_TRUE))
+        self.reach_stack.append(
+            Condition(ConditionStmtType.FUNC, Reach.RUNTIME_TRUE))
 
     def visit_While(self, node: ast.While):
         reach = self.infer_value_of_condition(node.test)
@@ -134,10 +137,14 @@ class ConditionInfer(BaseVisitor):
                 # option = eval_expr(test, self.recorder)
                 # if self.err_maker.exsit_error(option):
                 #     self.err_maker.dump_option(option)
-                first_type = self.err_maker.dump_option(eval_expr(args[0], self.recorder))
-                second_type = self.err_maker.dump_option(eval_expr(args[1], self.recorder))
-                
-                if type_consistent(first_type, self.err_maker.dump_option(second_type.call(None))):
+                first_type = self.err_maker.dump_option(
+                    eval_expr(args[0], self.recorder))
+                second_type = self.err_maker.dump_option(
+                    eval_expr(args[1], self.recorder))
+
+                if type_consistent(
+                        first_type,
+                        self.err_maker.dump_option(second_type.call(None))):
                     return Reach.RUNTIME_TRUE
                 else:
                     return Reach.RUNTIME_FALSE

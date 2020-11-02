@@ -1,13 +1,13 @@
 import ast
 from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
-from pystatic.symid import absolute_symidlist, SymId, symid2list, rel2abssymid
+from pystatic.symid import absolute_symidlist, SymId, symid2list, rel2abssymid, symid_parent
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
                               TypePackageIns, TypeTemp, TypePackageTemp,
-                              TypeType, TpState, any_ins)
+                              TypeType, TpState)
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:
-    from pystatic.preprocess.main import Preprocessor
+    from pystatic.manager import Manager
 
 
 class FakeData:
@@ -15,6 +15,7 @@ class FakeData:
         self.fun: Dict[str, 'fake_fun_entry'] = {}
         self.local: Dict[str, 'fake_local_entry'] = {}
         self.impt: Dict[str, 'fake_impt_entry'] = {}
+        self.cls_defs: Dict[str, 'TypeClassTemp'] = {}
 
 
 class fake_fun_entry:
@@ -59,7 +60,17 @@ def try_get_fake_data(symtable: 'SymTable') -> Optional[FakeData]:
     return getattr(symtable, 'fake_data', None)
 
 
+def clear_fake_data(symtable: 'SymTable'):
+    if hasattr(symtable, 'fake_data'):
+        fake_data: FakeData = symtable.fake_data  # type: ignore
+        for tp_temp in fake_data.cls_defs.values():
+            clear_fake_data(tp_temp.get_inner_symtable())
+        del symtable.fake_data  # type: ignore
+
+
 def add_cls_def(symtable: SymTable, name: str, temp: TypeClassTemp):
+    fake_data = get_fake_data(symtable)
+    fake_data.cls_defs[name] = temp
     symtable._cls_defs[name] = temp
 
 
@@ -85,6 +96,7 @@ def analyse_import_stmt(node: ImportNode,
                         symid: SymId) -> List[fake_impt_entry]:
     """Extract import information stored in import ast node."""
     info_list: List[fake_impt_entry] = []
+    pkg_symid = symid_parent(symid)
     if isinstance(node, ast.Import):
         for alias in node.names:
             module_symid = alias.name
@@ -94,7 +106,7 @@ def analyse_import_stmt(node: ImportNode,
     elif isinstance(node, ast.ImportFrom):
         imp_name = '.' * node.level
         imp_name += node.module or ''
-        module_symid = rel2abssymid(symid, imp_name)
+        module_symid = rel2abssymid(pkg_symid, imp_name)
         imported = []
         for alias in node.names:
             attr_name = alias.name
@@ -128,8 +140,7 @@ def get_temp_state(temp: TypeTemp) -> TpState:
 
 def update_symtable_import_cache(symtable: 'SymTable',
                                  entry: 'fake_impt_entry',
-                                 worker: 'Preprocessor') -> Optional[TypeIns]:
-    """Update symtable's import cache"""
+                                 manager: 'Manager') -> Optional[TypeIns]:
     symid = entry.symid
 
     symidlist = absolute_symidlist(symtable.glob_symid, symid)
@@ -143,7 +154,7 @@ def update_symtable_import_cache(symtable: 'SymTable',
     cur_ins = cache.get_moduleins(cur_symid)
 
     if not cur_ins:
-        temp = worker.get_module_temp(symidlist[0])
+        temp = manager.get_module_temp(symidlist[0])
         if not temp:
             return None
 
@@ -162,7 +173,7 @@ def update_symtable_import_cache(symtable: 'SymTable',
 
         cur_symid += f'.{symidlist[i]}'
         if symidlist[i] not in cur_ins.submodule:
-            temp = worker.get_module_temp(cur_symid)
+            temp = manager.get_module_temp(cur_symid)
             if not temp:
                 return None
 
@@ -188,7 +199,7 @@ def update_symtable_import_cache(symtable: 'SymTable',
     if isinstance(cur_ins, TypePackageIns):
         if not entry.is_import_module():
             cur_symid += f'.{entry.origin_name}'
-            temp = worker.get_module_temp(cur_symid)
+            temp = manager.get_module_temp(cur_symid)
 
             if temp:
                 cur_ins.add_submodule(entry.origin_name,
