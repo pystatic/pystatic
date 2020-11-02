@@ -121,6 +121,26 @@ class ConditionInfer(BaseVisitor):
                 return self.infer_value_of_condition(test.operand)
             else:
                 assert False, "TODO"
+        elif isinstance(test, ast.BoolOp):
+            op = test.op
+            if isinstance(op, ast.And):
+                for value in test.values:
+                    value_reach = self.infer_value_of_condition(value)
+                    if value_reach == Reach.RUNTIME_FALSE:
+                        return Reach.RUNTIME_FALSE
+                    elif value_reach == Reach.UNKNOWN:
+                        return Reach.UNKNOWN
+                return Reach.RUNTIME_TRUE
+            elif isinstance(op, test.Or):
+                for value in test.values:
+                    value_reach = self.infer_value_of_condition(value)
+                    if value_reach == Reach.RUNTIME_TRUE:
+                        return Reach.RUNTIME_TRUE
+                    elif value_reach == Reach.UNKNOWN:
+                        return Reach.UNKNOWN
+                return Reach.RUNTIME_FALSE
+            else:
+                assert False, "not reach here"
         elif isinstance(test, ast.Call):
             return self.infer_value_of_call(test)
         elif isinstance(test, ast.Name):
@@ -169,4 +189,3 @@ class ConditionInfer(BaseVisitor):
                 return Reach.RUNTIME_FALSE
         else:
             return Reach.UNKNOWN
-
