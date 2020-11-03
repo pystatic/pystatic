@@ -1,106 +1,247 @@
 import os
 import logging
+from collections import deque
+from typing import Optional, Dict, TYPE_CHECKING
+from pystatic.config import Config
+from pystatic.exprparse import eval_expr
+from pystatic.errorcode import *
+from pystatic.fsys import Filesys, FilePath, ModuleFindRes
+from pystatic.infer.infer import InferStarter
 from pystatic.message import MessageBox
-from typing import Optional, List, TextIO, Set, Dict
+from pystatic.option import Option
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
                                  get_init_module_symtable)
-from pystatic.config import Config
-from pystatic.modfinder import ModuleFinder
-from pystatic.symid import SymId, relpath2symid
-from pystatic.target import Target, Stage
-from pystatic.infer.infer import InferStarter
-from pystatic.stubgen import stubgen
+from pystatic.symid import SymId, relpath2symid, symid2list
+from pystatic.typesys import (TypeModuleTemp, TypePackageTemp, TypeIns,
+                              any_ins)
+from pystatic.target import BlockTarget, Target, Stage, PackageTarget
+
+if TYPE_CHECKING:
+    from pystatic.symtable import SymTable
 
 logger = logging.getLogger(__name__)
 
 
 class Manager:
-    def __init__(self, config, module_files: List[str],
-                 package_files: List[str], stdout: TextIO, stderr: TextIO,
-                 load_typeshed: bool):
-        self.check_targets: Dict[SymId, Target] = {}
+    def __init__(self, config: Config):
+        self.config = config
 
-        self.config = Config(config)
+        self.fsys = Filesys(config)
 
-        self.user_path: Set[str] = set()
-        self.set_user_path(module_files)
-        self.set_user_path(package_files)
-        finder = ModuleFinder(self.config.manual_path, list(self.user_path),
-                              self.config.sitepkg, self.config.typeshed,
-                              self.config.python_version)
-        self.boxdict: Dict[str, MessageBox] = {}
-        self.pre_proc = Preprocessor(self.boxdict, finder)
+        self.pre_proc = Preprocessor(self)
+        self.targets: Dict[SymId, Target] = {}
 
-        self.stdout = stdout
-        self.stderr = stderr
+        self.q_preprocess = deque()
+        self.q_infer = deque()
 
-        self.find_check_files(module_files)
-        self.find_check_files(package_files)
+        if not config.no_typeshed:
+            self.__init_typeshed()
 
-        if load_typeshed:
-            self.init_typeshed()
+    def __init_typeshed(self):
+        self.__add_check_symid('builtins', get_builtin_symtable())
+        self.__add_check_symid('typing', get_typing_symtable())
+        self.preprocess()
 
-    def init_typeshed(self):
-        builtins_target = Target('builtins', get_builtin_symtable())
-        typing_target = Target('typing', get_typing_symtable())
-        self.preprocess([typing_target, builtins_target])
+    def __add_check_symid(self,
+                          symid: 'SymId',
+                          default_symtable: Optional['SymTable'] = None,
+                          oldpath: Optional[FilePath] = None) -> Option[bool]:
+        """
+        default_symtable:
+            if not None, then the symtable of the new target is set to it.
 
-    def stubgen(self, rt_dir: Optional[str] = None):
-        check_list = list(self.check_targets.values())
-        self.preprocess(check_list)
-        if rt_dir:
-            stubgen(check_list, rt_dir)
+        oldpath:
+            if not None, then it is the path that find_module should return.
+        """
+        if symid in self.targets:
+            return Option(False)
+
+        find_res = self.fsys.find_module(symid)
+        add_option = Option(True)
+        if not find_res:
+            add_option.value = False
+            add_option.add_err(ModuleNotFound(symid))
+
         else:
-            stubgen(check_list)
+            if default_symtable:
+                symtable = default_symtable
+            else:
+                symtable = get_init_module_symtable(symid)
+            mbox = MessageBox(symid)
 
-    def start_check(self):
-        self.preprocess(list(self.check_targets.values()))
-        self.start_infer()
-        for key in self.boxdict.keys():
-            self.boxdict[key].report()
+            # TODO: support namespace
+            assert len(find_res.paths) == 1
 
-    def start_infer(self):
-        InferStarter(self.check_targets).start_infer()
+            if oldpath and oldpath != find_res.paths[0]:
+                # TODO: report name collision
+                add_option = Option(False)
+                return add_option
 
-    def preprocess(self, targets):
-        self.pre_proc.process_module(targets)
+            if find_res.res_type == ModuleFindRes.Module:
+                file_path = self.fsys.realpath(find_res.paths[0])
+                new_target = Target(symid, symtable, mbox, file_path)
 
-    def set_user_path(self, srcfiles: List[str]):
-        """Set user path according to sources"""
-        for srcfile in srcfiles:
-            srcfile = os.path.realpath(srcfile)
-            if not os.path.exists(srcfile):
-                logger.warning(f"{srcfile} doesn't exist")
-                continue
-            rt_path = crawl_path(os.path.dirname(srcfile))
-            if rt_path not in self.user_path:
-                self.user_path.add(rt_path)
-                logger.debug(f'Add user path: {rt_path}')
+                self.__parse(new_target)
+                self.update_stage(new_target, Stage.Preprocess)
+                self.__add_target(new_target)
 
-    def find_check_files(self, srcfiles: List[str]):
-        """Generate Target to be checked according to the srcfiles"""
-        for srcfile in srcfiles:
-            srcfile = os.path.realpath(srcfile)
-            if not os.path.exists(srcfile):
-                # already warned in set_user_path
-                continue
-            rt_path = crawl_path(os.path.dirname(srcfile))
-            symid = relpath2symid(rt_path, srcfile)
-            target = Target(symid,
-                            get_init_module_symtable(symid),
-                            path=srcfile,
-                            stage=Stage.PreParse)
-            self.set_target_mbox(target)
-            self.check_targets[symid] = target
+            elif find_res.res_type == ModuleFindRes.Package:
+                assert find_res.analyse_path
+                dir_path = self.fsys.realpath(find_res.paths[0])
+                analyse_path = self.fsys.realpath(find_res.analyse_path)
 
-    def set_target_mbox(self, target: Target):
-        """Set correct mbox according to a target"""
-        if not target.mbox:
-            target.mbox = MessageBox(target.symid)
+                assert dir_path == os.path.dirname(analyse_path)
 
-        if target.path not in self.boxdict:
-            self.boxdict[target.path] = target.mbox
+                new_target = PackageTarget(symid, symtable, mbox, dir_path,
+                                           analyse_path)
+                new_target.module_temp = TypePackageTemp(
+                    find_res.paths, new_target.symtable, new_target.symid)
+                new_target.path = self.fsys.realpath(find_res.paths[0])
+
+                self.__parse(new_target)
+                self.update_stage(new_target, Stage.Preprocess)
+                self.__add_target(new_target)
+
+            elif find_res.res_type == ModuleFindRes.Namespace:
+                assert False, "Namespace package not supported yet"
+
+        return add_option
+
+    def __add_target(self, target: Target):
+        """Add target"""
+        self.targets[target.symid] = target
+        if target.path:
+            self.fsys.add_path_symid_map(target.path, target.symid)
+
+    def __parse(self, target: Target):
+        assert target.stage == Stage.Parse
+        assert os.path.isabs(target.analyse_path)
+        target.ast = path2ast(target.analyse_path)
+
+    def is_module(self, symid: 'SymId') -> bool:
+        """symid represents a valid module?"""
+        find_res = self.fsys.find_module(symid)
+        if not find_res:
+            return False
+        else:
+            return True
+
+    def update_stage(self,
+                     target: BlockTarget,
+                     stage: Stage,
+                     isnew: bool = False):
+        """Update the stage of a target
+
+        ifnew:
+            True if target is not in self.targets.
+
+        If target's original stage is equal to the new stage and isnew is false,
+        then nothing will happen.
+        """
+        if target.stage == stage and not isnew:
+            return
+        target.stage = stage
+        if stage == Stage.Parse:
+            assert isinstance(target, Target)
+            self.__parse(target)
+        elif stage == Stage.Preprocess:
+            self.q_preprocess.append(target)
+        elif stage == Stage.Infer:
+            self.q_infer.append(target)
+        elif stage == Stage.FINISH:
+            pass
+
+    def get_module_temp(self, symid: 'SymId') -> Optional[TypeModuleTemp]:
+        if symid in self.targets:
+            return self.targets[symid].module_temp
+
+    def add_check_file(self, path: FilePath) -> Option[bool]:
+        path = self.fsys.realpath(path)
+
+        if not os.path.exists(path):
+            add_option = Option(False)
+            add_option.add_err(FileNotFound(path))
+            return add_option
+        else:
+            rt_path = crawl_path(os.path.dirname(path))
+            self.fsys.add_userpath(rt_path)
+            symid = relpath2symid(rt_path, path)
+            return self.__add_check_symid(symid, None, path)
+
+    def add_check_symid(self, symid: 'SymId') -> Option[bool]:
+        return self.__add_check_symid(symid)
+
+    def add_check_target(self, target: 'Target'):
+        assert target not in self.targets
+        self.__add_target(target)
+        self.update_stage(target, target.stage, True)
+
+    def change_target_stage(self, target: 'Target', stage: Stage):
+        assert target == self.targets.get(target.symid)
+        self.update_stage(target, stage)
+
+    def get_mbox_by_symid(self, symid: 'SymId') -> Optional[MessageBox]:
+        target = self.targets.get(symid)
+        if target:
+            return target.mbox
+        else:
+            return None
+
+    def get_mbox(self, path: FilePath) -> Optional[MessageBox]:
+        symid = self.fsys.path_to_symid(path)
+        if symid:
+            return self.get_mbox_by_symid(symid)
+        return None
+
+    def preprocess(self):
+        self.pre_proc.process()
+        pass
+
+    def preprocess_block(self, blk_target: BlockTarget):
+        self.update_stage(blk_target, Stage.Preprocess, True)
+        self.pre_proc.process()
+        pass
+
+    def infer(self):
+        self.preprocess()
+        InferStarter(self.targets).start_infer()
+
+    def get_sym_type(self, module_symid: SymId,
+                     var_symid: SymId) -> Optional['TypeIns']:
+        module_temp = self.get_module_temp(module_symid)
+        if not module_temp:
+            return None
+        else:
+            varid_list = symid2list(var_symid)
+            cur_ins = module_temp.get_default_ins().value
+            for subid in varid_list:
+                res_option = cur_ins.getattribute(subid, None)
+                if res_option.haserr():
+                    return None
+                cur_ins = res_option.value
+            return cur_ins
+
+    def eval_expr(self, module_symid: SymId, expr: str) -> Optional['TypeIns']:
+        try:
+            astnode = ast.parse(expr, mode='eval')
+            module_temp = self.get_module_temp(module_symid)
+            module_ins = module_temp.get_default_ins().value
+            if not module_temp:
+                return None
+            res_option = eval_expr(astnode.body, module_ins)  # type: ignore
+            if res_option.haserr():
+                return None
+            else:
+                return res_option.value
+        except SyntaxError as e:
+            return None
+
+
+def path2ast(path: FilePath) -> ast.AST:
+    with open(path, 'r') as f:
+        content = f.read()
+        return ast.parse(content, type_comments=True)
 
 
 def crawl_path(path: str) -> str:

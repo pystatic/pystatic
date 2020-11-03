@@ -14,6 +14,7 @@ class Scope:
     def set_type(self, name: str, tp: TypeIns):
         self.type_map[name] = tp
 
+
 class FuncScope(Scope):
     def __init__(self, tp: TypeIns, args: Dict[str, TypeIns],
                  ret_annotation: TypeIns):
@@ -35,7 +36,6 @@ class ModuleScope(Scope):
 
 class SymbolRecorder:
     """record the appeared symbol in cur scope"""
-
     def __init__(self, module):
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))
@@ -53,7 +53,8 @@ class SymbolRecorder:
     def leave_scope(self):
         self.stack.pop()
 
-    def enter_func(self, tp: TypeIns, args: Dict[str, TypeIns], ret_annotation):
+    def enter_func(self, tp: TypeIns, args: Dict[str, TypeIns],
+                   ret_annotation):
         self.stack.append(FuncScope(tp, args, ret_annotation))
 
     def leave_func(self):
@@ -107,7 +108,8 @@ class SymbolRecorder:
                     tp = table.lookup_local(name)
                 if tp:
                     return tp
-        return tp
+        table = self.stack[-1].tp.get_inner_symtable()
+        return table.legb_lookup(name)
 
     def getattribute(self, name, node: ast.AST) -> Option:
         tp = self.get_run_time_type(name)

@@ -1,5 +1,6 @@
 import ast
 import logging
+from contextlib import contextmanager
 from typing import Optional, Set
 from pystatic.typesys import *
 from pystatic.message import MessageBox, ErrorMaker
@@ -56,6 +57,7 @@ class InferVisitor(BaseVisitor):
         if not self.recorder.is_defined(name):
             self.recorder.set_type(target.id, comment)
         if not self.type_consistent(comment, rtype):
+            self.recorder.set_type(name, comment)
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
@@ -99,7 +101,8 @@ class InferVisitor(BaseVisitor):
             self.recorder.set_type(name, comment)
 
         if not self.type_consistent(comment, rtype):
-            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.err_maker.add_err(
+                IncompatibleTypeInAssign(rnode, comment, rtype))
             self.recorder.set_type(name, comment)
         else:
             self.recorder.set_type(name, rtype)
@@ -131,28 +134,29 @@ class InferVisitor(BaseVisitor):
             self.err_maker.add_err(
                 UnsupportedBinOperand(node, operand, ltype, rtype))
 
+    @contextmanager
+    def visit_scope(self, node):
+        tp = self.recorder.get_comment_type(node.name)
+        self.recorder.set_type(node.name, tp)
+        yield tp
+        self.recorder.leave_scope()
+
     def visit_ClassDef(self, node: ast.ClassDef):
-        class_type = self.recorder.get_comment_type(node.name)
-        self.recorder.set_type(node.name, class_type)
-        self.recorder.enter_cls(class_type)
-        for subnode in node.body:
-            self.visit(subnode)
-        self.recorder.leave_cls()
+        with self.visit_scope(node) as class_type:
+            self.recorder.enter_cls(class_type)
+            for subnode in node.body:
+                self.visit(subnode)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.cond_infer.accept(node)
+        with self.visit_condition(node):
+            with self.visit_scope(node) as func_type:
+                argument, ret_annotation = self.err_maker.dump_option(
+                    func_type.call(None))
+                self.recorder.enter_func(func_type, self.infer_argument(argument),
+                                         ret_annotation)
+                self.accept_condition_stmt_list(node.body, ConditionStmtType.FUNC)
 
-        func_type: TypeIns = self.recorder.get_comment_type(node.name)
-        self.recorder.set_type(node.name, func_type)
-        argument, ret_annotation = self.err_maker.dump_option(
-            func_type.call(None))
-        self.recorder.enter_func(func_type, self.infer_argument(argument),
-                                 ret_annotation)
-        self.accept_condition_stmt_list(node.body, ConditionStmtType.FUNC)
-
-        self.infer_return_value_of_func(node.returns)
-        self.recorder.leave_func()
-        self.cond_infer.pop()
+                self.infer_return_value_of_func(node.returns)
 
     def infer_argument(self, argument: Argument):
         args = {}
@@ -204,36 +208,29 @@ class InferVisitor(BaseVisitor):
 
         self.cond_infer.eliminate_break(stmt_type)
 
-    def visit_While(self, node: ast.While):
+    def visit_stmt_after_condition(self, stmt_list, condition_type):
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(stmt_list, condition_type)
+        else:
+            self.err_maker.generate_code_unreachable_error(stmt_list)
+
+    @contextmanager
+    def visit_condition(self, node):
         self.cond_infer.accept(node)
-        if not self.cond_infer.rejected():
-            self.accept_condition_stmt_list(node.body, ConditionStmtType.LOOP)
-        else:
-            self.err_maker.generate_code_unreachable_error(node.body)
-
-        self.cond_infer.flip()
-
-        if not self.cond_infer.rejected():
-            self.accept_condition_stmt_list(node.orelse,
-                                            ConditionStmtType.LOOP)
-        else:
-            self.err_maker.generate_code_unreachable_error(node.orelse)
+        yield
         self.cond_infer.pop()
+
+    def visit_While(self, node: ast.While):
+        with self.visit_condition(node):
+            self.visit_stmt_after_condition(node.body, ConditionStmtType.LOOP)
+            self.cond_infer.flip()
+            self.visit_stmt_after_condition(node.orelse, ConditionStmtType.IF)
 
     def visit_If(self, node: ast.If):
-        self.cond_infer.accept(node)
-        if not self.cond_infer.rejected():
-            self.accept_condition_stmt_list(node.body, ConditionStmtType.IF)
-        else:
-            self.err_maker.generate_code_unreachable_error(node.body)
-
-        self.cond_infer.flip()
-
-        if not self.cond_infer.rejected():
-            self.accept_condition_stmt_list(node.orelse, ConditionStmtType.IF)
-        else:
-            self.err_maker.generate_code_unreachable_error(node.orelse)
-        self.cond_infer.pop()
+        with self.visit_condition(node):
+            self.visit_stmt_after_condition(node.body, ConditionStmtType.IF)
+            self.cond_infer.flip()
+            self.visit_stmt_after_condition(node.orelse, ConditionStmtType.IF)
 
     def visit_Break(self, node: ast.Break):
         self.cond_infer.accept(node)
@@ -249,10 +246,6 @@ class InferStarter:
     def start_infer(self):
         for symid, target in self.sources.items():
             logger.info(f'Type infer in module \'{symid}\'')
-            print(
-                target.module_temp.getattribute('A',
-                                                None).getattribute('hj',
-                                                                   None).value)
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox)
             infer_visitor.infer()

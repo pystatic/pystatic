@@ -69,6 +69,9 @@ class MessageBox(object):
             return
         self.add_err(node, msg)
 
+    def clear(self):
+        self.error = []
+
     def report(self):
         for err in self.error:
             print(err)
@@ -100,7 +103,6 @@ class ErrorMaker:
     def generate_code_unreachable_error(self, code_frag: List[ast.stmt]):
         if len(code_frag) == 0:
             return
-
         begin = code_frag[0]
         end = code_frag[-1]
         begin.end_lineno = end.end_lineno

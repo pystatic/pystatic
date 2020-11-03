@@ -33,16 +33,18 @@ class Condition:
 
 
 class ConditionInfer(BaseVisitor):
-    def __init__(self,
-                 recorder: SymbolRecorder,
-                 # reach_map: Dict[ast.AST, Reach],
-                 err_maker: ErrorMaker):
+    def __init__(
+            self,
+            recorder: SymbolRecorder,
+            # reach_map: Dict[ast.AST, Reach],
+            err_maker: ErrorMaker):
         super().__init__()
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}
         self.err_maker = err_maker
-        self.reach_stack: List[Condition] = [Condition(ConditionStmtType.GLOBAL,
-                                                       Reach.RUNTIME_TRUE)]
+        self.reach_stack: List[Condition] = [
+            Condition(ConditionStmtType.GLOBAL, Reach.RUNTIME_TRUE)
+        ]
         self.break_flag = BreakFlag.NORMAL
         self.break_node: Optional[ast.stmt] = None
 
@@ -85,7 +87,8 @@ class ConditionInfer(BaseVisitor):
         return self.break_node
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.reach_stack.append(Condition(ConditionStmtType.FUNC, Reach.RUNTIME_TRUE))
+        self.reach_stack.append(
+            Condition(ConditionStmtType.FUNC, Reach.RUNTIME_TRUE))
 
     def visit_While(self, node: ast.While):
         reach = self.infer_value_of_condition(node.test)
@@ -121,8 +124,30 @@ class ConditionInfer(BaseVisitor):
                 return self.infer_value_of_condition(test.operand)
             else:
                 assert False, "TODO"
+        elif isinstance(test, ast.BoolOp):
+            op = test.op
+            if isinstance(op, ast.And):
+                for value in test.values:
+                    value_reach = self.infer_value_of_condition(value)
+                    if value_reach == Reach.RUNTIME_FALSE:
+                        return Reach.RUNTIME_FALSE
+                    elif value_reach == Reach.UNKNOWN:
+                        return Reach.UNKNOWN
+                return Reach.RUNTIME_TRUE
+            elif isinstance(op, test.Or):
+                for value in test.values:
+                    value_reach = self.infer_value_of_condition(value)
+                    if value_reach == Reach.RUNTIME_TRUE:
+                        return Reach.RUNTIME_TRUE
+                    elif value_reach == Reach.UNKNOWN:
+                        return Reach.UNKNOWN
+                return Reach.RUNTIME_FALSE
+            else:
+                assert False, "not reach here"
         elif isinstance(test, ast.Call):
             return self.infer_value_of_call(test)
+        elif isinstance(test, ast.Name):
+            return self.infer_value_of_name_node(test)
         else:
             return Reach.UNKNOWN
 
@@ -134,10 +159,13 @@ class ConditionInfer(BaseVisitor):
                 # option = eval_expr(test, self.recorder)
                 # if self.err_maker.exsit_error(option):
                 #     self.err_maker.dump_option(option)
-                first_type = self.err_maker.dump_option(eval_expr(args[0], self.recorder))
-                second_type = self.err_maker.dump_option(eval_expr(args[1], self.recorder))
-                
-                if type_consistent(first_type, self.err_maker.dump_option(second_type.call(None))):
+                first_type = self.err_maker.dump_option(
+                    eval_expr(args[0], self.recorder))
+                second_type = self.err_maker.dump_option(
+                    eval_expr(args[1], self.recorder))
+                if type_consistent(
+                        first_type,
+                        self.err_maker.dump_option(second_type.call(None))):
                     return Reach.RUNTIME_TRUE
                 else:
                     return Reach.RUNTIME_FALSE
@@ -154,3 +182,16 @@ class ConditionInfer(BaseVisitor):
             return Reach.RUNTIME_TRUE
         else:
             return Reach.RUNTIME_FALSE
+
+    def infer_value_of_name_node(self, test: ast.Name):
+        option: Option = eval_expr(test, self.recorder)
+        tp = self.err_maker.dump_option(option)
+        if self.err_maker.exsit_error(option):
+            return Reach.UNKNOWN
+        if isinstance(tp, TypeLiteralIns):
+            if tp.value:
+                return Reach.RUNTIME_TRUE
+            else:
+                return Reach.RUNTIME_FALSE
+        else:
+            return Reach.UNKNOWN
