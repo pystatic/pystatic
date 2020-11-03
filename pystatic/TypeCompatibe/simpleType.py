@@ -3,7 +3,6 @@ import enum
 from typing import Callable, Tuple, Optional, Type, TypeVar, Union
 from pystatic.typesys import TypeIns, TypeTemp, TypeOptionalTemp, TypeTupleTemp, TypeClassTemp
 
-
 '''
 phase2:
 已经完成：基本类型,部分特别类型和直接子类型的判断和检查
@@ -19,6 +18,7 @@ phase2:
     #下周可能做的事：关于别名和具体类型的子类型（这个应该不用特殊处理，直接当作一般类型判断就可以了吧） 
     a:A()=B实例和类型，type(B) 和B的temp具有相同的名字
 '''
+
 
 class compatibleState(enum.IntEnum):
     INVARIANT = 0
@@ -38,11 +38,12 @@ class TypeCompatible:
 
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        
-        if  (isinstance(a,TypeIns) and not isinstance(b,TypeIns)) or (isinstance(b,TypeIns) and not isinstance(a,TypeIns)):
+
+        if (isinstance(a, TypeIns) and not isinstance(b, TypeIns)) or (
+                isinstance(b, TypeIns) and not isinstance(a, TypeIns)):
             return False
 
-        if isinstance(a,TypeIns) and isinstance(b,TypeIns):
+        if isinstance(a, TypeIns) and isinstance(b, TypeIns):
             return self.SpecificClassTypeCom(a, b, compatibleState.CONVARIANT)  # 此处语法有待丰富
 
         if tempb.name == 'Literal':
@@ -62,14 +63,8 @@ class TypeCompatible:
         # need to change
 
         elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
-<<<<<<< HEAD
-
-            return self.SpecificClassTypeCom(tempa, tempb, compatibleState.CONVARIANT)  # 此处语法有待丰富
-=======
-            # print('lalala')
             return self.SpecificClassTypeCom(
                 tempa, tempb, compatibleState.CONVARIANT)  # 此处语法有待丰富
->>>>>>> 38cd79bb05763872b0b01dce04c2302a318db6cb
 
         return False
 
@@ -254,7 +249,7 @@ class TypeCompatible:
         if self.TypeCompatibleStrict(
                 a.constrains[0],
                 b.constrains[0]) and self.TypeCompatibleStrict(
-                    a.constrains[1], b.constrains[1]):
+            a.constrains[1], b.constrains[1]):
             return True
         else:
             return False
@@ -265,14 +260,8 @@ class TypeCompatible:
         else:
             return False
 
-<<<<<<< HEAD
-    def SpecificClassTypeCom(self, a: TypeClassTemp, b: TypeClassTemp, state: compatibleState) -> bool:
-        print(a.name)
-        print(b.name)
-=======
     def SpecificClassTypeCom(self, a: TypeClassTemp, b: TypeClassTemp,
                              state: compatibleState) -> bool:
->>>>>>> 38cd79bb05763872b0b01dce04c2302a318db6cb
         if a.name == b.name:
             return True
         elif state == compatibleState.INVARIANT:
@@ -335,4 +324,3 @@ def type_consistent(tp1, tp2):
 
 def is_any(tp):
     return str(tp) == "Any"
- 
