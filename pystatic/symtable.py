@@ -1,5 +1,6 @@
 import ast
 import enum
+from pystatic.symid import SymId, symid2list
 from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
 from pystatic.option import Option
 from pystatic.errorcode import *
@@ -7,7 +8,6 @@ from pystatic.errorcode import *
 if TYPE_CHECKING:
     from pystatic.typesys import (TypeIns, TypeClassTemp, TypeTemp,
                                   TypeFuncIns)
-    from pystatic.uri import Uri
 
 
 class TableScope(enum.Enum):
@@ -36,13 +36,51 @@ class Entry:
         return self._defnode
 
     def __str__(self):
-        return str(self._tp)
+        return str(self.get_type())
+
+
+class ImportCache:
+    __slots__ = ['import_nodes', 'import_map']
+
+    def __init__(self) -> None:
+        self.import_nodes: List['ImportNode'] = []
+        self.import_map: Dict[str, 'TypeIns'] = {}
+
+    def get_moduleins(self, abssymid: 'SymId') -> Optional['TypeIns']:
+        from pystatic.typesys import TypePackageIns, TypeModuleTemp
+
+        symidlist = symid2list(abssymid)
+        if not symidlist:
+            return None
+        cur_ins = self.import_map.get(symidlist[0], None)
+
+        for i in range(1, len(symidlist)):
+            if not cur_ins:
+                return None
+
+            if isinstance(cur_ins, TypePackageIns):
+                cur_ins = cur_ins.submodule.get(symidlist[i], None)
+            else:
+                assert isinstance(cur_ins.temp, TypeModuleTemp)
+                if i == len(symidlist) - 1:
+                    return cur_ins
+                else:
+                    return None
+
+        return cur_ins
+
+    def set_moduleins(self, abssymid: 'SymId', modins: 'TypeIns'):
+        self.import_map[abssymid] = modins
+
+    def add_import_node(self, node: 'ImportNode'):
+        self.import_nodes.append(node)
+
 
 class SymTable:
-    def __init__(self, uri: 'Uri', glob: 'SymTable',
+    def __init__(self, symid: 'SymId', glob: 'SymTable',
                  non_local: Optional['SymTable'], builtins: 'SymTable',
                  scope: 'TableScope') -> None:
-        self.uri = uri
+        self.symid = symid
 
         self.local: Dict[str, Entry] = {}
         self.non_local = non_local
@@ -51,18 +89,17 @@ class SymTable:
 
         self.scope = scope
 
+        self.import_cache = ImportCache()
+
         # inner data structure to store important information about this
         # symtable, used heavily in the preprocess stage.
         self._cls_defs: Dict[str, 'TypeClassTemp'] = {}
         self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
         self._func_defs: Dict[str, 'TypeFuncIns'] = {}
 
-        self._import_nodes: List[ImportNode] = []
-        self._import_tree: Dict[str, 'TypeIns'] = {}
-
     @property
-    def glob_uri(self):
-        return self.glob.uri
+    def glob_symid(self):
+        return self.glob.symid
 
     def _legb_lookup(self, name: str, find):
         curtable = self
@@ -118,13 +155,13 @@ class SymTable:
         support the getattribute interface.
         """
         from pystatic.typesys import any_ins  # avoid import circle
-        option_res = Option(any_ins)
+        res_option = Option(any_ins)
         res = self.lookup(name)
         if not res:
-            option_res.add_err(SymbolUndefined(node, name))
+            res_option.add_err(SymbolUndefined(node, name))
         else:
-            option_res.set_value(res)
-        return option_res
+            res_option.set_value(res)
+        return res_option
 
     def lookup_local_entry(self, name: str) -> Optional['Entry']:
         return self.local.get(name)
@@ -142,8 +179,8 @@ class SymTable:
         else:
             non_local = self
         glob = self.glob
-        new_uri = self.uri + '.' + name
-        return SymTable(new_uri, glob, non_local, builtins, new_scope)
+        new_symid = self.symid + '.' + name
+        return SymTable(new_symid, glob, non_local, builtins, new_scope)
 
     def legb_lookup(self, name):
         return self._legb_lookup(name, SymTable.lookup_local)

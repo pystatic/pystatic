@@ -1,7 +1,6 @@
 import ast
-import logging
 from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
-from pystatic.uri import absolute_urilist, Uri, uri2list, rel2absuri
+from pystatic.symid import absolute_symidlist, SymId, symid2list, rel2abssymid
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
                               TypePackageIns, TypeTemp, TypePackageTemp,
                               TypeType, TpState, any_ins)
@@ -10,14 +9,12 @@ from pystatic.symtable import SymTable, ImportNode
 if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
 
-logger = logging.getLogger(__name__)
-
 
 class FakeData:
     def __init__(self):
         self.fun: Dict[str, 'fake_fun_entry'] = {}
         self.local: Dict[str, 'fake_local_entry'] = {}
-        self.impt: List['fake_impt_entry'] = []
+        self.impt: Dict[str, 'fake_impt_entry'] = {}
 
 
 class fake_fun_entry:
@@ -36,11 +33,18 @@ class fake_local_entry:
 
 
 class fake_impt_entry:
-    def __init__(self, uri: 'Uri', origin_name: str,
+    __slots__ = ['symid', 'origin_name', 'asname', 'defnode']
+
+    def __init__(self, symid: 'SymId', origin_name: str, asname: str,
                  defnode: ImportNode) -> None:
-        self.uri = uri
+        self.symid = symid
         self.origin_name = origin_name
+        self.asname = asname
         self.defnode = defnode
+
+    def is_import_module(self):
+        """Import the whole module?"""
+        return self.origin_name == ''
 
 
 def get_fake_data(symtable: 'SymTable') -> FakeData:
@@ -51,7 +55,7 @@ def get_fake_data(symtable: 'SymTable') -> FakeData:
     return fake_data
 
 
-def try_fake_data(symtable: 'SymTable') -> Optional[FakeData]:
+def try_get_fake_data(symtable: 'SymTable') -> Optional[FakeData]:
     return getattr(symtable, 'fake_data', None)
 
 
@@ -77,67 +81,32 @@ def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
     fake_data.local[name] = entry
 
 
-class ImportInfoItem:
-    __slots__ = ['uri', 'origin_name', 'asname']
-
-    def __init__(self, uri: str, origin_name: str, asname: str) -> None:
-        self.uri = uri
-        self.origin_name = origin_name
-        self.asname = asname
-
-    @property
-    def is_import_module(self):
-        """Import the whole module?"""
-        return self.origin_name == ''
-
-
-def analyse_import_stmt(node: Union[ast.Import, ast.ImportFrom],
-                        uri: Uri) -> List[ImportInfoItem]:
-    """Extract import information stored in import ast node.
-
-    Return an dict that maps uri to a list of ImportInfoItem.
-    """
-    info_list: List[ImportInfoItem] = []
+def analyse_import_stmt(node: ImportNode,
+                        symid: SymId) -> List[fake_impt_entry]:
+    """Extract import information stored in import ast node."""
+    info_list: List[fake_impt_entry] = []
     if isinstance(node, ast.Import):
         for alias in node.names:
-            module_uri = alias.name
-            as_name = alias.asname or module_uri
-            info_list.append(ImportInfoItem(module_uri, '', as_name))
+            module_symid = alias.name
+            as_name = alias.asname or module_symid
+            info_list.append(fake_impt_entry(module_symid, '', as_name, node))
 
     elif isinstance(node, ast.ImportFrom):
         imp_name = '.' * node.level
         imp_name += node.module or ''
-        module_uri = rel2absuri(uri, imp_name)
+        module_symid = rel2abssymid(symid, imp_name)
         imported = []
         for alias in node.names:
             attr_name = alias.name
             as_name = alias.asname or attr_name
             imported.append((as_name, attr_name))
-            info_list.append(ImportInfoItem(module_uri, attr_name, as_name))
+            info_list.append(
+                fake_impt_entry(module_symid, attr_name, as_name, node))
 
     else:
         raise TypeError("node doesn't stand for an import statement")
 
     return info_list
-
-
-def add_import(symtable: 'SymTable', infoitem: 'ImportInfoItem',
-               defnode: 'ImportNode'):
-    """Store import information.
-
-    def node will be simply appended to symtable's _import_nodes list.
-
-    If defnode represents a ImportFrom node, then an fake_imp_entry will be
-    added to the symtable's fake_data.
-    """
-    symtable._import_nodes.append(defnode)
-
-    # TODO: warning if name collision happens
-    if isinstance(defnode, ast.ImportFrom):
-        tmp_entry = fake_impt_entry(infoitem.uri, infoitem.origin_name,
-                                    defnode)
-        fake_data = get_fake_data(symtable)
-        fake_data.impt.append(tmp_entry)
 
 
 def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):
@@ -157,19 +126,24 @@ def get_temp_state(temp: TypeTemp) -> TpState:
     return temp._resolve_state
 
 
-def add_uri_symtable(symtable: 'SymTable', uri: str,
-                     worker: 'Preprocessor') -> Optional[TypeIns]:
-    """Update symtable's import tree with uri"""
-    urilist = absolute_urilist(symtable.glob_uri, uri)
-    assert urilist
+def update_symtable_import_cache(symtable: 'SymTable',
+                                 entry: 'fake_impt_entry',
+                                 worker: 'Preprocessor') -> Optional[TypeIns]:
+    """Update symtable's import cache"""
+    symid = entry.symid
+
+    symidlist = absolute_symidlist(symtable.glob_symid, symid)
+    if not symidlist:
+        return None
+
+    cache = symtable.import_cache
 
     # get the initial module ins or package ins
-    cur_uri = urilist[0]
-    cur_ins: TypeIns
-    if urilist[0] in symtable._import_tree:
-        cur_ins = symtable._import_tree[urilist[0]]
-    else:
-        temp = worker.get_module_temp(urilist[0])
+    cur_symid = symidlist[0]
+    cur_ins = cache.get_moduleins(cur_symid)
+
+    if not cur_ins:
+        temp = worker.get_module_temp(symidlist[0])
         if not temp:
             return None
 
@@ -177,44 +151,47 @@ def add_uri_symtable(symtable: 'SymTable', uri: str,
             cur_ins = TypePackageIns(temp)
         else:
             assert isinstance(temp, TypeModuleTemp)
-            cur_ins = temp.get_default_ins()
+            cur_ins = temp.get_default_ins().value
 
-        symtable._import_tree[urilist[0]] = cur_ins
+        cache.set_moduleins(cur_symid, cur_ins)
 
     assert isinstance(cur_ins.temp, TypeModuleTemp)
-
-    for i in range(1, len(urilist)):
+    for i in range(1, len(symidlist)):
         if not isinstance(cur_ins, TypePackageIns):
             return None
 
-        cur_uri += f'.{urilist[i]}'
-        if urilist[i] not in cur_ins.submodule:
-            temp = worker.get_module_temp(cur_uri)
+        cur_symid += f'.{symidlist[i]}'
+        if symidlist[i] not in cur_ins.submodule:
+            temp = worker.get_module_temp(cur_symid)
             if not temp:
                 return None
 
             assert isinstance(temp, TypeModuleTemp)
             if isinstance(temp, TypePackageTemp):
-                cur_ins.add_submodule(urilist[i], TypePackageIns(temp))
+                cur_ins.add_submodule(symidlist[i], TypePackageIns(temp))
             else:
-                if i != len(urilist) - 1:
+                if i != len(symidlist) - 1:
                     return None
-                res_ins = temp.get_default_ins()
-                cur_ins.add_submodule(urilist[i], res_ins)
+                res_ins = temp.get_default_ins().value
+                cur_ins.add_submodule(symidlist[i], res_ins)
                 return res_ins
 
-        cur_ins = cur_ins.submodule[urilist[i]]
+        cur_ins = cur_ins.submodule[symidlist[i]]
 
-    return cur_ins
+    assert cur_symid == entry.symid
 
+    # If the source is a package then another module may be imported.
+    # Example:
+    # from fruit import apple
+    # fruit is a package and apple is a module so pystatic need to add apple
+    # to fruit's submodule list
+    if isinstance(cur_ins, TypePackageIns):
+        if not entry.is_import_module():
+            cur_symid += f'.{entry.origin_name}'
+            temp = worker.get_module_temp(cur_symid)
 
-def search_uri_symtable(symtable: 'SymTable', uri: str) -> Optional[TypeIns]:
-    urilist = uri2list(uri)
-    assert urilist
-    cur_ins = symtable._import_tree[urilist[0]]
-    for i in range(1, len(urilist)):
-        # TODO: warning here
-        cur_ins = cur_ins.getattribute(urilist[i], None).value
-        if not cur_ins:
-            return None
+            if temp:
+                cur_ins.add_submodule(entry.origin_name,
+                                      temp.get_default_ins().value)
+
     return cur_ins

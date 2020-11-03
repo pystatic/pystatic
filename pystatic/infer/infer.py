@@ -1,6 +1,6 @@
 import ast
 import logging
-from typing import Optional
+from typing import Optional, Set
 from pystatic.typesys import *
 from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
@@ -11,7 +11,8 @@ from pystatic.infer.op_map import *
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer import op_map
-from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any
+from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
+from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any, type_consistent
 
 logger = logging.getLogger(__name__)
 
@@ -22,26 +23,19 @@ class InferVisitor(BaseVisitor):
         self.root = node
         self.err_maker = ErrorMaker(mbox)
         self.type_comparator = TypeCompatible()
-
         self.recorder = SymbolRecorder(module)
-
-        self.ret_list = []
-        self.ret_annotation = None
+        self.cond_infer = ConditionInfer(self.recorder, self.err_maker)
 
     def infer(self):
         self.visit(self.root)
 
     def get_type(self, node: ast.AST) -> TypeIns:
         option = eval_expr(node, self.recorder)
-
         self.err_maker.handle_err(option.errors)
         return option.value
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
-        # print(type(ltype), type(rtype))
-        res = self.type_comparator.TypeCompatible(ltype, rtype)
-        print(f"type compatible of '{ltype}' and '{rtype}' is {res}")
-        return res
+        return type_consistent(ltype, rtype)
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
@@ -55,20 +49,25 @@ class InferVisitor(BaseVisitor):
             else:
                 self.check_composed_node_of_assign(target, node.value, rtype)
 
-    def infer_name_node_of_assign(self, target: ast.Name, rnode: ast.AST, rtype: TypeIns):
+    def infer_name_node_of_assign(self, target: ast.Name, rnode: ast.AST,
+                                  rtype: TypeIns):
         name = target.id
-        if not self.recorder.is_defined(name):
-            self.recorder.set_type(target.id, rtype)
         comment = self.recorder.get_comment_type(name)
+        if not self.recorder.is_defined(name):
+            self.recorder.set_type(target.id, comment)
         if not self.type_consistent(comment, rtype):
-            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.err_maker.add_err(
+                IncompatibleTypeInAssign(rnode, comment, rtype))
+        else:
+            self.recorder.set_type(target.id, rtype)
 
-    def check_composed_node_of_assign(self, target: ast.AST, rnode: ast.AST, rtype: TypeIns):
+    def check_composed_node_of_assign(self, target: ast.AST, rnode: ast.AST,
+                                      rtype: TypeIns):
         ltype = self.get_type(target)
-        if not ltype:
-            return
+
         if not self.type_consistent(ltype, rtype):
-            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
+            self.err_maker.add_err(
+                IncompatibleTypeInAssign(rnode, ltype, rtype))
 
     def check_multi_left_of_assign(self, target: List[ast.AST], rnode, rtypes):
         if len(target) < len(rtypes):
@@ -95,13 +94,18 @@ class InferVisitor(BaseVisitor):
 
     def check_name_node_of_annassign(self, target: ast.Name, rnode, rtype):
         name = target.id
+        comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):  # var appear first time
-            self.recorder.set_type(name, rtype)
-        ltype = self.recorder.get_comment_type(name)
-        if not self.type_consistent(ltype, rtype):
-            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
+            self.recorder.set_type(name, comment)
 
-    def check_composed_node_of_annassign(self, target: ast.AST, rnode: ast.AST, rtype: TypeIns):
+        if not self.type_consistent(comment, rtype):
+            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.recorder.set_type(name, comment)
+        else:
+            self.recorder.set_type(name, rtype)
+
+    def check_composed_node_of_annassign(self, target: ast.AST, rnode: ast.AST,
+                                         rtype: TypeIns):
         self.check_composed_node_of_assign(target, rnode, rtype)
 
     def visit_AugAssign(self, node: ast.AugAssign):
@@ -110,19 +114,22 @@ class InferVisitor(BaseVisitor):
         func_name: str = op_map.binop_map[type(node.op)]
         option: Option = ltype.getattribute(func_name, None)
         operand = op_map.binop_char_map[type(node.op)]
-        if self.exsit_error(option):
+        if self.err_maker.exsit_error(option):
             self.err_maker.add_err(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype))
             return
-        func_type = self.dump_option(option)
-        self.check_arg_of_operand_func(node.value, func_type, operand, ltype, rtype)
+        func_type = self.err_maker.dump_option(option)
+        self.check_arg_of_operand_func(node.value, func_type, operand, ltype,
+                                       rtype)
 
-    def check_arg_of_operand_func(self, node, func_type, operand, ltype, rtype):
+    def check_arg_of_operand_func(self, node, func_type, operand, ltype,
+                                  rtype):
         apply_args = ApplyArgs()
         apply_args.add_arg(rtype, node)
         option: Option = func_type.call(apply_args)
         if self.err_maker.exsit_error(option):
-            self.err_maker.add_err(UnsupportedBinOperand(node, operand, ltype, rtype))
+            self.err_maker.add_err(
+                UnsupportedBinOperand(node, operand, ltype, rtype))
 
     def visit_ClassDef(self, node: ast.ClassDef):
         class_type = self.recorder.get_comment_type(node.name)
@@ -133,19 +140,21 @@ class InferVisitor(BaseVisitor):
         self.recorder.leave_cls()
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
+        self.cond_infer.accept(node)
+
         func_type: TypeIns = self.recorder.get_comment_type(node.name)
         self.recorder.set_type(node.name, func_type)
+        argument, ret_annotation = self.err_maker.dump_option(
+            func_type.call(None))
+        self.recorder.enter_func(func_type, self.infer_argument(argument),
+                                 ret_annotation)
+        self.accept_condition_stmt_list(node.body, ConditionStmtType.FUNC)
 
-        argument, self.ret_annotation = self.err_maker.dump_option(func_type.call(None))
-        self.recorder.enter_func(func_type, self.infer_argument(argument))
-
-        for subnode in node.body:
-            self.visit(subnode)
-        self.infer_ret_value_of_func(func_type, node.returns)
+        self.infer_return_value_of_func(node.returns)
         self.recorder.leave_func()
+        self.cond_infer.pop()
 
     def infer_argument(self, argument: Argument):
-        # TODO: default value
         args = {}
         for arg in argument.posonlyargs:
             args[arg.name] = arg.ann
@@ -161,44 +170,76 @@ class InferVisitor(BaseVisitor):
             args[vararg.name] = vararg.ann
         return args
 
-    def infer_ret_value_of_func(self, func_type, type_comment):
-        if len(self.ret_list) == 0:
-            rtype = none_type
-            if not is_any(self.ret_annotation):
-                self.err_maker.add_err(ReturnValueExpected(type_comment))
-        elif len(self.ret_list) == 1:
-            # TODO
-            rtype = self.ret_list[0]
-            if rtype is None:
-                rtype = none_type
+    def infer_return_value_of_func(self, node):
+        ret_set = self.recorder.get_ret_type()
+        ret_list = list(ret_set)
+        ret_annotation = self.recorder.get_ret_annotation()
+        num = len(ret_list)
+        if num == 0:
+            self.err_maker.add_err(ReturnValueExpected(node))
         else:
             # TODO
             pass
-        self.ret_list = []
-        if not is_any(self.ret_annotation):
-            func_type.ret_type = rtype
 
     def visit_Return(self, node: ast.Return):
+        self.cond_infer.accept(node)
         ret_type = self.get_type(node.value)
-        self.check_ret_type(self.ret_annotation, node, ret_type)
-        self.ret_list.append(ret_type)
+        ret_annotation = self.recorder.get_ret_annotation()
+        self.check_ret_type(ret_annotation, node, ret_type)
+        self.recorder.add_ret(ret_type)
 
     def check_ret_type(self, annotation, ret_node: ast.Return, ret_type):
-        if ret_type is None:
-            self.err_maker.add_err(ReturnValueExpected(ret_node))
-            return
         if not self.type_consistent(annotation, ret_type):
             self.err_maker.add_err(
                 IncompatibleReturnType(ret_node.value, annotation, ret_type))
 
+    def accept_condition_stmt_list(self, stmt_list: List[ast.stmt], stmt_type):
+        for stmt in stmt_list:
+            if self.cond_infer.detect_break():
+                index = stmt_list.index(stmt)
+                self.err_maker.generate_code_unreachable_error(
+                    stmt_list[index:])
+                break
+            self.visit(stmt)
+
+        self.cond_infer.eliminate_break(stmt_type)
+
     def visit_While(self, node: ast.While):
-        pass
+        self.cond_infer.accept(node)
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(node.body, ConditionStmtType.LOOP)
+        else:
+            self.err_maker.generate_code_unreachable_error(node.body)
+
+        self.cond_infer.flip()
+
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(node.orelse,
+                                            ConditionStmtType.LOOP)
+        else:
+            self.err_maker.generate_code_unreachable_error(node.orelse)
+        self.cond_infer.pop()
 
     def visit_If(self, node: ast.If):
-        cond = self.get_type(node.test)
-        for subnode in node.body:
-            self.visit(subnode)
-        self.visit(node.orelse)
+        self.cond_infer.accept(node)
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(node.body, ConditionStmtType.IF)
+        else:
+            self.err_maker.generate_code_unreachable_error(node.body)
+
+        self.cond_infer.flip()
+
+        if not self.cond_infer.rejected():
+            self.accept_condition_stmt_list(node.orelse, ConditionStmtType.IF)
+        else:
+            self.err_maker.generate_code_unreachable_error(node.orelse)
+        self.cond_infer.pop()
+
+    def visit_Break(self, node: ast.Break):
+        self.cond_infer.accept(node)
+
+    def visit_Continue(self, node: ast.Continue):
+        self.cond_infer.accept(node)
 
 
 class InferStarter:
@@ -206,9 +247,12 @@ class InferStarter:
         self.sources = sources
 
     def start_infer(self):
-        for uri, target in self.sources.items():
-            logger.info(f'Type infer in module \'{uri}\'')
-            print(type(target.module_temp.getattribute('aa', None)))
+        for symid, target in self.sources.items():
+            logger.info(f'Type infer in module \'{symid}\'')
+            print(
+                target.module_temp.getattribute('A',
+                                                None).getattribute('hj',
+                                                                   None).value)
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox)
             infer_visitor.infer()

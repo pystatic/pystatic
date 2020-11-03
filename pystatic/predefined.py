@@ -1,6 +1,7 @@
 import typing
 from pystatic.symtable import SymTable, TableScope, Entry
 from pystatic.arg import Argument, Arg
+from pystatic.symid import SymId
 from pystatic.typesys import *
 
 builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
@@ -40,9 +41,9 @@ def get_typing_symtable() -> SymTable:
     return typing_symtable
 
 
-def get_init_module_symtable(uri: str) -> SymTable:
+def get_init_module_symtable(symid: SymId) -> SymTable:
     new_symtable = SymTable(
-        uri,
+        symid,
         None,  # type: ignore
         None,
         builtin_symtable,

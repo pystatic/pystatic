@@ -10,6 +10,10 @@ class Reach(enum.Enum):
     UNKNOWN = 5  # uncertain about its reachability
 
 
+ACCEPT_REACH = (Reach.RUNTIME_TRUE, Reach.TYPE_TRUE, Reach.UNKNOWN)
+REJECT_REACH = (Reach.RUNTIME_FALSE, Reach.TYPE_FALSE)
+
+
 def cal_neg(res: Reach) -> Reach:
     if res == Reach.TYPE_TRUE:
         return Reach.TYPE_FALSE

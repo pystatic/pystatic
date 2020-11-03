@@ -1,6 +1,6 @@
 import ast
 from typing import Optional, List, TYPE_CHECKING
-from pystatic.errorcode import ErrorCode
+from pystatic.errorcode import ErrorCode, CodeUnreachable
 from pystatic.option import Option
 
 if TYPE_CHECKING:
@@ -12,7 +12,6 @@ class Message(object):
 
     from_node: generate an error message for the position implied by the node
     """
-
     def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
                  end_col_offset: Optional[int], msg: str):
         self.lineno = lineno
@@ -53,8 +52,8 @@ class TypeNode:
 
 
 class MessageBox(object):
-    def __init__(self, module_uri: str):
-        self.module_uri = module_uri
+    def __init__(self, module_symid: str):
+        self.module_symid = module_symid
         self.error: List[Message] = []
         self.types: List[TypeNode] = []
 
@@ -98,5 +97,12 @@ class ErrorMaker:
     def exsit_error(self, option: Option) -> bool:
         return len(option.errors) != 0
 
-    def generate_code_unreachable_error(self, code_frag: List[ast.AST]):
-        pass
+    def generate_code_unreachable_error(self, code_frag: List[ast.stmt]):
+        if len(code_frag) == 0:
+            return
+
+        begin = code_frag[0]
+        end = code_frag[-1]
+        begin.end_lineno = end.end_lineno
+        begin.end_col_offset = end.end_col_offset
+        self.add_err(CodeUnreachable(begin))

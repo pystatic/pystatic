@@ -7,7 +7,7 @@ from pystatic.typesys import (TypeClassTemp, TpState, TypeVarIns, TypeVarTemp,
                               TypeType)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
-from pystatic.uri import Uri
+from pystatic.symid import SymId
 from pystatic.exprparse import eval_expr
 from pystatic.preprocess.sym_util import *
 
@@ -15,16 +15,14 @@ if TYPE_CHECKING:
     from pystatic.preprocess.main import Preprocessor
     from pystatic.target import BlockTarget, MethodTarget
 
-logger = logging.getLogger(__name__)
-
 
 def get_definition(target: 'BlockTarget', worker: 'Preprocessor',
                    mbox: 'MessageBox'):
     cur_ast = target.ast
     symtable = target.symtable
-    uri = target.uri
+    symid = target.symid
     assert cur_ast
-    return TypeDefVisitor(worker, symtable, mbox, uri).accept(cur_ast)
+    return TypeDefVisitor(worker, symtable, mbox, symid).accept(cur_ast)
 
 
 def get_definition_in_method(target: 'MethodTarget', worker: 'Preprocessor',
@@ -32,9 +30,9 @@ def get_definition_in_method(target: 'MethodTarget', worker: 'Preprocessor',
     cur_ast = target.ast
     symtable = target.symtable
     clstemp = target.clstemp
-    uri = target.uri
+    symid = target.symid
     assert isinstance(cur_ast, ast.FunctionDef)
-    return TypeDefVisitor(worker, symtable, mbox, uri, clstemp,
+    return TypeDefVisitor(worker, symtable, mbox, symid, clstemp,
                           True).accept_func(cur_ast)
 
 
@@ -43,21 +41,21 @@ class TypeDefVisitor(BaseVisitor):
                  worker: 'Preprocessor',
                  symtable: 'SymTable',
                  mbox: 'MessageBox',
-                 uri: Uri,
+                 symid: SymId,
                  clstemp: 'TypeClassTemp' = None,
                  is_method=False) -> None:
         super().__init__()
         self.symtable = symtable
         self.mbox = mbox
         self.worker = worker
-        self.uri = uri
+        self.symid = symid
 
         self.clstemp: Optional['TypeClassTemp'] = clstemp
         self._is_method = is_method
 
         self._clsname: List[str] = []
 
-        self.glob_uri = symtable.glob.uri  # the module's uri
+        self.glob_symid = symtable.glob.symid  # the module's symid
 
     def _is_self_def(self, node: ast.AST) -> Optional[str]:
         if isinstance(node, ast.Attribute):
@@ -73,10 +71,13 @@ class TypeDefVisitor(BaseVisitor):
             # on class template's var_attr
             assert self.clstemp
             inner_sym = self.clstemp.get_inner_symtable()
-            fake_data = try_fake_data(inner_sym)
+            fake_data = try_get_fake_data(inner_sym)
             if fake_data and attr in fake_data.local:
                 return
             if attr in inner_sym.local:
+                return
+
+            if attr in self.clstemp.var_attr:
                 return
 
             tmp_attr = {
@@ -140,14 +141,12 @@ class TypeDefVisitor(BaseVisitor):
 
             tpvarins.tpvar_name = last_target.id
             self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
-            logger.debug(f'TypeVar {tpvarins.tpvar_name}')
 
         else:
             for target in node.targets:
                 name = self._is_new_def(target)
                 if name:
                     add_local_var(self.symtable, name, node)
-                    logger.debug(f'add variable {name}')
                 elif self._is_method:
                     self._try_attr(node, target)
 
@@ -184,8 +183,9 @@ class TypeDefVisitor(BaseVisitor):
 
             new_symtable = self.symtable.new_symtable(clsname,
                                                       TableScope.CLASS)
-            clstemp = TypeClassTemp(abs_clsname, self.glob_uri, TpState.FRESH,
-                                    self.symtable, new_symtable, node)
+            clstemp = TypeClassTemp(abs_clsname, self.glob_symid,
+                                    TpState.FRESH, self.symtable, new_symtable,
+                                    node)
             clstype = clstemp.get_default_typetype()
             entry = Entry(clstype, node)
             self.symtable.add_entry(clsname, entry)
@@ -197,20 +197,23 @@ class TypeDefVisitor(BaseVisitor):
                     self.visit(body)
 
     def visit_Import(self, node: ast.Import):
-        info_list = analyse_import_stmt(node, self.uri)
+        info_list = analyse_import_stmt(node, self.symid)
         self._add_import_info(node, info_list)
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        info_list = analyse_import_stmt(node, self.uri)
+        info_list = analyse_import_stmt(node, self.symid)
         self._add_import_info(node, info_list)
 
     def _add_import_info(self, node: 'ImportNode',
-                         info_list: List[ImportInfoItem]):
+                         info_list: List[fake_impt_entry]):
         """Add import information to the symtable.
 
         info_list:
             import information dict returned by split_import_stmt.
         """
+        fake_data = get_fake_data(self.symtable)
+        self.symtable.import_cache.add_import_node(node)
+
         read_typing = False  # flag, if True typing module has been read
         typing_temp = None
         for infoitem in info_list:
@@ -218,12 +221,12 @@ class TypeDefVisitor(BaseVisitor):
             # imported from it as soon as possible because some types (such as
             # TypeVar) may affect how pystatic judge whether an assignment
             # statement stands for a special type definition or not.
-            if infoitem.uri == 'typing':
+            if infoitem.symid == 'typing':
                 if not read_typing:
                     typing_temp = self.worker.get_module_temp('typing')
 
                 if typing_temp:
-                    if infoitem.is_import_module:
+                    if infoitem.is_import_module():
                         self.symtable.add_entry(
                             'typing', Entry(typing_temp.get_default_ins(),
                                             node))
@@ -236,8 +239,14 @@ class TypeDefVisitor(BaseVisitor):
                             self.symtable.add_entry(infoitem.asname,
                                                     Entry(tpins, node))
                             continue
-            self.worker.add_cache_target_uri(infoitem.uri)
-            add_import(self.symtable, infoitem, node)
+
+            self.worker.add_cache_target_symid(infoitem.symid)
+            if not infoitem.is_import_module():
+                origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
+                if self.worker.is_module(origin_symid):
+                    self.worker.add_cache_target_symid(origin_symid)
+
+            fake_data.impt[infoitem.asname] = infoitem
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         add_fun_def(self.symtable, node.name, node)
