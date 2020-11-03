@@ -4,6 +4,22 @@ from typing import Callable, Tuple, Optional, Type, TypeVar, Union
 from pystatic.typesys import TypeIns, TypeTemp, TypeOptionalTemp, TypeTupleTemp, TypeClassTemp
 
 
+'''
+phase2:
+已经完成：基本类型,部分特别类型和直接子类型的判断和检查
+把Literal的变量转为其所定义的类型
+在查看Literal资料（PEP586)时：一些大家 需要知道的是：
+    见md文件
+
+    #把Union等特殊类型和容器类扁平化：Union[int,Union[str,float]]=Union[int,str,float] 
+    把Optional转化为Union
+    搞清楚陈瑄的测试用例
+    需要cx和hj那边给予支持，现在的tuple list是不可测试的
+ 
+    #下周可能做的事：关于别名和具体类型的子类型（这个应该不用特殊处理，直接当作一般类型判断就可以了吧） 
+    a:A()=B实例和类型，type(B) 和B的temp具有相同的名字
+'''
+
 class compatibleState(enum.IntEnum):
     INVARIANT = 0
     CONVARIANT = 1
@@ -22,6 +38,12 @@ class TypeCompatible:
 
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
+        
+        if  (isinstance(a,TypeIns) and not isinstance(b,TypeIns)) or (isinstance(b,TypeIns) and not isinstance(a,TypeIns)):
+            return False
+
+        if isinstance(a,TypeIns) and isinstance(b,TypeIns):
+            return self.SpecificClassTypeCom(a, b, compatibleState.CONVARIANT)  # 此处语法有待丰富
 
         if tempb.name == 'Literal':
             return self.LiteralRightCom(a, b)
@@ -40,9 +62,14 @@ class TypeCompatible:
         # need to change
 
         elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
+<<<<<<< HEAD
+
+            return self.SpecificClassTypeCom(tempa, tempb, compatibleState.CONVARIANT)  # 此处语法有待丰富
+=======
             # print('lalala')
             return self.SpecificClassTypeCom(
                 tempa, tempb, compatibleState.CONVARIANT)  # 此处语法有待丰富
+>>>>>>> 38cd79bb05763872b0b01dce04c2302a318db6cb
 
         return False
 
@@ -238,8 +265,14 @@ class TypeCompatible:
         else:
             return False
 
+<<<<<<< HEAD
+    def SpecificClassTypeCom(self, a: TypeClassTemp, b: TypeClassTemp, state: compatibleState) -> bool:
+        print(a.name)
+        print(b.name)
+=======
     def SpecificClassTypeCom(self, a: TypeClassTemp, b: TypeClassTemp,
                              state: compatibleState) -> bool:
+>>>>>>> 38cd79bb05763872b0b01dce04c2302a318db6cb
         if a.name == b.name:
             return True
         elif state == compatibleState.INVARIANT:
@@ -302,3 +335,4 @@ def type_consistent(tp1, tp2):
 
 def is_any(tp):
     return str(tp) == "Any"
+ 
