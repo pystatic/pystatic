@@ -204,7 +204,7 @@ class Manager:
         pass
 
     def infer(self):
-        self.preprocess()
+        # self.preprocess()
         InferStarter(self.targets).start_infer()
 
     def get_sym_type(self, module_symid: SymId,

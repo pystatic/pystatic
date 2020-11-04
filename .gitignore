@@ -131,6 +131,7 @@ include
 
 # pytest
 pytest.ini
+tests/
 
 # script
 script
