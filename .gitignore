@@ -131,7 +131,6 @@ include
 
 # pytest
 pytest.ini
-tests/
 
 # script
 script
@@ -141,6 +140,7 @@ script
 
 # pystatic language server
 mypyls
+mytest/
 
 # ini files
 Desktop.ini
