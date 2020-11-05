@@ -650,6 +650,10 @@ class TypeTupleTemp(TypeTemp):
 class TypeDictTemp(TypeTemp):
     def __init__(self):
         super().__init__('Dict', 'typing')
+        self.placeholders = [_invariant_tpvar, _invariant_tpvar]
+
+    def get_default_typetype(self) -> 'TypeType':
+        return dict_type
 
 
 class TypeUnionTemp(TypeTemp):
@@ -835,6 +839,9 @@ list_type = TypeType(list_temp, None)
 
 tuple_temp = TypeTupleTemp()
 tuple_type = TypeType(tuple_temp, None)
+
+dict_temp = TypeDictTemp()
+dict_type = TypeType(dict_temp, None)
 
 optional_temp = TypeOptionalTemp()
 union_temp = TypeUnionTemp()

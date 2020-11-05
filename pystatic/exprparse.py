@@ -3,8 +3,8 @@ import contextlib
 from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
-from pystatic.typesys import (TypeIns, TypeLiteralIns, any_ins, list_temp,
-                              tuple_temp, none_ins)
+from pystatic.typesys import (TypeIns, TypeLiteralIns, any_ins, none_ins,
+                              list_temp, tuple_temp, dict_temp)
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map
@@ -192,6 +192,25 @@ class ExprParser(NoGenVisitor):
                 assert isinstance(typeins, TypeIns)
                 inner_type_list.append(typeins)
             return tuple_temp.getins(inner_type_list).value
+
+    def visit_Dict(self, node: ast.Dict):
+        key_type = any_ins
+        value_type = any_ins
+        for key_node in node.keys:
+            if key_node:
+                # TODO: key type is not the same?
+                key_type = self.visit(key_node)
+                assert isinstance(key_type, TypeIns)
+
+        for value_node in node.values:
+            # TODO: value type is not the same?
+            value_type = self.visit(value_node)
+            assert isinstance(value_type, TypeIns)
+
+        return dict_temp.getins([key_type, value_type]).value
+
+    def visit_Set(self, node: ast.Set):
+        pass
 
     def visit_Slice(self, node: ast.Slice):
         assert False, "TODO"
