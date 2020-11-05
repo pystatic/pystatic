@@ -1,88 +1,74 @@
-myint: int = 1
-myfloat: float = 3.0
-mystr: str = 'hello'
-mycomplex: complex = 2 + 2j
-mybool: bool = False
-mybyte: bytes = b''
-mybytearray: bytearray = bytearray(b'\n')
-string = ('int', 'float', 'str', 'complex', 'bool', 'bytes', 'bytearray')
-
-myint = myfloat
-myint = mystr
-myint = mycomplex
-myint = mybool
-myint = mybyte
-myint = mybytearray
-
-myfloat = myint
-myfloat = myfloat
-myfloat = mystr
-myfloat = mycomplex
-myfloat = mybool
-myfloat = mybyte
-myfloat = mybytearray
-
-mycomplex = myint
-mycomplex = myfloat
-mycomplex = mystr
-mycomplex = mycomplex
-mycomplex = mybool
-mycomplex = mybyte
-mycomplex = mybytearray
-
-mystr = myint
-mystr = myfloat
-mystr = mystr
-mystr = mycomplex
-mystr = mybool
-mystr = mybyte
-mystr = mybytearray
-
-mybool = myint
-mybool = myfloat
-mybool = mycomplex
-mybool = mystr
-mybool = mybool
-mybool = mybyte
-mybool = mybytearray
-
-mybyte = myint
-mybyte = myfloat
-mybyte = mycomplex
-mybyte = mystr
-mybyte = mybool
-mybyte = mybyte
-mybyte = mybytearray
-
-mybytearray = myint
-mybytearray = myfloat
-mybytearray = mycomplex
-mybytearray = mystr
-mybytearray = mybool
-mybytearray = mybyte
-mybytearray = mybytearray
+from typing import Tuple,List,Set,Dict,Union,Literal,Optional
+#'Callable', 'Literal', 'Any', 'None', 'Union', 'Optional',
+# myint:int =1
+# mystr:str='a'
 
 
-class TypeTemp:
-    def __init__(self,
-                 name: str,
-                 module_uri: str,
-                 ):
-        self.name = name
-        self.placeholders = []
-
-        self.module_uri = module_uri  # the module uri that define this type
+# myfloat: float = 3.0
+# mystr: str = 'hello'
+# mycomplex: complex = 2 + 2j
+# mybool: bool = False
 
 
-class TypeClassTemp(TypeTemp):
-    # FIXME: remove None of symtable and defnode
-    def __init__(self,
-                 clsname: str,
-                 module_uri: str,
-                 defnode=None):
-        super().__init__(clsname, module_uri)
+# myfloat: float = 3.0
+# mystr: str = 'hello'
+# mycomplex: complex = 2 + 2j
+# mybool: bool = False
 
 
-t: TypeTemp = TypeClassTemp('hello', 'world')
-print(type(t))
-print(str(type(t))[-15:-2])
+
+# myfloat: float = 3.0
+# mystr: str = 'hello'
+# mycomplex: complex = 2 + 2j
+# mybool: bool = False
+
+# myint = myfloat
+# myint = mystr
+# myint = mycomplex
+# myint = mybool
+
+# myfloat = myint
+# myfloat = myfloat
+# myfloat = mystr
+# myfloat = mycomplex
+# myfloat = mybool
+
+# mycomplex = myint
+# mycomplex = myfloat
+# mycomplex = mystr
+# mycomplex = mycomplex
+# mycomplex = mybool
+
+# mystr = myint
+# mystr = myfloat
+# mystr = mystr
+# mystr = mycomplex
+# mystr = mybool
+
+# mybool = myint
+# mybool = myfloat
+# mybool = mycomplex
+# mybool = mystr
+# mybool = mybool
+
+
+
+
+
+
+# mytuple:Tuple[int,str]=(1,'s')
+
+myoptional:Optional[int]= 'a'
+myoptional2:Optional[int]= 'str'
+myoptional1  = myoptional2
+
+
+mylist:List[int]=[1]
+mylist2:List[str]=['a']
+mylist = mylist2
+
+myunion:Union[int,str]=1
+myunion2:Union[int,str]='a'
+myunion = myunion2
+# myinstance1:Union[int,float]='a'
+# muyints:Union[float,bool]=myinstance1

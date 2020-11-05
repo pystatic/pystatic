@@ -36,6 +36,7 @@ class TypeTemp:
                  name: str,
                  module_symid: str,
                  resolve_state: TpState = TpState.OVER):
+     
         self.name = name
         self.placeholders = []
 
@@ -203,7 +204,7 @@ class TypeIns:
     def substitute(self, context: TypeContext) -> list:
         context = context or {}
         new_bindlist = []
-        bindlist = self.bindlist or []
+        bindlist =  self.bindlist or []
         for item in bindlist:
             if isinstance(item, TypeVarIns) and item in context:
                 # TODO: check consistence here
@@ -307,8 +308,22 @@ class TypeType(TypeIns):
 
         all errors will be stored in typetype_option.
         """
+        #
+       
         ins_option = self.temp.getins(self.bindlist)
         typetype_option.combine_error(ins_option)
+
+        return ins_option.value
+
+    def get_default_ins(self) -> 'TypeIns':
+        """Get TypeIns from TypeType
+
+        all errors will be stored in typetype_option.
+        """
+        #
+       
+        ins_option = self.temp.getins(self.bindlist)
+       
 
         return ins_option.value
 
