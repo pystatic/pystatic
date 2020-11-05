@@ -141,6 +141,7 @@ script
 
 # pystatic language server
 mypyls
+mytest/
 
 # ini files
 Desktop.ini

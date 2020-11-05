@@ -8,10 +8,9 @@ from pystatic.arg import Argument
 from pystatic.errorcode import *
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
-from pystatic.infer.op_map import *
+from pystatic.opmap import *
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
-from pystatic.infer import op_map
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
 from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any, type_consistent
 

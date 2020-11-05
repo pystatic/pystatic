@@ -55,7 +55,7 @@ def cmdline_main():
             add_option = manager.add_check_file(mod)
             add_option.dump_to_box(cmdline_mbox)
 
-        # manager.preprocess()
+        manager.preprocess()
         manager.infer()
 
         for err in cmdline_mbox.error:
