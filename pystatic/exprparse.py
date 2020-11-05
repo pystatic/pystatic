@@ -4,7 +4,7 @@ from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
 from pystatic.typesys import (TypeIns, TypeLiteralIns, any_ins, none_ins,
-                              list_temp, tuple_temp, dict_temp)
+                              list_temp, tuple_temp, dict_temp, set_temp)
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map
@@ -210,7 +210,13 @@ class ExprParser(NoGenVisitor):
         return dict_temp.getins([key_type, value_type]).value
 
     def visit_Set(self, node: ast.Set):
-        pass
+        set_type = any_ins
+        for subnode in node.elts:
+            # TODO: value type is not the same?
+            set_type = self.visit(subnode)
+            assert isinstance(set_type, TypeIns)
+
+        return set_temp.getins([set_type]).value
 
     def visit_Slice(self, node: ast.Slice):
         assert False, "TODO"
