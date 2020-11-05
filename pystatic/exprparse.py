@@ -207,7 +207,9 @@ class ExprParser(NoGenVisitor):
             value_type = self.visit(value_node)
             assert isinstance(value_type, TypeIns)
 
-        return dict_temp.getins([key_type, value_type]).value
+        res = dict_temp.getins([key_type, value_type]).value
+        self.add_to_container(res, node)
+        return res
 
     def visit_Set(self, node: ast.Set):
         set_type = any_ins
@@ -216,7 +218,9 @@ class ExprParser(NoGenVisitor):
             set_type = self.visit(subnode)
             assert isinstance(set_type, TypeIns)
 
-        return set_temp.getins([set_type]).value
+        res = set_temp.getins([set_type]).value
+        self.add_to_container(res, node)
+        return res
 
     def visit_Slice(self, node: ast.Slice):
         assert False, "TODO"
