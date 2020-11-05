@@ -73,7 +73,10 @@ class Manager:
             # TODO: support namespace
             assert len(find_res.paths) == 1
 
-            if oldpath and oldpath != find_res.paths[0]:
+            assert (not oldpath or os.path.isabs(oldpath))
+            assert os.path.isabs(find_res.paths[0])
+            if oldpath and os.path.normcase(oldpath) != os.path.normcase(
+                    find_res.paths[0]):
                 # TODO: report name collision
                 add_option = Option(False)
                 return add_option
@@ -189,6 +192,7 @@ class Manager:
             return None
 
     def get_mbox(self, path: FilePath) -> Optional[MessageBox]:
+        path = os.path.normcase(path)
         symid = self.fsys.path_to_symid(path)
         if symid:
             return self.get_mbox_by_symid(symid)
@@ -204,7 +208,6 @@ class Manager:
         pass
 
     def infer(self):
-        # self.preprocess()
         InferStarter(self.targets).start_infer()
 
     def get_sym_type(self, module_symid: SymId,

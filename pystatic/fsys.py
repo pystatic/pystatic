@@ -67,6 +67,8 @@ class Filesys:
         return os.path.realpath(self.abspath(path))
 
     def add_path_symid_map(self, path: FilePath, symid: 'SymId'):
+        assert os.path.isabs(path)
+        path = os.path.normcase(path)
         self.path_symid_map[path] = symid
 
     def path_to_symid(self, path: FilePath) -> Optional['SymId']:
