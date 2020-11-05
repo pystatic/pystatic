@@ -149,8 +149,7 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         with self.visit_condition(node):
             with self.visit_scope(node) as func_type:
-                argument, ret_annotation = self.err_maker.dump_option(
-                    func_type.call(None))
+                argument, ret_annotation = func_type.get_func_def()
                 self.recorder.enter_func(func_type, self.infer_argument(argument),
                                          ret_annotation)
                 self.accept_condition_stmt_list(node.body, ConditionStmtType.FUNC)
