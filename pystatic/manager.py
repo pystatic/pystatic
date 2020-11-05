@@ -192,6 +192,7 @@ class Manager:
             return None
 
     def get_mbox(self, path: FilePath) -> Optional[MessageBox]:
+        path = os.path.normcase(path)
         symid = self.fsys.path_to_symid(path)
         if symid:
             return self.get_mbox_by_symid(symid)
