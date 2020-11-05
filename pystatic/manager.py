@@ -73,7 +73,10 @@ class Manager:
             # TODO: support namespace
             assert len(find_res.paths) == 1
 
-            if oldpath and oldpath != find_res.paths[0]:
+            assert (not oldpath or os.path.isabs(oldpath))
+            assert os.path.isabs(find_res.paths[0])
+            if oldpath and os.path.normcase(oldpath) != os.path.normcase(
+                    find_res.paths[0]):
                 # TODO: report name collision
                 add_option = Option(False)
                 return add_option
