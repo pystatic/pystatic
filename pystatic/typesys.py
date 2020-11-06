@@ -17,6 +17,7 @@ TypeVarList = List['TypeVarIns']
 BindList = Optional[List[Any]]
 
 DEFAULT_TYPEVAR_NAME: Final[str] = '__unknown_typevar_name__'
+INFINITE_ARITY: Final[int] = -1
 
 
 class TpVarKind(Enum):
@@ -175,7 +176,13 @@ class TypeTemp:
         """__str__ with bindlist and context"""
         str_bindlist = []
         slot_cnt = self.arity()
-        if slot_cnt == 0:
+
+        if slot_cnt == INFINITE_ARITY:
+            for bind in bindlist:
+                str_bindlist.append(f'{bind}')
+            return self.name + '[' + ','.join(str_bindlist) + ']'
+
+        elif slot_cnt == 0:
             return self.name
 
         if not bindlist:
@@ -648,10 +655,29 @@ class TypeTupleTemp(TypeTemp):
     def __init__(self):
         super().__init__('Tuple', 'typing')
 
+    def arity(self) -> int:
+        return INFINITE_ARITY
+
+    def get_default_typetype(self) -> 'TypeType':
+        return tuple_type
+
+
+class TypeSetTemp(TypeTemp):
+    def __init__(self) -> None:
+        super().__init__('Set', 'typing')
+        self.placeholders = [_invariant_tpvar]
+
+    def get_default_typetype(self) -> 'TypeType':
+        return set_type
+
 
 class TypeDictTemp(TypeTemp):
     def __init__(self):
         super().__init__('Dict', 'typing')
+        self.placeholders = [_invariant_tpvar, _invariant_tpvar]
+
+    def get_default_typetype(self) -> 'TypeType':
+        return dict_type
 
 
 class TypeUnionTemp(TypeTemp):
@@ -835,8 +861,16 @@ _contravariant_tpvar = TypeVarIns('_contravariant_tpvar',
 list_temp = TypeListTemp()
 list_type = TypeType(list_temp, None)
 
-optional_temp = TypeOptionalTemp()
 tuple_temp = TypeTupleTemp()
+tuple_type = TypeType(tuple_temp, None)
+
+dict_temp = TypeDictTemp()
+dict_type = TypeType(dict_temp, None)
+
+set_temp = TypeSetTemp()
+set_type = TypeType(set_temp, None)
+
+optional_temp = TypeOptionalTemp()
 union_temp = TypeUnionTemp()
 callable_temp = TypeCallableTemp()
 generic_temp = TypeGenericTemp()

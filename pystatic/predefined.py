@@ -32,6 +32,9 @@ add_spt_def('Literal', literal_temp)
 add_spt_def('Union', union_temp)
 add_spt_def('TypeVar', typevar_temp, typevar_type)
 add_spt_def('List', list_temp, list_type)
+add_spt_def('Tuple', tuple_temp, tuple_type)
+add_spt_def('Dict', dict_temp, dict_type)
+add_spt_def('Set', set_temp, set_type)
 
 
 def get_builtin_symtable() -> SymTable:
