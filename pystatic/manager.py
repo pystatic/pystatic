@@ -74,6 +74,8 @@ class Manager:
             assert len(find_res.paths) == 1
 
             assert (not oldpath or os.path.isabs(oldpath))
+
+            find_res.paths[0] = self.fsys.abspath(find_res.paths[0])
             assert os.path.isabs(find_res.paths[0])
             if oldpath and os.path.normcase(oldpath) != os.path.normcase(
                     find_res.paths[0]):

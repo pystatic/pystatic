@@ -3,8 +3,8 @@ import contextlib
 from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
-from pystatic.typesys import (TypeIns, TypeLiteralIns, any_ins, list_temp,
-                              none_ins)
+from pystatic.typesys import (TypeIns, TypeLiteralIns, any_ins, none_ins,
+                              list_temp, tuple_temp, dict_temp, set_temp)
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map
@@ -186,8 +186,41 @@ class ExprParser(NoGenVisitor):
             self.add_to_container(tp, node)
             return tp
         else:
+            inner_type_list = []
             for subnode in node.elts:
-                pass
+                typeins = self.visit(subnode)
+                assert isinstance(typeins, TypeIns)
+                inner_type_list.append(typeins)
+            return tuple_temp.getins(inner_type_list).value
+
+    def visit_Dict(self, node: ast.Dict):
+        key_type = any_ins
+        value_type = any_ins
+        for key_node in node.keys:
+            if key_node:
+                # TODO: key type is not the same?
+                key_type = self.visit(key_node)
+                assert isinstance(key_type, TypeIns)
+
+        for value_node in node.values:
+            # TODO: value type is not the same?
+            value_type = self.visit(value_node)
+            assert isinstance(value_type, TypeIns)
+
+        res = dict_temp.getins([key_type, value_type]).value
+        self.add_to_container(res, node)
+        return res
+
+    def visit_Set(self, node: ast.Set):
+        set_type = any_ins
+        for subnode in node.elts:
+            # TODO: value type is not the same?
+            set_type = self.visit(subnode)
+            assert isinstance(set_type, TypeIns)
+
+        res = set_temp.getins([set_type]).value
+        self.add_to_container(res, node)
+        return res
 
     def visit_Slice(self, node: ast.Slice):
         assert False, "TODO"
