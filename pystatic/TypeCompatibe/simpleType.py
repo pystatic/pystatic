@@ -44,10 +44,10 @@ class TypeCompatible:
 
        
 
-        # elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
-        #     # ####print('lalala')
-        #     return self.SpecificClassTypeCom(
-        #         tempa, tempb, compatibleState.CONVARIANT)  # 此处语法有待丰富
+        elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
+            print('TypeclassTemp')
+            return self.SpecificClassTypeCom(
+                a, b, compatibleState.CONVARIANT)  # 此处语法有待丰富
 
         return False
 
@@ -79,14 +79,15 @@ class TypeCompatible:
             else:
                 return False
 
-        # elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
-        #     if self.SpecificClassTypeCom(tempa, tempb,
-        #                                  compatibleState.INVARIANT):
-        #         return True
-        #     else:
-        #         return False
-        # else:
-        #     return False
+        elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
+            print("TypeClassTemp")
+            if self.SpecificClassTypeCom(a,b,
+                                         compatibleState.INVARIANT):
+                return True
+            else:
+                return False
+        else:
+            return False
 
     def BaseTypeCom(self, a: TypeIns, b: TypeIns,
                     state: compatibleState) -> bool:
@@ -102,6 +103,7 @@ class TypeCompatible:
         elif tempa.name in self.baseTypestr and tempb.name in self.specialTypestr:
             return self.Base2SpeTypeCom(a,b,
                                         compatibleState.CONVARIANT)
+        return False #此处如果涉及到定义基本类型的子类，待补充
 
     def Base2BaseTypeCom(self,a, b) -> bool:
         namea=a.temp.name
@@ -285,22 +287,24 @@ class TypeCompatible:
         else:
             return False
 
-    def SpecificClassTypeCom(self, a: TypeClassTemp, b: TypeClassTemp,
+    def SpecificClassTypeCom(self, a: TypeIns, b: TypeIns,
                              state: compatibleState) -> bool:
-        if a.name == b.name:
+        tempa:TypeClassTemp = a.temp
+        tempb:TypeClassTemp = b.temp
+        if tempa.name == tempb.name:
             return True
         elif state == compatibleState.INVARIANT:
             return False
         elif state == compatibleState.CONVARIANT:
             # 考虑继承关系时，暂时只考虑到一层，即：无法处理 class A(B): class B(C): a:A=c:C
             # 待补充#涉及到两层继承，无法使用最开始父类的值
-            for index in range(len(a.baseclass)):
-                if a.baseclass[index].temp.name == b.name:
+            for index in range(len(tempa.baseclass)):
+                if tempa.baseclass[index].temp.name == tempb.name:
                     return True
             return False
         elif state == compatibleState.CONTRIVARIANT:
-            for index in range(len(b.baseclass)):
-                if b.baseclass[index].temp.name == a.name:
+            for index in range(len(tempb.baseclass)):
+                if tempb.baseclass[index].temp.name == tempa.name:
                     return True
             return False
         else:
