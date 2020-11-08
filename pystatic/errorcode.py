@@ -124,12 +124,16 @@ class TooMoreValuesToUnpack(ErrorCode):
 
 
 class NeedMoreValuesToUnpack(ErrorCode):
-    def __init__(self, node: Optional[ast.AST]):
+    def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
         super().__init__()
         self.node = node
+        self.expected_num = expected_num
+        self.got_num = got_num
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, NEED_MORE_VALUES_TO_UNPACK
+        review = NEED_MORE_VALUES_TO_UNPACK
+        detail = f"expected {self.expected_num}, got {self.got_num}"
+        return self.node, self.concat_msg(review, detail)
 
 
 class ReturnValueExpected(ErrorCode):

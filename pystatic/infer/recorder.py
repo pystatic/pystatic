@@ -16,7 +16,7 @@ class Scope:
 
 
 class FuncScope(Scope):
-    def __init__(self, tp: TypeIns, args: Dict[str, TypeIns],
+    def __init__(self, tp: TypeFuncIns, args: Dict[str, TypeIns],
                  ret_annotation: TypeIns):
         super().__init__(tp)
         self.type_map = args
@@ -53,7 +53,7 @@ class SymbolRecorder:
     def leave_scope(self):
         self.stack.pop()
 
-    def enter_func(self, tp: TypeIns, args: Dict[str, TypeIns],
+    def enter_func(self, tp: TypeFuncIns, args: Dict[str, TypeIns],
                    ret_annotation):
         self.stack.append(FuncScope(tp, args, ret_annotation))
 
@@ -89,6 +89,7 @@ class SymbolRecorder:
     def get_comment_type(self, name) -> TypeIns:
         scope = self.cur_scope
         table: SymTable = scope.tp.get_inner_symtable()
+        # print([e for e in table.local])
         tp = table.legb_lookup(name)
         if tp:
             return tp

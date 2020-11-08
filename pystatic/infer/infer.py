@@ -69,6 +69,10 @@ class InferVisitor(BaseVisitor):
 
     def check_multi_left_of_assign(self, target: List[ast.expr], rtype: TypeIns, rnode: Optional[ast.AST]):
         type_list = rtype.bindlist
+        if not type_list:  # a=()
+            if len(target) > 1:
+                self.err_maker.add_err(NeedMoreValuesToUnpack(rnode))
+
         if len(target) < len(type_list):
             self.err_maker.add_err(NeedMoreValuesToUnpack(rnode))
         elif len(target) > len(rtype):
