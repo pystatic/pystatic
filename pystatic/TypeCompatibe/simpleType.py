@@ -2,7 +2,7 @@ import ast
 import enum
 from pystatic.typesys import TypeLiteralIns
 from typing import Callable, Tuple, Optional, Type, TypeVar, Union
-from pystatic.typesys import TypeIns, TypeTemp, TypeOptionalTemp, TypeTupleTemp, TypeClassTemp
+from pystatic.typesys import TypeIns, TypeTemp, TypeOptionalTemp, TypeTupleTemp, TypeClassTemp,TypeType
 from pystatic.TypeCompatibe.type2TypeTemp import Literal2Type
 
 class compatibleState(enum.IntEnum):
@@ -26,7 +26,7 @@ class TypeCompatible:
         tempb: TypeTemp = b.temp
         print(a,b,tempa.name,tempb.name)
        
-       
+        
      
         if tempa.name in self.baseTypestr:
             #print('{tempa.name} In baseTyperstr')
@@ -42,12 +42,16 @@ class TypeCompatible:
             return self.CollectionsTypeCom(a,b,
                                            compatibleState.CONVARIANT)
 
-       
+        elif isinstance(a,TypeType) or isinstance(b,TypeType):
+            if isinstance(a,TypeType) and isinstance(b,TypeType):
+                return self.TypeTypeCom(a,b,compatibleState.CONVARIANT) or self.TypeTypeCom(a,b,compatibleState.CONTRIVARIANT)
+            else:
+                return False
 
         elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
             print('TypeclassTemp')
             return self.SpecificClassTypeCom(
-                a, b, compatibleState.CONVARIANT)  # 此处语法有待丰富
+                a, b, compatibleState.CONTRIVARIANT)  # 此处语法有待丰富
 
         return False
 
@@ -88,6 +92,9 @@ class TypeCompatible:
                 return False
         else:
             return False
+
+    def TypeTypeCom(self,a:TypeType,TypeType,state:compatibleState):
+        return self.SpecificClassTypeCom(a,b,state)
 
     def BaseTypeCom(self, a: TypeIns, b: TypeIns,
                     state: compatibleState) -> bool:
@@ -287,7 +294,7 @@ class TypeCompatible:
         else:
             return False
 
-    def SpecificClassTypeCom(self, a: TypeIns, b: TypeIns,
+    def SpecificClassTypeCom(self, a: Union[TypeIns,TypeType], b: Union[TypeIns,TypeType],
                              state: compatibleState) -> bool:
         tempa:TypeClassTemp = a.temp
         tempb:TypeClassTemp = b.temp
