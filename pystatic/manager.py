@@ -15,7 +15,7 @@ from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
 from pystatic.symid import SymId, relpath2symid, symid2list
 from pystatic.typesys import (TypeModuleTemp, TypePackageTemp, TypeIns,
                               any_ins)
-from pystatic.target import BlockTarget, Mode, Target, Stage, PackageTarget
+from pystatic.target import BlockTarget, Target, Stage, PackageTarget
 
 if TYPE_CHECKING:
     from pystatic.symtable import SymTable
@@ -46,8 +46,7 @@ class Manager:
     def __add_check_symid(self,
                           symid: 'SymId',
                           default_symtable: Optional['SymTable'] = None,
-                          oldpath: Optional[FilePath] = None,
-                          mode: Mode = Mode.Normal) -> Option[bool]:
+                          oldpath: Optional[FilePath] = None) -> Option[bool]:
         """
         default_symtable:
             if not None, then the symtable of the new target is set to it.
@@ -86,11 +85,7 @@ class Manager:
 
             if find_res.res_type == ModuleFindRes.Module:
                 file_path = self.fsys.realpath(find_res.paths[0])
-                new_target = Target(symid,
-                                    symtable,
-                                    mbox,
-                                    file_path,
-                                    mode=mode)
+                new_target = Target(symid, symtable, mbox, file_path)
 
                 self.__parse(new_target)
                 self.update_stage(new_target, Stage.Preprocess)
@@ -103,12 +98,8 @@ class Manager:
 
                 assert dir_path == os.path.dirname(analyse_path)
 
-                new_target = PackageTarget(symid,
-                                           symtable,
-                                           mbox,
-                                           dir_path,
-                                           analyse_path,
-                                           mode=mode)
+                new_target = PackageTarget(symid, symtable, mbox, dir_path,
+                                           analyse_path)
                 new_target.module_temp = TypePackageTemp(
                     find_res.paths, new_target.symtable, new_target.symid)
                 new_target.path = self.fsys.realpath(find_res.paths[0])

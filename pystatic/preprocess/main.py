@@ -41,11 +41,9 @@ class Preprocessor:
 
             # get current module's class definitions.
             if isinstance(current, MethodTarget):
-                get_definition_in_method(current, self.manager, current.mbox,
-                                         current.mode)
+                get_definition_in_method(current, self.manager, current.mbox)
             else:
-                get_definition(current, self.manager, current.mbox,
-                               current.mode)
+                get_definition(current, self.manager, current.mbox)
 
         # get type imported from other module.
         for target in to_check:
