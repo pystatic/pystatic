@@ -29,7 +29,7 @@ class InferVisitor(BaseVisitor):
     def infer(self):
         self.visit(self.root)
 
-    def get_type(self, node: ast.AST) -> TypeIns:
+    def get_type(self, node: Optional[ast.AST]) -> TypeIns:
         option = eval_expr(node, self.recorder)
         self.err_maker.handle_err(option.errors)
         return option.value
@@ -43,14 +43,13 @@ class InferVisitor(BaseVisitor):
         for target in node.targets:
             self.err_maker.add_type(target, rtype)  # TODO
             if isinstance(target, ast.Name):
-                self.infer_name_node_of_assign(target, node.value, rtype)
+                self.infer_name_node_of_assign(target, rtype, node.value)
             elif isinstance(target, (ast.List, ast.Tuple)):
-                self.check_multi_left_of_assign(target.elts, node.value, rtype)
+                self.check_multi_left_of_assign(target.elts, rtype, node.value)
             else:
-                self.check_composed_node_of_assign(target, node.value, rtype)
+                self.check_composed_node_of_assign(target, rtype, node.value)
 
-    def infer_name_node_of_assign(self, target: ast.Name, rnode: ast.AST,
-                                  rtype: TypeIns):
+    def infer_name_node_of_assign(self, target: ast.Name, rtype: TypeIns, rnode: ast.AST):
         name = target.id
         comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):
@@ -62,38 +61,37 @@ class InferVisitor(BaseVisitor):
         else:
             self.recorder.set_type(target.id, rtype)
 
-    def check_composed_node_of_assign(self, target: ast.AST, rnode: ast.AST,
-                                      rtype: TypeIns):
+    def check_composed_node_of_assign(self, target: ast.AST, rtype: TypeIns, rnode: Optional[ast.AST]):
         ltype = self.get_type(target)
-
         if not self.type_consistent(ltype, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, ltype, rtype))
 
-    def check_multi_left_of_assign(self, target: List[ast.AST], rnode, rtypes):
-        if len(target) < len(rtypes):
+    def check_multi_left_of_assign(self, target: List[ast.expr], rtype: TypeIns, rnode: Optional[ast.AST]):
+        type_list = rtype.bindlist
+        if len(target) < len(type_list):
             self.err_maker.add_err(NeedMoreValuesToUnpack(rnode))
-        elif len(target) > len(rtypes):
+        elif len(target) > len(rtype):
             self.err_maker.add_err(TooMoreValuesToUnpack(rnode))
-        for lvalue, node, rtype in zip(target, rnode.elts, rtypes):
+        for lvalue, node, rtype in zip(target, rnode.elts, rtype):
             if isinstance(lvalue, ast.Name):
-                self.infer_name_node_of_assign(lvalue, node, rtype)
+                self.infer_name_node_of_assign(lvalue, rtype, node)
             elif isinstance(lvalue, (ast.List, ast.Tuple)):
-                self.check_multi_left_of_assign(lvalue.elts, node, rtype)
+                self.check_multi_left_of_assign(lvalue.elts, rtype, node)
             else:
-                self.check_composed_node_of_assign(lvalue, node, rtype)
+                self.check_composed_node_of_assign(lvalue, rtype, node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        rtype: Optional[TypeIns] = self.get_type(node.value)
+        rtype: TypeIns = self.get_type(node.value)
         self.err_maker.add_type(node.target, rtype)
         self.err_maker.add_type(node.value, rtype)
         target = node.target
         if isinstance(target, ast.Name):
-            self.check_name_node_of_annassign(target, node.value, rtype)
+            self.check_name_node_of_annassign(target, rtype, node.value)
         else:
-            self.check_composed_node_of_assign(target, node.value, rtype)
+            self.check_composed_node_of_annassign(target, rtype, node.value)
 
-    def check_name_node_of_annassign(self, target: ast.Name, rnode, rtype):
+    def check_name_node_of_annassign(self, target: ast.Name, rtype, rnode):
         name = target.id
         comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):  # var appear first time
@@ -106,16 +104,15 @@ class InferVisitor(BaseVisitor):
         else:
             self.recorder.set_type(name, rtype)
 
-    def check_composed_node_of_annassign(self, target: ast.AST, rnode: ast.AST,
-                                         rtype: TypeIns):
-        self.check_composed_node_of_assign(target, rnode, rtype)
+    def check_composed_node_of_annassign(self, target: ast.AST, rtype: TypeIns, rnode: Optional[ast.AST]):
+        self.check_composed_node_of_assign(target, rtype, rnode)
 
     def visit_AugAssign(self, node: ast.AugAssign):
         ltype = self.get_type(node.target)
         rtype = self.get_type(node.value)
-        func_name: str = op_map.binop_map[type(node.op)]
+        func_name: str = binop_map[type(node.op)]
         option: Option = ltype.getattribute(func_name, None)
-        operand = op_map.binop_char_map[type(node.op)]
+        operand = binop_char_map[type(node.op)]
         if self.err_maker.exsit_error(option):
             self.err_maker.add_err(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype))

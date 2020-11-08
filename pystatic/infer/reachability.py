@@ -27,8 +27,4 @@ def cal_neg(res: Reach) -> Reach:
         return Reach.UNKNOWN
 
 
-def is_true(res: Reach, runtime=False) -> bool:
-    if runtime:
-        return res in (Reach.ALWAYS_TRUE, Reach.RUNTIME_TRUE)
-    else:
-        return res in (Reach.ALWAYS_TRUE, Reach.TYPE_TRUE)
+
