@@ -28,8 +28,8 @@ if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 
-def resolve_cls_def(targets: List['BlockTarget'], manager: 'Manager'):
-    """Get class definition information(inheritance, placeholders)"""
+def resolve_cls(targets: List['BlockTarget'], manager: 'Manager'):
+    """Get class information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
 
@@ -53,9 +53,10 @@ def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
     graph = DependencyGraph()
     for target in targets:
         fake_data = get_fake_data(target.symtable)
-        for temp in fake_data.cls_defs.values():
-            assert isinstance(temp, TypeClassTemp)
-            _build_graph_cls(temp, graph)
+        for clsentry in fake_data.cls_defs.values():
+            tp_temp = clsentry.clstemp
+            assert isinstance(tp_temp, TypeClassTemp)
+            _build_graph_cls(tp_temp, graph)
     return graph
 
 
@@ -66,11 +67,12 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
     _build_graph_inh(clstemp, graph)
 
-    for subtemp in fake_data.cls_defs.values():
-        assert isinstance(subtemp, TypeClassTemp)
-        _build_graph_cls(subtemp, graph)
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
+        assert isinstance(tp_temp, TypeClassTemp)
+        _build_graph_cls(tp_temp, graph)
         # add dependency relations due to containment
-        graph.add_dependency(clstemp, subtemp)
+        graph.add_dependency(clstemp, tp_temp)
 
 
 def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
@@ -234,12 +236,14 @@ def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
                        mbox: 'MessageBox'):
     # symid here is not set correctly
     fake_data = get_fake_data(symtable)
-    for tp_temp in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
         method_targets = _resolve_cls_method(symid, tp_temp, mbox)
         for blk_target in method_targets:
             manager.preprocess_block(blk_target)
 
-    for tp_temp in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
         new_symid = '.'.join([symid, tp_temp.basename])
         resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, manager,
                            mbox)
@@ -317,7 +321,8 @@ def _resolve_cls_method(symid: str, clstemp: 'TypeClassTemp',
 
 def resolve_cls_attr(symtable: 'SymTable', mbox: 'MessageBox'):
     fake_data = get_fake_data(symtable)
-    for tp_temp in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
         _resolve_cls_attr(tp_temp, mbox)
         resolve_cls_attr(tp_temp.get_inner_symtable(), mbox)
 

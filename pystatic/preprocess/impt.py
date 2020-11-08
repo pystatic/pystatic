@@ -62,9 +62,10 @@ def resolve_import_type(symtable: SymTable, manager: 'Manager'):
 
     fake_data.impt = new_impt_dict
 
-    for tp_def in fake_data.cls_defs.values():
-        assert isinstance(tp_def, TypeClassTemp)
-        inner_symtable = tp_def.get_inner_symtable()
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
+        assert isinstance(tp_temp, TypeClassTemp)
+        inner_symtable = tp_temp.get_inner_symtable()
         resolve_import_type(inner_symtable, manager)
 
 
@@ -77,9 +78,10 @@ def resolve_import_ins(symtable: SymTable, manager: 'Manager'):
         assert asname
         _resolve_import_chain(symtable, asname, manager, False)
 
-    for tp_def in fake_data.cls_defs.values():
-        assert isinstance(tp_def, TypeClassTemp)
-        inner_symtable = tp_def.get_inner_symtable()
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
+        assert isinstance(tp_temp, TypeClassTemp)
+        inner_symtable = tp_temp.get_inner_symtable()
         resolve_import_ins(inner_symtable, manager)
 
 

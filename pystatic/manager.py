@@ -1,7 +1,7 @@
 import os
 import logging
 from collections import deque
-from typing import Optional, Dict, TYPE_CHECKING
+from typing import Optional, Dict, TYPE_CHECKING, Deque
 from pystatic.config import Config
 from pystatic.exprparse import eval_expr
 from pystatic.errorcode import *
@@ -15,7 +15,7 @@ from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
 from pystatic.symid import SymId, relpath2symid, symid2list
 from pystatic.typesys import (TypeModuleTemp, TypePackageTemp, TypeIns,
                               any_ins)
-from pystatic.target import BlockTarget, Target, Stage, PackageTarget
+from pystatic.target import BlockTarget, Mode, Target, Stage, PackageTarget
 
 if TYPE_CHECKING:
     from pystatic.symtable import SymTable
@@ -32,8 +32,8 @@ class Manager:
         self.pre_proc = Preprocessor(self)
         self.targets: Dict[SymId, Target] = {}
 
-        self.q_preprocess = deque()
-        self.q_infer = deque()
+        self.q_preprocess: Deque[BlockTarget] = deque()
+        self.q_infer: Deque[BlockTarget] = deque()
 
         if not config.no_typeshed:
             self.__init_typeshed()
@@ -46,7 +46,8 @@ class Manager:
     def __add_check_symid(self,
                           symid: 'SymId',
                           default_symtable: Optional['SymTable'] = None,
-                          oldpath: Optional[FilePath] = None) -> Option[bool]:
+                          oldpath: Optional[FilePath] = None,
+                          mode: Mode = Mode.Normal) -> Option[bool]:
         """
         default_symtable:
             if not None, then the symtable of the new target is set to it.
@@ -85,7 +86,11 @@ class Manager:
 
             if find_res.res_type == ModuleFindRes.Module:
                 file_path = self.fsys.realpath(find_res.paths[0])
-                new_target = Target(symid, symtable, mbox, file_path)
+                new_target = Target(symid,
+                                    symtable,
+                                    mbox,
+                                    file_path,
+                                    mode=mode)
 
                 self.__parse(new_target)
                 self.update_stage(new_target, Stage.Preprocess)
@@ -98,8 +103,12 @@ class Manager:
 
                 assert dir_path == os.path.dirname(analyse_path)
 
-                new_target = PackageTarget(symid, symtable, mbox, dir_path,
-                                           analyse_path)
+                new_target = PackageTarget(symid,
+                                           symtable,
+                                           mbox,
+                                           dir_path,
+                                           analyse_path,
+                                           mode=mode)
                 new_target.module_temp = TypePackageTemp(
                     find_res.paths, new_target.symtable, new_target.symid)
                 new_target.path = self.fsys.realpath(find_res.paths[0])
@@ -160,6 +169,7 @@ class Manager:
     def get_module_temp(self, symid: 'SymId') -> Optional[TypeModuleTemp]:
         if symid in self.targets:
             return self.targets[symid].module_temp
+        return None
 
     def add_check_file(self, path: FilePath) -> Option[bool]:
         path = self.fsys.realpath(path)
@@ -231,9 +241,9 @@ class Manager:
         try:
             astnode = ast.parse(expr, mode='eval')
             module_temp = self.get_module_temp(module_symid)
-            module_ins = module_temp.get_default_ins().value
             if not module_temp:
                 return None
+            module_ins = module_temp.get_default_ins().value
             res_option = eval_expr(astnode.body, module_ins)  # type: ignore
             if res_option.haserr():
                 return None

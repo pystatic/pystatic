@@ -1,5 +1,5 @@
 import ast
-from enum import IntEnum
+from enum import IntEnum, Enum, auto
 from typing import TYPE_CHECKING, Optional
 from pystatic.typesys import TypeClassTemp, TypeModuleTemp
 from pystatic.message import MessageBox
@@ -17,18 +17,25 @@ class Stage(IntEnum):
     FINISH = 4
 
 
+class Mode(Enum):
+    Normal = auto()
+    Augment = auto()
+
+
 class BlockTarget:
     """Block target mainly used for function"""
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',
                  mbox: MessageBox,
-                 stage: Stage = Stage.Preprocess) -> None:
+                 stage: Stage = Stage.Preprocess,
+                 mode: Mode = Mode.Normal) -> None:
         self.symid = symid
         self.symtable = symtable
-        self.stage = stage
         self.mbox: 'MessageBox' = mbox
         self.ast: Optional[ast.AST] = None
+        self.stage = stage
+        self.mode = mode
 
 
 class MethodTarget(BlockTarget):
@@ -38,8 +45,9 @@ class MethodTarget(BlockTarget):
                  clstemp: 'TypeClassTemp',
                  astnode: 'ast.AST',
                  mbox: 'MessageBox',
-                 stage: Stage = Stage.Preprocess) -> None:
-        super().__init__(symid, symtable, mbox, stage)
+                 stage: Stage = Stage.Preprocess,
+                 mode: Mode = Mode.Normal) -> None:
+        super().__init__(symid, symtable, mbox, stage, mode)
         self.clstemp = clstemp
         self.ast = astnode
 
@@ -51,8 +59,9 @@ class Target(BlockTarget):
                  symtable: 'SymTable',
                  mbox: 'MessageBox',
                  path: str,
-                 stage: Stage = Stage.Parse):
-        super().__init__(symid, symtable, mbox, stage)
+                 stage: Stage = Stage.Parse,
+                 mode: Mode = Mode.Normal):
+        super().__init__(symid, symtable, mbox, stage, mode)
         # NOTE: TpStage.OVER may be wrong.
         self.module_temp = TypeModuleTemp(symid, self.symtable)
         self.path: str = path
@@ -69,8 +78,9 @@ class PackageTarget(Target):
                  mbox: 'MessageBox',
                  path: str,
                  analyse_path: str,
-                 stage: Stage = Stage.Parse):
-        super().__init__(symid, symtable, mbox, path, stage)
+                 stage: Stage = Stage.Parse,
+                 mode: Mode = Mode.Normal):
+        super().__init__(symid, symtable, mbox, path, stage, mode)
         self.__analyse_path = analyse_path
 
     @property

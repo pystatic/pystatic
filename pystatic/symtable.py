@@ -35,9 +35,6 @@ class Entry:
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
 
-    # def __str__(self):
-    #     return str(self.get_type(None))
-
 
 class ImportEntry(Entry):
     def __init__(self,
@@ -130,7 +127,7 @@ class SymTable:
         return self.glob.symid
 
     def _legb_lookup(self, name: str, find):
-        curtable = self
+        curtable: Optional[SymTable] = self
         res = find(curtable, name)
         if res:
             return res
@@ -190,12 +187,6 @@ class SymTable:
         else:
             res_option.set_value(res)
         return res_option
-
-    # def lookup_local_entry(self, name: str) -> Optional['Entry']:
-    #     return self.local.get(name)
-
-    # def lookup_entry(self, name: str) -> Optional['Entry']:
-    #     return self._legb_lookup(name, SymTable.lookup_local_entry)
 
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
