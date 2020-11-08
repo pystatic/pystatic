@@ -37,7 +37,6 @@ class TypeTemp:
                  name: str,
                  module_symid: str,
                  resolve_state: TpState = TpState.OVER):
-     
         self.name = name
         self.placeholders = []
 
@@ -211,7 +210,7 @@ class TypeIns:
     def substitute(self, context: TypeContext) -> list:
         context = context or {}
         new_bindlist = []
-        bindlist =  self.bindlist or []
+        bindlist = self.bindlist or []
         for item in bindlist:
             if isinstance(item, TypeVarIns) and item in context:
                 # TODO: check consistence here
@@ -270,7 +269,7 @@ class TypeIns:
                   node: ast.BinOp) -> Option['TypeIns']:
         return self.temp.binop_mgf(self.bindlist, other, op, node)
 
-    def __eq__(self, other):
+    def equiv(self, other):
         # note that `isinstance(other, TypeIns)` won't reject typeins and typetype
         if other.__class__ != self.__class__:
             return False
@@ -295,15 +294,9 @@ class TypeIns:
                 ext_list2 = [any_ins] * temp_arity
 
             for i in range(temp_arity):
-                if ext_list1[i] != ext_list2[i]:
+                if not ext_list1[i].equiv(ext_list2[i]):
                     return False
             return True
-
-    def __hash__(self):
-        return hash(id(self))
-
-    def __ne__(self, other):
-        return not (self == other)
 
     def __str__(self) -> str:
         return self.temp.str_expr(self.bindlist)
@@ -318,8 +311,6 @@ class TypeType(TypeIns):
 
         all errors will be stored in typetype_option.
         """
-        #
-       
         ins_option = self.temp.getins(self.bindlist)
         typetype_option.combine_error(ins_option)
 
@@ -330,11 +321,7 @@ class TypeType(TypeIns):
 
         all errors will be stored in typetype_option.
         """
-        #
-       
         ins_option = self.temp.getins(self.bindlist)
-       
-
         return ins_option.value
 
     def getattribute(
