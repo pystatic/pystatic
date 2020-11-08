@@ -87,16 +87,16 @@ def clear_fake_data(symtable: 'SymTable'):
         del symtable.fake_data  # type: ignore
 
 
-def add_cls_def(symtable: SymTable, temp: TypeClassTemp, node: ast.ClassDef):
+def add_cls_def(symtable: SymTable, fake_data: 'FakeData', temp: TypeClassTemp,
+                node: ast.ClassDef):
     name = node.name
     fake_entry = fake_clsdef_entry(temp, node)
-    fake_data = get_fake_data(symtable)
     fake_data.cls_defs[name] = fake_entry
     symtable._cls_defs[name] = temp
 
 
-def add_fun_def(symtable: 'SymTable', node: ast.FunctionDef):
-    fake_data = get_fake_data(symtable)
+def add_fun_def(symtable: 'SymTable', fake_data: 'FakeData',
+                node: ast.FunctionDef):
     name = node.name
     if name in fake_data.fun:
         fake_data.fun[name].defnodes.append(node)
@@ -104,8 +104,8 @@ def add_fun_def(symtable: 'SymTable', node: ast.FunctionDef):
         fake_data.fun[name] = fake_fun_entry(node)
 
 
-def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
-    fake_data = get_fake_data(symtable)
+def add_local_var(symtable: 'SymTable', fake_data: 'FakeData', name: str,
+                  node: ast.AST):
     entry = fake_local_entry(name, node)
     fake_data.local[name] = entry
 

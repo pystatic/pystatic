@@ -51,6 +51,7 @@ class TypeDefVisitor(BaseVisitor):
                  is_method=False) -> None:
         super().__init__()
         self.symtable = symtable
+        self.fake_data = get_fake_data(symtable)
         self.mbox = mbox
         self.manager = manager
         self.symid = symid
@@ -99,8 +100,10 @@ class TypeDefVisitor(BaseVisitor):
     def enter_class(self, new_symtable: 'SymTable', clsname: str):
         old_symtable = self.symtable
         old_is_method = self._is_method
+        old_fake_data = self.fake_data
 
         self.symtable = new_symtable
+        self.fake_data = get_fake_data(new_symtable)
         self._clsname.append(clsname)
         self._is_method = False
 
@@ -109,6 +112,7 @@ class TypeDefVisitor(BaseVisitor):
         self._is_method = old_is_method
         self._clsname.pop()
         self.symtable = old_symtable
+        self.fake_data = old_fake_data
 
     @property
     def cur_clsname(self):
@@ -151,7 +155,7 @@ class TypeDefVisitor(BaseVisitor):
             for target in node.targets:
                 name = self._is_new_def(target)
                 if name:
-                    add_local_var(self.symtable, name, node)
+                    add_local_var(self.symtable, self.fake_data, name, node)
                 elif self._is_method:
                     self._try_attr(node, target)
 
@@ -170,7 +174,7 @@ class TypeDefVisitor(BaseVisitor):
         else:
             name = self._is_new_def(node.target)
             if name:
-                add_local_var(self.symtable, name, node)
+                add_local_var(self.symtable, self.fake_data, name, node)
             elif self._is_method:
                 self._try_attr(node, node.target)
 
@@ -198,7 +202,7 @@ class TypeDefVisitor(BaseVisitor):
         # entry = Entry(clstype, node)
         # self.symtable.add_entry(clsname, entry)
         assert isinstance(clstemp, TypeClassTemp)
-        add_cls_def(self.symtable, clstemp, node)
+        add_cls_def(self.symtable, self.fake_data, clstemp, node)
 
         # enter class scope
         with self.enter_class(new_symtable, clsname):
@@ -272,4 +276,4 @@ class TypeDefVisitor(BaseVisitor):
             fake_data.impt[infoitem.asname] = infoitem
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        add_fun_def(self.symtable, node)
+        add_fun_def(self.symtable, self.fake_data, node)
