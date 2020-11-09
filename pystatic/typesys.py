@@ -1,5 +1,6 @@
 import ast
 import copy
+from abc import ABC, abstractmethod
 from typing import (Any, Optional, List, Final, Dict, TYPE_CHECKING)
 from pystatic.option import Option
 from pystatic.evalutil import ApplyArgs, GetItemType
@@ -172,18 +173,23 @@ class TypeType(TypeIns):
         return "Type[" + s + ']'
 
 
-class TypeTemp:
-    def __init__(self, name: str, module_symid: str):
+class TypeTemp(ABC):
+    def __init__(self, name: str):
         self.name = name
         self.placeholders = []
-        self.module_symid = module_symid  # the module symid that define this type
 
         self._cached_ins = TypeIns(self, None)
         self._cached_typetype = TypeType(self, None)
 
+    @property
     def basename(self) -> str:
         rpos = self.name.rfind('.')
         return self.name[rpos + 1:]
+
+    @property
+    @abstractmethod
+    def module_symid(self) -> str:
+        ...
 
     def arity(self) -> int:
         return len(self.placeholders)
@@ -346,14 +352,28 @@ class TypeTemp:
         assert False, "use str_expr instead"
 
 
+class ModuleNamedTypeTemp(TypeTemp):
+    """TypeTemp with module_symid set
+
+    TypeTemp is an abstract class and ModuleNamedTypeTemp makes it convenient
+    to create temporary TypeTemp.
+    """
+    def __init__(self, name: str, module_symid: str) -> None:
+        super().__init__(name)
+        self._module_symid = module_symid
+
+    @property
+    def module_symid(self) -> str:
+        return self._module_symid
+
+
 class TypeClassTemp(TypeTemp):
     def __init__(self,
                  clsname: str,
-                 module_symid: str,
                  def_symtable: 'SymTable',
                  inner_symtable: 'SymTable',
                  defnode: ast.ClassDef = None):
-        super().__init__(clsname, module_symid)
+        super().__init__(clsname)
 
         self.baseclass: 'List[TypeType]'
         self.baseclass = []
@@ -364,7 +384,9 @@ class TypeClassTemp(TypeTemp):
         self._def_symtable = def_symtable  # symtable where this cls is defined
         self._defnode = defnode
 
-        self._glob_symid = module_symid  # the module symid that this class is defined
+    @property
+    def module_symid(self) -> str:
+        return self._def_symtable.glob_symid
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         cls_defs = self._inner_symtable._cls_defs
@@ -419,7 +441,11 @@ class TypeClassTemp(TypeTemp):
 
 class TypeAnyTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Any', 'typing')
+        super().__init__('Any')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
     # basic
     def getattribute(self, name: str, bindlist: BindList,

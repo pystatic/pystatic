@@ -194,8 +194,7 @@ class TypeDefVisitor(BaseVisitor):
 
             new_symtable = self.symtable.new_symtable(clsname,
                                                       TableScope.CLASS)
-            clstemp = TypeClassTemp(abs_clsname, self.glob_symid,
-                                    self.symtable, new_symtable, node)
+            clstemp = TypeClassTemp(abs_clsname, self.symtable, new_symtable, node)
 
         # clstype = clstemp.get_default_typetype()
         # entry = Entry(clstype, node)

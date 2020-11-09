@@ -4,15 +4,15 @@ import os
 
 sys.path.extend(['.', '..'])
 
-from pystatic.typesys import TypeTemp, TypeType, TypeIns, any_ins
+from pystatic.typesys import ModuleNamedTypeTemp, TypeType, TypeIns, any_ins
 from pystatic.predefined import TypeVarIns
 from pystatic.predefined import list_type
 
 
 def test_eq():
-    int_temp = TypeTemp('int', 'builtins')
-    float_temp = TypeTemp('float', 'builtins')
-    container_temp = TypeTemp('container', 'builtins')
+    int_temp = ModuleNamedTypeTemp('int', 'builtins')
+    float_temp = ModuleNamedTypeTemp('float', 'builtins')
+    container_temp = ModuleNamedTypeTemp('container', 'builtins')
     T = TypeVarIns('T', bound=any_ins)
     F = TypeVarIns('F', bound=any_ins)
     container_temp.placeholders = [T, F]

@@ -18,10 +18,34 @@ class TpVarKind(Enum):
 TypeContext = Dict['TypeVarIns', 'TypeIns']
 TypeVarList = List['TypeVarIns']
 
+builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
+builtin_symtable.glob = builtin_symtable
+builtin_symtable.builtins = builtin_symtable
 
-class TypeVarTemp(TypeTemp):
+typing_symtable = SymTable('typings', None, None, builtin_symtable,
+                           TableScope.GLOB)
+typing_symtable.glob = typing_symtable
+
+
+def get_builtin_symtable() -> SymTable:
+    return builtin_symtable
+
+
+def get_typing_symtable() -> SymTable:
+    return typing_symtable
+
+
+def get_init_module_symtable(symid: SymId) -> SymTable:
+    new_symtable = SymTable(symid, None, None, builtin_symtable,
+                            TableScope.GLOB)
+    new_symtable.glob = new_symtable
+    return new_symtable
+
+
+class TypeVarTemp(TypeClassTemp):
     def __init__(self):
-        super().__init__('TypeVar', 'typing')
+        symtable = typing_symtable.new_symtable('TypeVar', TableScope.CLASS)
+        super().__init__('TypeVar', typing_symtable, symtable)
 
     def init_ins(self, applyargs: 'ApplyArgs',
                  bindlist: BindList) -> Option[TypeIns]:
@@ -112,36 +136,32 @@ class TypeVarIns(TypeIns):
         self.constrains: List['TypeIns'] = list(*args)
 
 
-class TypeFuncTemp(TypeTemp):
+class TypeUnionTemp(TypeTemp):
     def __init__(self):
-        super().__init__('function', 'builtins')
-
-
-class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, symid: SymId, symtable: 'SymTable'):
-        # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(symid, symid, symtable, symtable)
+        super().__init__('Union')
 
     @property
-    def symid(self):
-        return self.name
-
-    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
-        return self._inner_symtable.get_type_def(name)
+    def module_symid(self) -> str:
+        return 'typing'
 
 
-class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], symtable: 'SymTable', symid: SymId):
-        super().__init__(symid, symtable)
-        self.paths = paths
+class TypeOptionalTemp(TypeTemp):
+    def __init__(self):
+        super().__init__('Optional')
+        self.placeholders = [_covariant_tpvar]
 
-    def get_default_typetype(self) -> 'TypeType':
-        return TypePackageType(self)
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
 
 class TypeNoneTemp(TypeTemp):
     def __init__(self):
-        super().__init__('None', 'typing')
+        super().__init__('None')
+
+    @property
+    def module_symid(self) -> str:
+        return 'builtins'
 
     def getattribute(self, name: str, bindlist: BindList,
                      context: Optional[TypeContext]) -> Optional['TypeIns']:
@@ -180,10 +200,45 @@ class TypeNoneTemp(TypeTemp):
         return none_type
 
 
+class TypeFuncTemp(TypeTemp):
+    def __init__(self):
+        super().__init__('function')
+
+    @property
+    def module_symid(self) -> str:
+        return 'builtins'
+
+
+class TypeModuleTemp(TypeClassTemp):
+    def __init__(self, symid: SymId, symtable: 'SymTable'):
+        # FIXME: inner_symtable and def_symtable should be different
+        super().__init__(symid, symtable, symtable)
+
+    @property
+    def symid(self):
+        return self.name
+
+    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
+        return self._inner_symtable.get_type_def(name)
+
+
+class TypePackageTemp(TypeModuleTemp):
+    def __init__(self, paths: List[str], symtable: 'SymTable', symid: SymId):
+        super().__init__(symid, symtable)
+        self.paths = paths
+
+    def get_default_typetype(self) -> 'TypeType':
+        return TypePackageType(self)
+
+
 class TypeListTemp(TypeTemp):
     def __init__(self) -> None:
-        super().__init__('List', 'typing')
+        super().__init__('List')
         self.placeholders = [_invariant_tpvar]
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
     def get_default_typetype(self) -> 'TypeType':
         return list_type
@@ -191,7 +246,11 @@ class TypeListTemp(TypeTemp):
 
 class TypeTupleTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Tuple', 'typing')
+        super().__init__('Tuple')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
     def arity(self) -> int:
         return INFINITE_ARITY
@@ -202,8 +261,12 @@ class TypeTupleTemp(TypeTemp):
 
 class TypeSetTemp(TypeTemp):
     def __init__(self) -> None:
-        super().__init__('Set', 'typing')
+        super().__init__('Set')
         self.placeholders = [_invariant_tpvar]
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
     def get_default_typetype(self) -> 'TypeType':
         return set_type
@@ -211,27 +274,24 @@ class TypeSetTemp(TypeTemp):
 
 class TypeDictTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Dict', 'typing')
+        super().__init__('Dict')
         self.placeholders = [_invariant_tpvar, _invariant_tpvar]
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
     def get_default_typetype(self) -> 'TypeType':
         return dict_type
 
 
-class TypeUnionTemp(TypeTemp):
-    def __init__(self):
-        super().__init__('Union', 'typing')
-
-
-class TypeOptionalTemp(TypeTemp):
-    def __init__(self):
-        super().__init__('Optional', 'typing')
-        self.placeholders = [_covariant_tpvar]
-
-
 class TypeEllipsisTemp(TypeTemp):
     def __init__(self) -> None:
-        super().__init__('ellipsis', 'typing')
+        super().__init__('ellipsis')
+
+    @property
+    def module_symid(self) -> str:
+        return 'builtins'
 
     def get_default_typetype(self) -> 'TypeType':
         return ellipsis_type
@@ -242,12 +302,20 @@ class TypeEllipsisTemp(TypeTemp):
 
 class TypeCallableTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Callable', 'typing')
+        super().__init__('Callable')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
 
 class TypeGenericTemp(TypeTemp):
     def __init__(self):
-        super().__init__('Generic', 'typing')
+        super().__init__('Generic')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
     def getitem(self, item: GetItemType,
                 bindlist: BindList) -> Option['TypeIns']:
@@ -276,7 +344,11 @@ class TypeGenericTemp(TypeTemp):
 
 class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
-        super().__init__('Literal', 'typing')
+        super().__init__('Literal')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
     def arity(self) -> int:
         return 1
@@ -410,14 +482,6 @@ callable_temp = TypeCallableTemp()
 generic_temp = TypeGenericTemp()
 literal_temp = TypeLiteralTemp()
 
-builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
-builtin_symtable.glob = builtin_symtable
-builtin_symtable.builtins = builtin_symtable
-
-typing_symtable = SymTable('typings', None, None, None, TableScope.GLOB)
-typing_symtable.glob = typing_symtable
-typing_symtable.builtins = builtin_symtable
-
 
 def add_spt_def(name, temp, ins=None):
     global typing_symtable
@@ -441,30 +505,3 @@ add_spt_def('List', list_temp, list_type)
 add_spt_def('Tuple', tuple_temp, tuple_type)
 add_spt_def('Dict', dict_temp, dict_type)
 add_spt_def('Set', set_temp, set_type)
-
-
-def get_builtin_symtable() -> SymTable:
-    return builtin_symtable
-
-
-def get_typing_symtable() -> SymTable:
-    return typing_symtable
-
-
-def get_init_module_symtable(symid: SymId) -> SymTable:
-    new_symtable = SymTable(
-        symid,
-        None,  # type: ignore
-        None,
-        builtin_symtable,
-        TableScope.GLOB)
-    new_symtable.glob = new_symtable
-    return new_symtable
-
-
-def init_builtins(self):
-    pass
-
-
-def init_typeshed(self):
-    pass
