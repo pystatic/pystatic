@@ -13,8 +13,8 @@ from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
                                  get_init_module_symtable)
 from pystatic.symid import SymId, relpath2symid, symid2list
-from pystatic.typesys import (TypeModuleTemp, TypePackageTemp, TypeIns,
-                              any_ins)
+from pystatic.typesys import TypeIns, any_ins
+from pystatic.predefined import TypeModuleTemp, TypePackageTemp
 from pystatic.target import BlockTarget, Target, Stage, PackageTarget
 
 if TYPE_CHECKING:

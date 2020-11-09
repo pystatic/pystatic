@@ -2,8 +2,10 @@ import ast
 from typing import Optional, TYPE_CHECKING, Dict, List
 from pystatic.symid import (absolute_symidlist, SymId, symid2list,
                             rel2abssymid, symid_parent)
-from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
-                              TypePackageIns, TypePackageTemp, TypeType)
+from pystatic.typesys import TypeClassTemp, TypeIns, TypeType
+from pystatic.predefined import (TypeModuleTemp, TypePackageIns,
+                                 TypePackageTemp)
+
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:

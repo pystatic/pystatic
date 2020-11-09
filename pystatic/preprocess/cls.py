@@ -9,9 +9,9 @@ from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
                                           eval_typedef_expr,
                                           template_resolve_fun)
 from typing import List, TYPE_CHECKING, Optional
-from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeGenericTemp,
-                              TypeModuleTemp, TypeTemp, TypeIns, TypeVarIns,
-                              TypeType)
+from pystatic.typesys import (TypeClassTemp, TypeTemp, TypeIns, TypeType)
+from pystatic.predefined import (TypeGenericTemp, TypeModuleTemp, TypeVarIns,
+                                 TypeFuncIns)
 from pystatic.exprparse import eval_expr
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.message import MessageBox

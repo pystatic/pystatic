@@ -6,7 +6,8 @@ import ast
 from pystatic.arg import Argument
 from pystatic.preprocess.sym_util import *
 from pystatic.symtable import SymTable
-from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns)
+from pystatic.typesys import TypeClassTemp, any_ins, TypeIns
+from pystatic.predefined import TypeFuncIns
 from pystatic.symtable import Entry
 from pystatic.message import MessageBox
 from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,

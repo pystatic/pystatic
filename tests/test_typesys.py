@@ -4,7 +4,9 @@ import os
 
 sys.path.extend(['.', '..'])
 
-from pystatic.typesys import TypeTemp, TypeType, TypeIns, TypeVarIns, list_type, any_ins
+from pystatic.typesys import TypeTemp, TypeType, TypeIns, any_ins
+from pystatic.predefined import TypeVarIns
+from pystatic.predefined import list_type
 
 
 def test_eq():

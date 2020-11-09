@@ -3,6 +3,7 @@ import logging
 from contextlib import contextmanager
 from typing import Optional, Set
 from pystatic.typesys import *
+from pystatic.predefined import *
 from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
 from pystatic.errorcode import *
@@ -49,7 +50,8 @@ class InferVisitor(BaseVisitor):
             else:
                 self.check_composed_node_of_assign(target, rtype, node.value)
 
-    def infer_name_node_of_assign(self, target: ast.Name, rtype: TypeIns, rnode: ast.AST):
+    def infer_name_node_of_assign(self, target: ast.Name, rtype: TypeIns,
+                                  rnode: ast.AST):
         name = target.id
         comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):
@@ -61,13 +63,15 @@ class InferVisitor(BaseVisitor):
         else:
             self.recorder.set_type(target.id, rtype)
 
-    def check_composed_node_of_assign(self, target: ast.AST, rtype: TypeIns, rnode: Optional[ast.AST]):
+    def check_composed_node_of_assign(self, target: ast.AST, rtype: TypeIns,
+                                      rnode: Optional[ast.AST]):
         ltype = self.get_type(target)
         if not self.type_consistent(ltype, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, ltype, rtype))
 
-    def check_multi_left_of_assign(self, target: List[ast.expr], rtype: TypeIns, rnode: Optional[ast.AST]):
+    def check_multi_left_of_assign(self, target: List[ast.expr],
+                                   rtype: TypeIns, rnode: Optional[ast.AST]):
         type_list = rtype.bindlist
         if not type_list:  # a=()
             if len(target) > 1:
@@ -108,7 +112,8 @@ class InferVisitor(BaseVisitor):
         else:
             self.recorder.set_type(name, rtype)
 
-    def check_composed_node_of_annassign(self, target: ast.AST, rtype: TypeIns, rnode: Optional[ast.AST]):
+    def check_composed_node_of_annassign(self, target: ast.AST, rtype: TypeIns,
+                                         rnode: Optional[ast.AST]):
         self.check_composed_node_of_assign(target, rtype, rnode)
 
     def visit_AugAssign(self, node: ast.AugAssign):
@@ -151,9 +156,11 @@ class InferVisitor(BaseVisitor):
         with self.visit_condition(node):
             with self.visit_scope(node) as func_type:
                 argument, ret_annotation = func_type.get_func_def()
-                self.recorder.enter_func(func_type, self.infer_argument(argument),
+                self.recorder.enter_func(func_type,
+                                         self.infer_argument(argument),
                                          ret_annotation)
-                self.accept_condition_stmt_list(node.body, ConditionStmtType.FUNC)
+                self.accept_condition_stmt_list(node.body,
+                                                ConditionStmtType.FUNC)
 
                 self.infer_return_value_of_func(node.returns)
 

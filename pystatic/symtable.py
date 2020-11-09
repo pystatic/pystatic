@@ -6,8 +6,8 @@ from pystatic.option import Option
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
-    from pystatic.typesys import (TypeIns, TypeClassTemp, TypeTemp,
-                                  TypeFuncIns)
+    from pystatic.typesys import TypeIns, TypeTemp, TypeClassTemp
+    from pystatic.predefined import TypeFuncIns, TypePackageIns
 
 
 class TableScope(enum.Enum):
@@ -60,7 +60,7 @@ class ImportCache:
         self._cache: Dict[SymId, Dict[SymId, 'TypeIns']] = {}
 
     def get_moduleins(self, abssymid: 'SymId') -> Optional['TypeIns']:
-        from pystatic.typesys import TypePackageIns, TypeModuleTemp
+        from pystatic.predefined import TypePackageIns, TypeModuleTemp
 
         symidlist = symid2list(abssymid)
         if not symidlist:

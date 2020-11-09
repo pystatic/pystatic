@@ -1,7 +1,8 @@
 import ast
 from enum import IntEnum, Enum, auto
 from typing import TYPE_CHECKING, Optional
-from pystatic.typesys import TypeClassTemp, TypeModuleTemp
+from pystatic.typesys import TypeClassTemp
+from pystatic.predefined import TypeModuleTemp
 from pystatic.message import MessageBox
 
 if TYPE_CHECKING:

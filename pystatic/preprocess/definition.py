@@ -2,8 +2,8 @@ import ast
 from contextlib import contextmanager
 from typing import List, Optional, TYPE_CHECKING
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import (TypeClassTemp, TypeVarIns, TypeVarTemp,
-                              TypeType)
+from pystatic.typesys import TypeClassTemp, TypeType
+from pystatic.predefined import TypeVarTemp, TypeVarIns
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.symid import SymId

@@ -3,8 +3,8 @@ import sys
 
 sys.path.extend(['.', '..'])
 
-from pystatic.typesys import (TypeAnyTemp, TypeIns, TypeModuleTemp, TypeType,
-                              TypeFuncIns, TypeFuncTemp)
+from pystatic.typesys import TypeAnyTemp, TypeIns, TypeType
+from pystatic.predefined import TypeFuncTemp, TypeModuleTemp, TypeFuncIns
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.exprparse import eval_expr

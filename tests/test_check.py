@@ -5,7 +5,8 @@ from collections import namedtuple
 
 sys.path.extend(['.', '..'])
 
-from pystatic.typesys import TypeIns, TypeModuleTemp, TypeType
+from pystatic.typesys import TypeIns, TypeType
+from pystatic.predefined import TypeModuleTemp
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.exprparse import eval_expr
@@ -19,7 +20,7 @@ def parse_file(file_path):
 
     lineno = 1
     for line in lines:
-        line=line.strip()
+        line = line.strip()
         index = line.find("# E")
         if index != -1:
             msg = line[index + 4:]
@@ -27,10 +28,8 @@ def parse_file(file_path):
         lineno += 1
     return msg_list
 
-file_list=[
-    'test_assign',
-    'test_attribute'
-]
+
+file_list = ['test_assign', 'test_attribute']
 
 
 def test_check():
