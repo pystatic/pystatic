@@ -236,7 +236,7 @@ def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
 
     for clsentry in fake_data.cls_defs.values():
         tp_temp = clsentry.clstemp
-        new_symid = '.'.join([symid, tp_temp.basename])
+        new_symid = '.'.join([symid, tp_temp.basename()])
         resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, manager,
                            mbox)
 
