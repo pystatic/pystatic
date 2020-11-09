@@ -6,6 +6,7 @@ from pystatic.option import Option
 from pystatic.message import ErrorMaker
 from pystatic.typesys import TypeLiteralIns
 from pystatic.errorcode import *
+from pystatic.config import Config
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH
@@ -36,12 +37,13 @@ class ConditionInfer(BaseVisitor):
     def __init__(
             self,
             recorder: SymbolRecorder,
-            # reach_map: Dict[ast.AST, Reach],
-            err_maker: ErrorMaker):
+            err_maker: ErrorMaker,
+            config: Config):
         super().__init__()
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}
         self.err_maker = err_maker
+        self.config = config
         self.reach_stack: List[Condition] = [
             Condition(ConditionStmtType.GLOBAL, Reach.RUNTIME_TRUE)
         ]
@@ -124,6 +126,10 @@ class ConditionInfer(BaseVisitor):
                 return self.infer_value_of_condition(test.operand)
             else:
                 assert False, "TODO"
+        elif isinstance(test, ast.Compare):
+            op = test.op
+
+
         elif isinstance(test, ast.BoolOp):
             op = test.op
             if isinstance(op, ast.And):

@@ -28,8 +28,9 @@ def parse_file(file_path):
     return msg_list
 
 file_list=[
-    'test_assign',
-    'test_attribute'
+    'check_assign',
+    'check_attribute',
+    'check_reach'
 ]
 
 

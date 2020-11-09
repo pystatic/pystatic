@@ -9,6 +9,7 @@ from pystatic.errorcode import *
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.opmap import *
+from pystatic.config import Config
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
@@ -19,12 +20,13 @@ logger = logging.getLogger(__name__)
 
 class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleTemp,
-                 mbox: MessageBox):
+                 mbox: MessageBox, config: Config):
         self.root = node
         self.err_maker = ErrorMaker(mbox)
         self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
-        self.cond_infer = ConditionInfer(self.recorder, self.err_maker)
+        self.config = config
+        self.cond_infer = ConditionInfer(self.recorder, self.err_maker, self.config)
 
     def infer(self):
         self.visit(self.root)
@@ -69,15 +71,23 @@ class InferVisitor(BaseVisitor):
 
     def check_multi_left_of_assign(self, target: List[ast.expr], rtype: TypeIns, rnode: Optional[ast.AST]):
         type_list = rtype.bindlist
-        if not type_list:  # a=()
-            if len(target) > 1:
-                self.err_maker.add_err(NeedMoreValuesToUnpack(rnode))
-
+        if not type_list:  # a,b=()
+            self.err_maker.add_err(
+                NeedMoreValuesToUnpack(rnode, len(target), 0))
+            return
+        if not isinstance(rnode, (ast.Tuple, ast.List)):  # a,b=1
+            self.err_maker.add_err(
+                NeedMoreValuesToUnpack(rnode, len(target), 1))
+            return
         if len(target) < len(type_list):
-            self.err_maker.add_err(NeedMoreValuesToUnpack(rnode))
-        elif len(target) > len(rtype):
-            self.err_maker.add_err(TooMoreValuesToUnpack(rnode))
-        for lvalue, node, rtype in zip(target, rnode.elts, rtype):
+            self.err_maker.add_err(
+                NeedMoreValuesToUnpack(rnode, len(target), len(type_list)))
+            return
+        elif len(target) > len(type_list):
+            self.err_maker.add_err(
+                TooMoreValuesToUnpack(rnode, len(target), len(type_list)))
+            return
+        for lvalue, tp, node in zip(target, type_list, rnode.elts):
             if isinstance(lvalue, ast.Name):
                 self.infer_name_node_of_assign(lvalue, rtype, node)
             elif isinstance(lvalue, (ast.List, ast.Tuple)):

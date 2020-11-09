@@ -62,7 +62,6 @@ def cmdline_main():
             print(f'{err}\n')
 
         for mod in cmd_res.module:
-            print(mod)
             mbox = manager.get_mbox(mod)
 
             for err in mbox.error:
