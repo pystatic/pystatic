@@ -26,6 +26,7 @@ def get_definition(target: 'BlockTarget', manager: 'Manager',
     fake_data = get_fake_data(symtable)
     for name, clsentry in fake_data.cls_defs.items():
         clstype = clsentry.clstemp.get_default_typetype()
+        # predefined typetype may be re-added to symtable here
         entry = Entry(clstype, clsentry.defnode)
         symtable.add_entry(name, entry)
 

@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from typing import Dict, List, TYPE_CHECKING, Tuple
+from typing import Dict, List, TYPE_CHECKING, Tuple, Type
 from pystatic.symtable import SymTable, TableScope, Entry
 from pystatic.arg import Argument
 from pystatic.symid import SymId
@@ -26,6 +26,9 @@ typing_symtable = SymTable('typings', None, None, builtin_symtable,
                            TableScope.GLOB)
 typing_symtable.glob = typing_symtable
 
+typing_symtable.add_type_def('Any', any_temp)
+typing_symtable.add_entry('Any', Entry(any_type))
+
 
 def get_builtin_symtable() -> SymTable:
     return builtin_symtable
@@ -42,24 +45,36 @@ def get_init_module_symtable(symid: SymId) -> SymTable:
     return new_symtable
 
 
-def _add_cls_to_builtins(name: str):
-    symtable = builtin_symtable.new_symtable(name, TableScope.CLASS)
+def _add_cls_to_symtable(name: str, def_sym: 'SymTable'):
+    symtable = def_sym.new_symtable(name, TableScope.CLASS)
     clstemp = TypeClassTemp(name, builtin_symtable, symtable)
     clstype = clstemp.get_default_typetype()
     clsins = clstemp.get_default_ins().value
 
-    builtin_symtable.add_entry(name, Entry(clstype))
-    builtin_symtable.add_type_def(name, clstemp)
+    def_sym.add_entry(name, Entry(clstype))
+    def_sym.add_type_def(name, clstemp)
 
     return clstemp, clstype, clsins
 
 
-int_temp, int_type, int_ins = _add_cls_to_builtins('int')
-float_temp, float_type, float_ins = _add_cls_to_builtins('float')
-str_temp, str_type, str_ins = _add_cls_to_builtins('str')
-bool_temp, bool_type, bool_ins = _add_cls_to_builtins('bool')
-complex_temp, complex_type, complex_ins = _add_cls_to_builtins('complex')
-byte_temp, byte_type, byte_ins = _add_cls_to_builtins('byte')
+def _add_spt_to_symtable(spt_temp_cls: Type[TypeTemp], def_sym: 'SymTable',
+                         *args, **kwargs):
+    """Add special types to typing"""
+    spt_temp = spt_temp_cls(*args, **kwargs)
+    def_sym.add_type_def(spt_temp.name, spt_temp)
+    spt_type = spt_temp.get_default_typetype()
+    def_sym.add_entry(spt_temp.name, Entry(spt_type))
+    return spt_temp, spt_type, spt_temp.get_default_ins().value
+
+
+int_temp, int_type, int_ins = _add_cls_to_symtable('int', builtin_symtable)
+float_temp, float_type, float_ins = _add_cls_to_symtable(
+    'float', builtin_symtable)
+str_temp, str_type, str_ins = _add_cls_to_symtable('str', builtin_symtable)
+bool_temp, bool_type, bool_ins = _add_cls_to_symtable('bool', builtin_symtable)
+complex_temp, complex_type, complex_ins = _add_cls_to_symtable(
+    'complex', builtin_symtable)
+byte_temp, byte_type, byte_ins = _add_cls_to_symtable('byte', builtin_symtable)
 
 
 class TypeVarTemp(TypeClassTemp):
@@ -190,34 +205,39 @@ class TypeNoneTemp(TypeTemp):
     def call(self, applyargs: 'ApplyArgs',
              bindlist: BindList) -> Option['TypeIns']:
         # TODO: warning
-        return Option(none_ins)
+        return Option(self._cached_ins)
 
     def getitem(self, item: GetItemType,
                 bindlist: BindList) -> Option['TypeIns']:
         # TODO: warning
-        return Option(none_ins)
+        return Option(self._cached_ins)
 
     def unaryop_mgf(self, bindlist: BindList, op: str,
                     node: ast.UnaryOp) -> Option['TypeIns']:
+        none_ins = self._cached_ins
         res_option = Option(none_ins)
         res_option.add_err(NoAttribute(node, none_ins, 'None'))
         return res_option
 
     def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
                   node: ast.BinOp) -> Option['TypeIns']:
+        none_ins = self._cached_ins
         res_option = Option(none_ins)
         res_option.add_err(NoAttribute(node, none_ins, 'None'))
         return res_option
 
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
-        return Option(none_ins)
+        return Option(self._cached_ins)
 
     def get_typetype(self, bindlist: Optional[BindList],
                      item: Optional[GetItemType]) -> Option['TypeType']:
-        return Option(none_type)
+        return Option(self._cached_typetype)
+
+    def get_default_ins(self) -> Option['TypeIns']:
+        return Option(self._cached_ins)
 
     def get_default_typetype(self) -> 'TypeType':
-        return none_type
+        return self._cached_typetype
 
 
 class TypeFuncTemp(TypeTemp):
@@ -246,22 +266,17 @@ class TypePackageTemp(TypeModuleTemp):
     def __init__(self, paths: List[str], symtable: 'SymTable', symid: SymId):
         super().__init__(symid, symtable)
         self.paths = paths
+        self._cached_typetype = TypePackageType(self)
 
     def get_default_typetype(self) -> 'TypeType':
-        return TypePackageType(self)
+        return self._cached_typetype
 
 
-class TypeListTemp(TypeTemp):
+class TypeListTemp(TypeClassTemp):
     def __init__(self) -> None:
-        super().__init__('List')
+        symtable = typing_symtable.new_symtable('List', TableScope.CLASS)
+        super().__init__('List', typing_symtable, symtable)
         self.placeholders = [_invariant_tpvar]
-
-    @property
-    def module_symid(self) -> str:
-        return 'typing'
-
-    def get_default_typetype(self) -> 'TypeType':
-        return list_type
 
 
 class TypeTupleTemp(TypeTemp):
@@ -276,7 +291,7 @@ class TypeTupleTemp(TypeTemp):
         return INFINITE_ARITY
 
     def get_default_typetype(self) -> 'TypeType':
-        return tuple_type
+        return self._cached_typetype
 
 
 class TypeSetTemp(TypeTemp):
@@ -289,7 +304,7 @@ class TypeSetTemp(TypeTemp):
         return 'typing'
 
     def get_default_typetype(self) -> 'TypeType':
-        return set_type
+        return self._cached_typetype
 
 
 class TypeDictTemp(TypeTemp):
@@ -302,7 +317,7 @@ class TypeDictTemp(TypeTemp):
         return 'typing'
 
     def get_default_typetype(self) -> 'TypeType':
-        return dict_type
+        return self._cached_typetype
 
 
 class TypeEllipsisTemp(TypeTemp):
@@ -314,10 +329,10 @@ class TypeEllipsisTemp(TypeTemp):
         return 'builtins'
 
     def get_default_typetype(self) -> 'TypeType':
-        return ellipsis_type
+        return self._cached_typetype
 
-    def get_default_ins(self) -> 'TypeIns':
-        return ellipsis_ins
+    def get_default_ins(self) -> Option['TypeIns']:
+        return Option(self._cached_ins)
 
 
 class TypeCallableTemp(TypeTemp):
@@ -462,14 +477,6 @@ class TypeFuncIns(TypeIns):
         return Option(self.overloads[0].ret_type)
 
 
-ellipsis_temp = TypeEllipsisTemp()
-ellipsis_ins = TypeIns(ellipsis_temp, None)
-ellipsis_type = TypeType(ellipsis_temp, None)
-
-none_temp = TypeNoneTemp()
-none_ins = TypeIns(none_temp, None)
-none_type = TypeType(none_temp, None)
-
 typevar_temp = TypeVarTemp()
 typevar_type = TypeType(typevar_temp, None)
 func_temp = TypeFuncTemp()
@@ -484,44 +491,23 @@ _contravariant_tpvar = TypeVarIns('_contravariant_tpvar',
                                   bound=any_ins,
                                   kind=TpVarKind.CONTRAVARIANT)
 
-list_temp = TypeListTemp()
-list_type = TypeType(list_temp, None)
+list_temp, list_type, _ = _add_spt_to_symtable(TypeListTemp, typing_symtable)
+tuple_temp, tuple_type, _ = _add_spt_to_symtable(TypeTupleTemp,
+                                                 typing_symtable)
+dict_temp, dict_type, _ = _add_spt_to_symtable(TypeDictTemp, typing_symtable)
+set_temp, set_type, _ = _add_spt_to_symtable(TypeSetTemp, typing_symtable)
+optional_temp, optional_type, _ = _add_spt_to_symtable(TypeOptionalTemp,
+                                                       typing_symtable)
+literal_temp, literal_type, _ = _add_spt_to_symtable(TypeLiteralTemp,
+                                                     typing_symtable)
+generic_temp, generic_type, _ = _add_spt_to_symtable(TypeGenericTemp,
+                                                     typing_symtable)
+union_temp, union_type, _ = _add_spt_to_symtable(TypeUnionTemp,
+                                                 typing_symtable)
+callable_temp, callable_type, _ = _add_spt_to_symtable(TypeCallableTemp,
+                                                       typing_symtable)
 
-tuple_temp = TypeTupleTemp()
-tuple_type = TypeType(tuple_temp, None)
-
-dict_temp = TypeDictTemp()
-dict_type = TypeType(dict_temp, None)
-
-set_temp = TypeSetTemp()
-set_type = TypeType(set_temp, None)
-
-optional_temp = TypeOptionalTemp()
-union_temp = TypeUnionTemp()
-callable_temp = TypeCallableTemp()
-generic_temp = TypeGenericTemp()
-literal_temp = TypeLiteralTemp()
-
-
-def add_spt_def(name, temp, ins=None):
-    global typing_symtable
-    typing_symtable._spt_types[name] = temp
-    if ins:
-        entry = Entry(ins)
-    else:
-        entry = Entry(temp.get_default_typetype())
-    typing_symtable.add_entry(name, entry)
-
-
-add_spt_def('Generic', generic_temp)
-add_spt_def('Callable', callable_temp)
-add_spt_def('Any', any_temp, any_type)
-add_spt_def('Tuple', tuple_temp)
-add_spt_def('Optional', optional_temp)
-add_spt_def('Literal', literal_temp)
-add_spt_def('Union', union_temp)
-add_spt_def('TypeVar', typevar_temp, typevar_type)
-add_spt_def('List', list_temp, list_type)
-add_spt_def('Tuple', tuple_temp, tuple_type)
-add_spt_def('Dict', dict_temp, dict_type)
-add_spt_def('Set', set_temp, set_type)
+none_temp, none_type, none_ins = _add_spt_to_symtable(TypeNoneTemp,
+                                                      builtin_symtable)
+ellipsis_temp, ellipsis_type, ellipsis_ins = _add_spt_to_symtable(
+    TypeEllipsisTemp, builtin_symtable)

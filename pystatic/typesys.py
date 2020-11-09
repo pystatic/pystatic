@@ -389,12 +389,9 @@ class TypeClassTemp(TypeTemp):
         return self._def_symtable.glob_symid
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
-        cls_defs = self._inner_symtable._cls_defs
-        spt_defs = self._inner_symtable._spt_types
+        cls_defs = self._inner_symtable._tp_defs
         if name in cls_defs:
             return cls_defs[name]
-        elif name in spt_defs:
-            return spt_defs[name]
         else:
             return None
 

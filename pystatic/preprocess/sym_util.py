@@ -94,7 +94,7 @@ def add_cls_def(symtable: SymTable, fake_data: 'FakeData', temp: TypeClassTemp,
     name = node.name
     fake_entry = fake_clsdef_entry(temp, node)
     fake_data.cls_defs[name] = fake_entry
-    symtable._cls_defs[name] = temp
+    symtable.add_type_def(name, temp)
 
 
 def add_fun_def(symtable: 'SymTable', fake_data: 'FakeData',

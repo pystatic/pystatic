@@ -118,8 +118,7 @@ class SymTable:
 
         # inner data structure to store important information about this
         # symtable, used heavily in the preprocess stage.
-        self._cls_defs: Dict[str, 'TypeClassTemp'] = {}
-        self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
+        self._tp_defs: Dict[str, 'TypeTemp'] = {}
         self._func_defs: Dict[str, 'TypeFuncIns'] = {}
 
     @property
@@ -144,16 +143,14 @@ class SymTable:
             return res
         return find(self.builtins, name)
 
-    def add_type_def(self, name: str, temp: 'TypeClassTemp'):
-        self._cls_defs[name] = temp
+    def add_type_def(self, name: str, temp: 'TypeTemp'):
+        self._tp_defs[name] = temp
 
     def get_type_def(self, name: str) -> Optional['TypeTemp']:
         findlist = name.split('.')
         assert findlist
-        if name in self._cls_defs:
-            cur_temp = self._cls_defs[name]
-        elif name in self._spt_types:
-            cur_temp = self._spt_types[name]
+        if name in self._tp_defs:
+            cur_temp = self._tp_defs[name]
         else:
             return None
 
