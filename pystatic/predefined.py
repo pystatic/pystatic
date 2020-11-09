@@ -279,9 +279,11 @@ class TypeListTemp(TypeClassTemp):
         self.placeholders = [_invariant_tpvar]
 
 
-class TypeTupleTemp(TypeTemp):
+class TypeTupleTemp(TypeClassTemp):
     def __init__(self):
-        super().__init__('Tuple')
+        symtable = typing_symtable.new_symtable('Tuple', TableScope.CLASS)
+        super().__init__('Tuple', typing_symtable, symtable)
+        self.placeholders = [_covariant_tpvar]
 
     @property
     def module_symid(self) -> str:
@@ -290,13 +292,17 @@ class TypeTupleTemp(TypeTemp):
     def arity(self) -> int:
         return INFINITE_ARITY
 
+    def get_default_ins(self) -> Option['TypeIns']:
+        return Option(self._cached_ins)
+
     def get_default_typetype(self) -> 'TypeType':
         return self._cached_typetype
 
 
-class TypeSetTemp(TypeTemp):
+class TypeSetTemp(TypeClassTemp):
     def __init__(self) -> None:
-        super().__init__('Set')
+        symtable = typing_symtable.new_symtable('Set', TableScope.CLASS)
+        super().__init__('Set', typing_symtable, symtable)
         self.placeholders = [_invariant_tpvar]
 
     @property
@@ -307,9 +313,10 @@ class TypeSetTemp(TypeTemp):
         return self._cached_typetype
 
 
-class TypeDictTemp(TypeTemp):
+class TypeDictTemp(TypeClassTemp):
     def __init__(self):
-        super().__init__('Dict')
+        symtable = typing_symtable.new_symtable('Dict', TableScope.CLASS)
+        super().__init__('Dict', typing_symtable, symtable)
         self.placeholders = [_invariant_tpvar, _invariant_tpvar]
 
     @property
