@@ -42,6 +42,26 @@ def get_init_module_symtable(symid: SymId) -> SymTable:
     return new_symtable
 
 
+def _add_cls_to_builtins(name: str):
+    symtable = builtin_symtable.new_symtable(name, TableScope.CLASS)
+    clstemp = TypeClassTemp(name, builtin_symtable, symtable)
+    clstype = clstemp.get_default_typetype()
+    clsins = clstemp.get_default_ins().value
+
+    builtin_symtable.add_entry(name, Entry(clstype))
+    builtin_symtable.add_type_def(name, clstemp)
+
+    return clstemp, clstype, clsins
+
+
+int_temp, int_type, int_ins = _add_cls_to_builtins('int')
+float_temp, float_type, float_ins = _add_cls_to_builtins('float')
+str_temp, str_type, str_ins = _add_cls_to_builtins('str')
+bool_temp, bool_type, bool_ins = _add_cls_to_builtins('bool')
+complex_temp, complex_type, complex_ins = _add_cls_to_builtins('complex')
+byte_temp, byte_type, byte_ins = _add_cls_to_builtins('byte')
+
+
 class TypeVarTemp(TypeClassTemp):
     def __init__(self):
         symtable = typing_symtable.new_symtable('TypeVar', TableScope.CLASS)

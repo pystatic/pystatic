@@ -3,19 +3,20 @@ import builtins
 import enum
 from typing import Callable, Tuple, Optional, Type, TypeVar, Union, Dict
 from pystatic.typesys import TypeIns, TypeTemp, TypeClassTemp
-from pystatic.predefined import (TypeOptionalTemp, TypeTupleTemp, TypeListTemp,
-                                 TypeLiteralTemp, TypeLiteralIns)
+from pystatic.predefined import (TypeLiteralIns, int_temp, str_temp,
+                                 float_temp, bool_temp, complex_temp,
+                                 byte_temp)
 
 
 class Literal2Type:
     def __init__(self):
         self.dict = {
-            'int': TypeTemp('int', builtins),
-            'str': TypeTemp('str', builtins),
-            'float': TypeTemp('float', builtins),
-            'bool': TypeTemp('bool', builtins),
-            'complex': TypeTemp('complex', builtins),
-            'byte': TypeTemp('byte', builtins)
+            'int': int_temp,
+            'str': str_temp,
+            'float': float_temp,
+            'bool': bool_temp,
+            'complex': complex_temp,
+            'byte': byte_temp
         }
 
     def Literal2SpecTypeTemp(self, Liter: TypeLiteralIns) -> TypeTemp:

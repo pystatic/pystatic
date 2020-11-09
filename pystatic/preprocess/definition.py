@@ -184,6 +184,8 @@ class TypeDefVisitor(BaseVisitor):
         if (clstemp := self.symtable.get_type_def(clsname)):
             assert isinstance(clstemp, TypeClassTemp)
             new_symtable = clstemp.get_inner_symtable()
+            # predefined class may not set it defnode
+            clstemp._defnode = node
 
         else:
             cur_clsname = self.cur_clsname

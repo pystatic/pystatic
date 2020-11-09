@@ -372,7 +372,7 @@ class TypeClassTemp(TypeTemp):
                  clsname: str,
                  def_symtable: 'SymTable',
                  inner_symtable: 'SymTable',
-                 defnode: ast.ClassDef = None):
+                 defnode: Optional[ast.ClassDef] = None):
         super().__init__(clsname)
 
         self.baseclass: 'List[TypeType]'

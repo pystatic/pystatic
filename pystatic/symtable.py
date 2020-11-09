@@ -7,7 +7,7 @@ from pystatic.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns, TypeTemp, TypeClassTemp
-    from pystatic.predefined import TypeFuncIns, TypePackageIns
+    from pystatic.predefined import TypeFuncIns
 
 
 class TableScope(enum.Enum):
@@ -143,6 +143,9 @@ class SymTable:
         if res:
             return res
         return find(self.builtins, name)
+
+    def add_type_def(self, name: str, temp: 'TypeClassTemp'):
+        self._cls_defs[name] = temp
 
     def get_type_def(self, name: str) -> Optional['TypeTemp']:
         findlist = name.split('.')
