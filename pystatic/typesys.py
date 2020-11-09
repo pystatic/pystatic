@@ -26,22 +26,12 @@ class TpVarKind(Enum):
     CONTRAVARIANT = auto()
 
 
-class TpState(IntEnum):
-    FRESH = 1
-    ON = 2
-    OVER = 3
-
-
 class TypeTemp:
-    def __init__(self,
-                 name: str,
-                 module_symid: str,
-                 resolve_state: TpState = TpState.OVER):
+    def __init__(self, name: str, module_symid: str):
         self.name = name
         self.placeholders = []
 
         self.module_symid = module_symid  # the module symid that define this type
-        self._resolve_state = resolve_state
 
     @property
     def basename(self) -> str:
@@ -451,15 +441,13 @@ class TypeVarIns(TypeIns):
 
 
 class TypeClassTemp(TypeTemp):
-    # FIXME: remove None of symtable and defnode
     def __init__(self,
                  clsname: str,
                  module_symid: str,
-                 state: TpState,
                  def_symtable: 'SymTable',
                  inner_symtable: 'SymTable',
                  defnode: ast.ClassDef = None):
-        super().__init__(clsname, module_symid, state)
+        super().__init__(clsname, module_symid)
 
         self.baseclass: 'List[TypeType]'
         self.baseclass = []
@@ -525,13 +513,13 @@ class TypeClassTemp(TypeTemp):
 
 class TypeFuncTemp(TypeTemp):
     def __init__(self):
-        super().__init__('function', 'builtins', TpState.OVER)
+        super().__init__('function', 'builtins')
 
 
 class TypeModuleTemp(TypeClassTemp):
     def __init__(self, symid: SymId, symtable: 'SymTable'):
         # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(symid, symid, TpState.OVER, symtable, symtable)
+        super().__init__(symid, symid, symtable, symtable)
 
     @property
     def symid(self):

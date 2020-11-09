@@ -2,7 +2,7 @@ import ast
 from contextlib import contextmanager
 from typing import List, Optional, TYPE_CHECKING
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import (TypeClassTemp, TpState, TypeVarIns, TypeVarTemp,
+from pystatic.typesys import (TypeClassTemp, TypeVarIns, TypeVarTemp,
                               TypeType)
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
@@ -195,8 +195,7 @@ class TypeDefVisitor(BaseVisitor):
             new_symtable = self.symtable.new_symtable(clsname,
                                                       TableScope.CLASS)
             clstemp = TypeClassTemp(abs_clsname, self.glob_symid,
-                                    TpState.FRESH, self.symtable, new_symtable,
-                                    node)
+                                    self.symtable, new_symtable, node)
 
         # clstype = clstemp.get_default_typetype()
         # entry = Entry(clstype, node)

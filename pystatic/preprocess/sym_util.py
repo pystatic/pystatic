@@ -1,9 +1,9 @@
 import ast
-from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
-from pystatic.symid import absolute_symidlist, SymId, symid2list, rel2abssymid, symid_parent
+from typing import Optional, TYPE_CHECKING, Dict, List
+from pystatic.symid import (absolute_symidlist, SymId, symid2list,
+                            rel2abssymid, symid_parent)
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
-                              TypePackageIns, TypeTemp, TypePackageTemp,
-                              TypeType, TpState)
+                              TypePackageIns, TypePackageTemp, TypeType)
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:
@@ -146,14 +146,6 @@ def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):
 
 def get_cls_defnode(temp: TypeClassTemp):
     return temp._defnode
-
-
-def set_temp_state(temp: TypeTemp, st: TpState):
-    temp._resolve_state = st
-
-
-def get_temp_state(temp: TypeTemp) -> TpState:
-    return temp._resolve_state
 
 
 def update_symtable_import_cache(symtable: 'SymTable',
