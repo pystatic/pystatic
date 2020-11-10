@@ -1,9 +1,11 @@
 import ast
-from typing import Optional, TYPE_CHECKING, Union, Dict, Tuple, List
-from pystatic.symid import absolute_symidlist, SymId, symid2list, rel2abssymid, symid_parent
-from pystatic.typesys import (TypeClassTemp, TypeIns, TypeModuleTemp,
-                              TypePackageIns, TypeTemp, TypePackageTemp,
-                              TypeType, TpState)
+from typing import Optional, TYPE_CHECKING, Dict, List
+from pystatic.symid import (absolute_symidlist, SymId, symid2list,
+                            rel2abssymid, symid_parent)
+from pystatic.typesys import TypeClassTemp, TypeIns, TypeType
+from pystatic.predefined import (TypeModuleTemp, TypePackageIns,
+                                 TypePackageTemp)
+
 from pystatic.symtable import SymTable, ImportNode
 
 if TYPE_CHECKING:
@@ -15,16 +17,34 @@ class FakeData:
         self.fun: Dict[str, 'fake_fun_entry'] = {}
         self.local: Dict[str, 'fake_local_entry'] = {}
         self.impt: Dict[str, 'fake_impt_entry'] = {}
-        self.cls_defs: Dict[str, 'TypeClassTemp'] = {}
+        self.cls_defs: Dict[str, 'fake_clsdef_entry'] = {}
+
+
+class fake_clsdef_entry:
+    def __init__(self, clstemp: 'TypeClassTemp',
+                 defnode: ast.ClassDef) -> None:
+        assert isinstance(defnode, ast.ClassDef)
+        self.defnode = defnode
+        self.clstemp = clstemp
+
+    @property
+    def name(self):
+        return self.defnode.name
 
 
 class fake_fun_entry:
-    def __init__(self, name: str, defnode: ast.FunctionDef) -> None:
-        self.name = name
+    def __init__(self, defnode: ast.FunctionDef) -> None:
+        assert isinstance(defnode, ast.FunctionDef)
         self.defnodes = [defnode]
 
     def add_defnode(self, defnode: ast.FunctionDef):
+        assert isinstance(defnode, ast.FunctionDef)
+        assert defnode.name == self.defnodes[0].name
         self.defnodes.append(defnode)
+
+    @property
+    def name(self):
+        return self.defnodes[0].name
 
 
 class fake_local_entry:
@@ -63,31 +83,31 @@ def try_get_fake_data(symtable: 'SymTable') -> Optional[FakeData]:
 def clear_fake_data(symtable: 'SymTable'):
     if hasattr(symtable, 'fake_data'):
         fake_data: FakeData = symtable.fake_data  # type: ignore
-        for tp_temp in fake_data.cls_defs.values():
+        for clsentry in fake_data.cls_defs.values():
+            tp_temp = clsentry.clstemp
             clear_fake_data(tp_temp.get_inner_symtable())
         del symtable.fake_data  # type: ignore
 
 
-def add_cls_def(symtable: SymTable, name: str, temp: TypeClassTemp):
-    fake_data = get_fake_data(symtable)
-    fake_data.cls_defs[name] = temp
-    symtable._cls_defs[name] = temp
+def add_cls_def(symtable: SymTable, fake_data: 'FakeData', temp: TypeClassTemp,
+                node: ast.ClassDef):
+    name = node.name
+    fake_entry = fake_clsdef_entry(temp, node)
+    fake_data.cls_defs[name] = fake_entry
+    symtable.add_type_def(name, temp)
 
 
-def add_spt_def(symtable: SymTable, name: str, temp: TypeTemp):
-    symtable._spt_types[name] = temp
-
-
-def add_fun_def(symtable: 'SymTable', name: str, node: ast.FunctionDef):
-    fake_data = get_fake_data(symtable)
+def add_fun_def(symtable: 'SymTable', fake_data: 'FakeData',
+                node: ast.FunctionDef):
+    name = node.name
     if name in fake_data.fun:
         fake_data.fun[name].defnodes.append(node)
     else:
-        fake_data.fun[name] = fake_fun_entry(name, node)
+        fake_data.fun[name] = fake_fun_entry(node)
 
 
-def add_local_var(symtable: 'SymTable', name: str, node: ast.AST):
-    fake_data = get_fake_data(symtable)
+def add_local_var(symtable: 'SymTable', fake_data: 'FakeData', name: str,
+                  node: ast.AST):
     entry = fake_local_entry(name, node)
     fake_data.local[name] = entry
 
@@ -128,14 +148,6 @@ def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):
 
 def get_cls_defnode(temp: TypeClassTemp):
     return temp._defnode
-
-
-def set_temp_state(temp: TypeTemp, st: TpState):
-    temp._resolve_state = st
-
-
-def get_temp_state(temp: TypeTemp) -> TpState:
-    return temp._resolve_state
 
 
 def update_symtable_import_cache(symtable: 'SymTable',

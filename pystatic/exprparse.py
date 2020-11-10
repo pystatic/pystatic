@@ -3,8 +3,9 @@ import contextlib
 from typing import List, Optional, Protocol
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
-from pystatic.typesys import (TypeIns, TypeLiteralIns, any_ins, none_ins,
-                              list_temp, tuple_temp, dict_temp, set_temp)
+from pystatic.typesys import TypeIns, any_ins
+from pystatic.predefined import (TypeLiteralIns, none_ins, list_temp,
+                                 tuple_temp, dict_temp, set_temp)
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map

@@ -4,7 +4,7 @@ from enum import Enum
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.message import ErrorMaker
-from pystatic.typesys import TypeLiteralIns
+from pystatic.predefined import TypeLiteralIns
 from pystatic.errorcode import *
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.visitor import BaseVisitor
@@ -34,10 +34,10 @@ class Condition:
 
 class ConditionInfer(BaseVisitor):
     def __init__(
-            self,
-            recorder: SymbolRecorder,
-            # reach_map: Dict[ast.AST, Reach],
-            err_maker: ErrorMaker):
+        self,
+        recorder: SymbolRecorder,
+        # reach_map: Dict[ast.AST, Reach],
+        err_maker: ErrorMaker):
         super().__init__()
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}

@@ -4,8 +4,9 @@ Resovle import related type information.
 
 import ast
 import copy
-from pystatic.typesys import TypeClassTemp, TypeModuleTemp, TypeType, TypeVarIns
 from typing import TYPE_CHECKING, Tuple, List, Dict, Any, Optional
+from pystatic.typesys import TypeClassTemp, TypeType
+from pystatic.predefined import TypeVarIns, TypeModuleTemp
 from pystatic.symid import symid2list
 from pystatic.symtable import ImportEntry, SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
@@ -62,9 +63,10 @@ def resolve_import_type(symtable: SymTable, manager: 'Manager'):
 
     fake_data.impt = new_impt_dict
 
-    for tp_def in fake_data.cls_defs.values():
-        assert isinstance(tp_def, TypeClassTemp)
-        inner_symtable = tp_def.get_inner_symtable()
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
+        assert isinstance(tp_temp, TypeClassTemp)
+        inner_symtable = tp_temp.get_inner_symtable()
         resolve_import_type(inner_symtable, manager)
 
 
@@ -77,9 +79,10 @@ def resolve_import_ins(symtable: SymTable, manager: 'Manager'):
         assert asname
         _resolve_import_chain(symtable, asname, manager, False)
 
-    for tp_def in fake_data.cls_defs.values():
-        assert isinstance(tp_def, TypeClassTemp)
-        inner_symtable = tp_def.get_inner_symtable()
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
+        assert isinstance(tp_temp, TypeClassTemp)
+        inner_symtable = tp_temp.get_inner_symtable()
         resolve_import_ins(inner_symtable, manager)
 
 

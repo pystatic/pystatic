@@ -9,17 +9,16 @@ from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
                                           eval_typedef_expr,
                                           template_resolve_fun)
 from typing import List, TYPE_CHECKING, Optional
-from pystatic.typesys import (TypeClassTemp, TypeFuncIns, TypeGenericTemp,
-                              TypeModuleTemp, TpState, TypeTemp, TypeIns,
-                              TypeVarIns, TypeType)
+from pystatic.typesys import (TypeClassTemp, TypeTemp, TypeIns, TypeType)
+from pystatic.predefined import (TypeGenericTemp, TypeModuleTemp, TypeVarIns,
+                                 TypeFuncIns)
 from pystatic.exprparse import eval_expr
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
 from pystatic.preprocess.sym_util import (add_baseclass, get_cls_defnode,
-                                          get_fake_data, get_temp_state,
-                                          set_temp_state)
+                                          get_fake_data)
 from pystatic.arg import Argument
 
 if TYPE_CHECKING:
@@ -28,14 +27,13 @@ if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 
-def resolve_cls_def(targets: List['BlockTarget'], manager: 'Manager'):
-    """Get class definition information(inheritance, placeholders)"""
+def resolve_cls(targets: List['BlockTarget'], manager: 'Manager'):
+    """Get class information(inheritance, placeholders)"""
     graph = _build_graph(targets)
     resolve_order = graph.toposort()
 
     # placeholders
     for temp in resolve_order:
-        set_temp_state(temp, TpState.ON)
         temp_mbox = manager.get_mbox_by_symid(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_placeholder(temp, temp_mbox)
@@ -45,7 +43,6 @@ def resolve_cls_def(targets: List['BlockTarget'], manager: 'Manager'):
         temp_mbox = manager.get_mbox_by_symid(temp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
         _resolve_cls_inh(temp, temp_mbox)
-        set_temp_state(temp, TpState.OVER)
 
 
 def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
@@ -53,9 +50,10 @@ def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
     graph = DependencyGraph()
     for target in targets:
         fake_data = get_fake_data(target.symtable)
-        for temp in fake_data.cls_defs.values():
-            assert isinstance(temp, TypeClassTemp)
-            _build_graph_cls(temp, graph)
+        for clsentry in fake_data.cls_defs.values():
+            tp_temp = clsentry.clstemp
+            assert isinstance(tp_temp, TypeClassTemp)
+            _build_graph_cls(tp_temp, graph)
     return graph
 
 
@@ -66,39 +64,36 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
     _build_graph_inh(clstemp, graph)
 
-    for subtemp in fake_data.cls_defs.values():
-        assert isinstance(subtemp, TypeClassTemp)
-        _build_graph_cls(subtemp, graph)
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
+        assert isinstance(tp_temp, TypeClassTemp)
+        _build_graph_cls(tp_temp, graph)
         # add dependency relations due to containment
-        graph.add_dependency(clstemp, subtemp)
+        graph.add_dependency(clstemp, tp_temp)
 
 
 def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
     """Add dependency relations that due to the inheritance"""
-    if get_temp_state(clstemp) != TpState.OVER:
-        graph.add_typetemp(clstemp)
-        assert isinstance(
-            clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
-        defnode = get_cls_defnode(clstemp)
+    graph.add_typetemp(clstemp)
+    assert isinstance(
+        clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
+    defnode = get_cls_defnode(clstemp)
 
-        def_sym = clstemp.get_def_symtable()
-        visitor = _FirstClassTempVisitor(def_sym)
-        for basenode in defnode.bases:
-            first_temp = visitor.accept(basenode)
-            assert isinstance(first_temp, TypeTemp) and not isinstance(
-                first_temp, TypeModuleTemp
-            )  # FIXME: if the result is a module, warninng here
-            if first_temp:
-                assert get_temp_state(clstemp) != TpState.OVER
-                assert isinstance(first_temp, TypeTemp)
-                if get_temp_state(first_temp) == TpState.ON:
-                    assert isinstance(first_temp, TypeClassTemp)
-                    graph.add_dependency(clstemp, first_temp)
+    def_sym = clstemp.get_def_symtable()
+    visitor = _FirstClassTempVisitor(def_sym)
+    for basenode in defnode.bases:
+        first_temp = visitor.accept(basenode)
+        assert isinstance(first_temp, TypeTemp) and not isinstance(
+            first_temp,
+            TypeModuleTemp)  # FIXME: if the result is a module, warninng here
+        if first_temp:
+            assert isinstance(first_temp, TypeTemp)
+            assert isinstance(first_temp, TypeClassTemp)
+            graph.add_dependency(clstemp, first_temp)
 
 
 def _resolve_cls_placeholder(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     """Resolve placeholders of a class"""
-    assert get_temp_state(clstemp) != TpState.OVER
     symtable = clstemp.get_def_symtable()
     visitor = _TypeVarVisitor(symtable, mbox)
     defnode = get_cls_defnode(clstemp)
@@ -110,7 +105,6 @@ def _resolve_cls_placeholder(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
 
 def _resolve_cls_inh(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
-    assert get_temp_state(clstemp) != TpState.OVER
     symtable = clstemp.get_def_symtable()
     defnode = get_cls_defnode(clstemp)
 
@@ -234,12 +228,14 @@ def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
                        mbox: 'MessageBox'):
     # symid here is not set correctly
     fake_data = get_fake_data(symtable)
-    for tp_temp in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
         method_targets = _resolve_cls_method(symid, tp_temp, mbox)
         for blk_target in method_targets:
             manager.preprocess_block(blk_target)
 
-    for tp_temp in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
         new_symid = '.'.join([symid, tp_temp.basename])
         resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, manager,
                            mbox)
@@ -317,7 +313,8 @@ def _resolve_cls_method(symid: str, clstemp: 'TypeClassTemp',
 
 def resolve_cls_attr(symtable: 'SymTable', mbox: 'MessageBox'):
     fake_data = get_fake_data(symtable)
-    for tp_temp in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
         _resolve_cls_attr(tp_temp, mbox)
         resolve_cls_attr(tp_temp.get_inner_symtable(), mbox)
 

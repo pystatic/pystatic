@@ -6,8 +6,8 @@ from pystatic.option import Option
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
-    from pystatic.typesys import (TypeIns, TypeClassTemp, TypeTemp,
-                                  TypeFuncIns)
+    from pystatic.typesys import TypeIns, TypeTemp, TypeClassTemp
+    from pystatic.predefined import TypeFuncIns
 
 
 class TableScope(enum.Enum):
@@ -35,9 +35,6 @@ class Entry:
     def get_defnode(self) -> Optional[ast.AST]:
         return self._defnode
 
-    # def __str__(self):
-    #     return str(self.get_type(None))
-
 
 class ImportEntry(Entry):
     def __init__(self,
@@ -63,7 +60,7 @@ class ImportCache:
         self._cache: Dict[SymId, Dict[SymId, 'TypeIns']] = {}
 
     def get_moduleins(self, abssymid: 'SymId') -> Optional['TypeIns']:
-        from pystatic.typesys import TypePackageIns, TypeModuleTemp
+        from pystatic.predefined import TypePackageIns, TypeModuleTemp
 
         symidlist = symid2list(abssymid)
         if not symidlist:
@@ -121,8 +118,7 @@ class SymTable:
 
         # inner data structure to store important information about this
         # symtable, used heavily in the preprocess stage.
-        self._cls_defs: Dict[str, 'TypeClassTemp'] = {}
-        self._spt_types: Dict[str, 'TypeTemp'] = {}  # special type template
+        self._tp_defs: Dict[str, 'TypeTemp'] = {}
         self._func_defs: Dict[str, 'TypeFuncIns'] = {}
 
     @property
@@ -130,7 +126,7 @@ class SymTable:
         return self.glob.symid
 
     def _legb_lookup(self, name: str, find):
-        curtable = self
+        curtable: Optional[SymTable] = self
         res = find(curtable, name)
         if res:
             return res
@@ -147,13 +143,14 @@ class SymTable:
             return res
         return find(self.builtins, name)
 
+    def add_type_def(self, name: str, temp: 'TypeTemp'):
+        self._tp_defs[name] = temp
+
     def get_type_def(self, name: str) -> Optional['TypeTemp']:
         findlist = name.split('.')
         assert findlist
-        if name in self._cls_defs:
-            cur_temp = self._cls_defs[name]
-        elif name in self._spt_types:
-            cur_temp = self._spt_types[name]
+        if name in self._tp_defs:
+            cur_temp = self._tp_defs[name]
         else:
             return None
 
@@ -190,12 +187,6 @@ class SymTable:
         else:
             res_option.set_value(res)
         return res_option
-
-    # def lookup_local_entry(self, name: str) -> Optional['Entry']:
-    #     return self.local.get(name)
-
-    # def lookup_entry(self, name: str) -> Optional['Entry']:
-    #     return self._legb_lookup(name, SymTable.lookup_local_entry)
 
     def add_entry(self, name: str, entry: Entry):
         self.local[name] = entry
