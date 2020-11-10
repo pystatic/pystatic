@@ -1,6 +1,6 @@
 import ast
 from typing import Optional, List, TYPE_CHECKING
-from pystatic.errorcode import ErrorCode, CodeUnreachable
+from pystatic.errorcode import ErrorCode, CodeUnreachable, Level
 from pystatic.option import Option
 
 if TYPE_CHECKING:
@@ -12,6 +12,7 @@ class Message(object):
 
     from_node: generate an error message for the position implied by the node
     """
+
     def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
                  end_col_offset: Optional[int], msg: str):
         self.lineno = lineno
@@ -82,14 +83,8 @@ class ErrorMaker:
         self.mbox = mbox
 
     def dump_option(self, option: Option):
-        self.handle_err(option.errors)
+        option.dump_to_box(self.mbox)
         return option.value
-
-    def handle_err(self, err_list: List[ErrorCode]):
-        if err_list is None:
-            return
-        for err in err_list:
-            self.mbox.make(err)
 
     def add_err(self, err: ErrorCode):
         self.mbox.make(err)
@@ -100,7 +95,7 @@ class ErrorMaker:
         self.mbox.add_type(node, tp)
 
     def exsit_error(self, option: Option) -> bool:
-        return len(option.errors) != 0
+        return option.haserr()
 
     def generate_code_unreachable_error(self, code_frag: List[ast.stmt]):
         if len(code_frag) == 0:
@@ -110,3 +105,10 @@ class ErrorMaker:
         begin.end_lineno = end.end_lineno
         begin.end_col_offset = end.end_col_offset
         self.add_err(CodeUnreachable(begin))
+
+    def level_error_in_option(self, option: Option):
+        if option.errors:
+            for err in option.errors:
+                if err.level == Level.ERROR:
+                    return True
+        return False

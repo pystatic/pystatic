@@ -32,6 +32,7 @@ class Condition:
     def __init__(self, stmt_type: ConditionStmtType, reach: Reach):
         self.stmt_type = stmt_type
         self.reach = reach
+        self.dirty_map: Dict[str, TypeIns] = {}
 
 
 class ConditionInfer(BaseVisitor):
@@ -54,6 +55,12 @@ class ConditionInfer(BaseVisitor):
     def cur_condition(self):
         return self.reach_stack[-1]
 
+    def save_type(self, name: str):
+        tp = self.recorder.get_run_time_type(name)
+        if name in self.cur_condition.dirty_map:
+            return
+        self.cur_condition.dirty_map[name] = tp
+
     def accept(self, node: ast.stmt):
         self.visit(node)
 
@@ -62,6 +69,9 @@ class ConditionInfer(BaseVisitor):
         return reach in REJECT_REACH
 
     def pop(self):
+        if self.cur_condition.reach == Reach.UNKNOWN:
+            # print(self.cur_condition.dirty_map)
+            self.recorder.clean_dirty(self.cur_condition.dirty_map)
         self.reach_stack.pop()
         assert len(self.reach_stack) != 0
 
@@ -124,14 +134,23 @@ class ConditionInfer(BaseVisitor):
             return res
         elif isinstance(test, ast.UnaryOp):
             op = test.op
-            if isinstance(op, (ast.Not, ast.USub)):
-                return cal_neg(self.infer_value_of_condition(test.operand))
+            res = self.infer_value_of_condition(test.operand)
+            # print(res)
+            if isinstance(op, ast.Not):
+                return cal_neg(res)
             elif isinstance(op, ast.UAdd):
-                return self.infer_value_of_condition(test.operand)
+                return res
+            elif isinstance(op, ast.USub):
+                if isinstance(test.operand, ast.Constant):  # -1 1 0 -0
+                    return res
+                else:  # -False -True
+                    return cal_neg(res)
             else:
-                assert False, "TODO"
+                return Reach.UNKNOWN
         elif isinstance(test, ast.Compare):
             left = test.left
+            # option = eval_expr(test, self.recorder)
+            # option.dump_to_box()
             for cmpa, op in zip(test.comparators, test.ops):
                 right = cmpa
                 if is_cmp_python_version(left):
@@ -154,7 +173,7 @@ class ConditionInfer(BaseVisitor):
                     elif value_reach == Reach.UNKNOWN:
                         return Reach.UNKNOWN
                 return Reach.ALWAYS_TRUE
-            elif isinstance(op, test.Or):
+            elif isinstance(op, ast.Or):
                 for value in test.values:
                     value_reach = self.infer_value_of_condition(value)
                     if value_reach == Reach.ALWAYS_TRUE:
@@ -191,13 +210,17 @@ class ConditionInfer(BaseVisitor):
                     return Reach.ALWAYS_FALSE
                 # TODO
             elif name == "issubclass":
-                pass
+                # TODO
+                return Reach.UNKNOWN
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
         option: Option = eval_expr(test, self.recorder)
         literal_ins: TypeLiteralIns = self.err_maker.dump_option(option)
         if self.err_maker.exsit_error(option):
-            return Reach.UNKNOWN
+            if self.err_maker.level_error_in_option(option):
+                return Reach.ALWAYS_FALSE
+            else:
+                return Reach.UNKNOWN
         if literal_ins.value:
             return Reach.ALWAYS_TRUE
         else:
@@ -207,7 +230,10 @@ class ConditionInfer(BaseVisitor):
         option: Option = eval_expr(test, self.recorder)
         tp = self.err_maker.dump_option(option)
         if self.err_maker.exsit_error(option):
-            return Reach.UNKNOWN
+            if self.err_maker.level_error_in_option(option):
+                return Reach.ALWAYS_FALSE
+            else:
+                return Reach.UNKNOWN
         if isinstance(tp, TypeLiteralIns):
             if tp.value:
                 return Reach.ALWAYS_TRUE

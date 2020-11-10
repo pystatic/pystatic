@@ -12,4 +12,3 @@ b = A()  # E Incompatible type in assignment(expression has type 'A', variable h
 c: A = A  # E Incompatible type in assignment(expression has type 'Type[A]', variable has type 'A')
 c = A()
 
-
