@@ -3,13 +3,14 @@ from typing import Dict, Union, List
 from enum import Enum
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
+from pystatic.visitor import val_unparse, VisitException
 from pystatic.message import ErrorMaker
 from pystatic.typesys import TypeLiteralIns
 from pystatic.errorcode import *
 from pystatic.config import Config
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.visitor import BaseVisitor
-from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH
+from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH, is_true
 from pystatic.TypeCompatibe.simpleType import type_consistent
 
 
@@ -45,7 +46,7 @@ class ConditionInfer(BaseVisitor):
         self.err_maker = err_maker
         self.config = config
         self.reach_stack: List[Condition] = [
-            Condition(ConditionStmtType.GLOBAL, Reach.RUNTIME_TRUE)
+            Condition(ConditionStmtType.GLOBAL, Reach.ALWAYS_TRUE)
         ]
         self.break_flag = BreakFlag.NORMAL
         self.break_node: Optional[ast.stmt] = None
@@ -88,18 +89,22 @@ class ConditionInfer(BaseVisitor):
     def get_break_node(self):
         return self.break_node
 
+    def mark_node(self, node: ast.stmt, reach: Reach):
+        self.reach_map[node] = reach
+        node.reach = reach
+
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.reach_stack.append(
-            Condition(ConditionStmtType.FUNC, Reach.RUNTIME_TRUE))
+            Condition(ConditionStmtType.FUNC, Reach.ALWAYS_TRUE))
 
     def visit_While(self, node: ast.While):
         reach = self.infer_value_of_condition(node.test)
-        self.reach_map[node] = reach
+        self.mark_node(node, reach)
         self.reach_stack.append(Condition(ConditionStmtType.LOOP, reach))
 
     def visit_If(self, node: ast.If):
         reach = self.infer_value_of_condition(node.test)
-        self.reach_map[node] = reach
+        self.mark_node(node, reach)
         self.reach_stack.append(Condition(ConditionStmtType.IF, reach))
 
     def visit_Break(self, node: ast.Break):
@@ -127,27 +132,37 @@ class ConditionInfer(BaseVisitor):
             else:
                 assert False, "TODO"
         elif isinstance(test, ast.Compare):
-            op = test.op
-
-
+            left = test.left
+            for cmpa, op in zip(test.comparators, test.ops):
+                right = cmpa
+                if is_cmp_python_version(left):
+                    res = compare_python_version(left, right, op, self.config, False)
+                elif is_cmp_python_version(right):
+                    res = compare_python_version(right, left, op, self.config, True)
+                else:
+                    return Reach.UNKNOWN
+                if not is_true(res, False):
+                    return res
+                left = cmpa
+            return Reach.ALWAYS_TRUE
         elif isinstance(test, ast.BoolOp):
             op = test.op
             if isinstance(op, ast.And):
                 for value in test.values:
                     value_reach = self.infer_value_of_condition(value)
-                    if value_reach == Reach.RUNTIME_FALSE:
-                        return Reach.RUNTIME_FALSE
+                    if value_reach == Reach.ALWAYS_FALSE:
+                        return Reach.ALWAYS_FALSE
                     elif value_reach == Reach.UNKNOWN:
                         return Reach.UNKNOWN
-                return Reach.RUNTIME_TRUE
+                return Reach.ALWAYS_TRUE
             elif isinstance(op, test.Or):
                 for value in test.values:
                     value_reach = self.infer_value_of_condition(value)
-                    if value_reach == Reach.RUNTIME_TRUE:
-                        return Reach.RUNTIME_TRUE
+                    if value_reach == Reach.ALWAYS_TRUE:
+                        return Reach.ALWAYS_TRUE
                     elif value_reach == Reach.UNKNOWN:
                         return Reach.UNKNOWN
-                return Reach.RUNTIME_FALSE
+                return Reach.ALWAYS_FALSE
             else:
                 assert False, "not reach here"
         elif isinstance(test, ast.Call):
@@ -172,9 +187,9 @@ class ConditionInfer(BaseVisitor):
                 if type_consistent(
                         first_type,
                         self.err_maker.dump_option(second_type.call(None))):
-                    return Reach.RUNTIME_TRUE
+                    return Reach.ALWAYS_TRUE
                 else:
-                    return Reach.RUNTIME_FALSE
+                    return Reach.ALWAYS_FALSE
                 # TODO
             elif name == "issubclass":
                 pass
@@ -185,9 +200,9 @@ class ConditionInfer(BaseVisitor):
         if self.err_maker.exsit_error(option):
             return Reach.UNKNOWN
         if literal_ins.value:
-            return Reach.RUNTIME_TRUE
+            return Reach.ALWAYS_TRUE
         else:
-            return Reach.RUNTIME_FALSE
+            return Reach.ALWAYS_FALSE
 
     def infer_value_of_name_node(self, test: ast.Name):
         option: Option = eval_expr(test, self.recorder)
@@ -196,8 +211,48 @@ class ConditionInfer(BaseVisitor):
             return Reach.UNKNOWN
         if isinstance(tp, TypeLiteralIns):
             if tp.value:
-                return Reach.RUNTIME_TRUE
+                return Reach.ALWAYS_TRUE
             else:
-                return Reach.RUNTIME_FALSE
+                return Reach.ALWAYS_FALSE
         else:
             return Reach.UNKNOWN
+
+
+def is_cmp_python_version(node: ast.expr):
+    if (isinstance(node, ast.Attribute) and node.attr == 'version_info'
+            and isinstance(node.value, ast.Name) and node.value.id == 'sys'):
+        return True
+    else:
+        return False
+
+
+def compare_python_version(sys_node: ast.expr,
+                           cmp_node: ast.expr,
+                           op: ast.cmpop,
+                           config: 'Config',
+                           atright=False) -> Reach:
+    py_version = config.python_version
+    try:
+        right = val_unparse(cmp_node)
+    except VisitException:
+        return Reach.UNKNOWN
+    if not isinstance(right, tuple):
+        return Reach.UNKNOWN
+
+    left = py_version
+    if atright:
+        left, right = right, left
+
+    cond_map = {False: Reach.ALWAYS_FALSE, True: Reach.ALWAYS_TRUE}
+    if isinstance(op, ast.Eq):
+        return cond_map[left == right]
+    elif isinstance(op, ast.Gt):
+        return cond_map[left > right]
+    elif isinstance(op, ast.GtE):
+        return cond_map[left >= right]
+    elif isinstance(op, ast.Lt):
+        return cond_map[left < right]
+    elif isinstance(op, ast.LtE):
+        return cond_map[left <= right]
+    else:
+        return Reach.UNKNOWN

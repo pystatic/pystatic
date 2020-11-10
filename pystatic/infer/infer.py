@@ -249,12 +249,13 @@ class InferVisitor(BaseVisitor):
 
 
 class InferStarter:
-    def __init__(self, sources):
+    def __init__(self, sources, config):
         self.sources = sources
+        self.config = config
 
     def start_infer(self):
         for symid, target in self.sources.items():
             logger.info(f'Type infer in module \'{symid}\'')
             infer_visitor = InferVisitor(target.ast, target.module_temp,
-                                         target.mbox)
+                                         target.mbox, self.config)
             infer_visitor.infer()
