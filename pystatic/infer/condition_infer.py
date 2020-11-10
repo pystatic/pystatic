@@ -5,7 +5,7 @@ from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.visitor import val_unparse, VisitException
 from pystatic.message import ErrorMaker
-from pystatic.typesys import TypeLiteralIns
+from pystatic.predefined import TypeLiteralIns
 from pystatic.errorcode import *
 from pystatic.config import Config
 from pystatic.infer.recorder import SymbolRecorder
@@ -35,11 +35,10 @@ class Condition:
 
 
 class ConditionInfer(BaseVisitor):
-    def __init__(
-            self,
-            recorder: SymbolRecorder,
-            err_maker: ErrorMaker,
-            config: Config):
+    def __init__(self,
+                 recorder: SymbolRecorder,
+                 err_maker: ErrorMaker,
+                 config: Config) -> None:
         super().__init__()
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}

@@ -6,7 +6,8 @@ import ast
 from pystatic.arg import Argument
 from pystatic.preprocess.sym_util import *
 from pystatic.symtable import SymTable
-from pystatic.typesys import (TypeClassTemp, TypeFuncIns, any_ins, TypeIns)
+from pystatic.typesys import TypeClassTemp, any_ins, TypeIns
+from pystatic.predefined import TypeFuncIns
 from pystatic.symtable import Entry
 from pystatic.message import MessageBox
 from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,
@@ -34,9 +35,10 @@ def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
     symtable.local.update(new_entry)
 
     fake_data.local = {}  # empty the fake_data
-    for tp_def in fake_data.cls_defs.values():
-        assert isinstance(tp_def, TypeClassTemp)
-        inner_symtable = tp_def.get_inner_symtable()
+    for clsentry in fake_data.cls_defs.values():
+        tp_temp = clsentry.clstemp
+        assert isinstance(tp_temp, TypeClassTemp)
+        inner_symtable = tp_temp.get_inner_symtable()
         resolve_local_typeins(inner_symtable, mbox)
 
 

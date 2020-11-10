@@ -4,7 +4,8 @@ import os
 
 sys.path.extend(['.', '..'])
 
-from pystatic.typesys import TypeIns, TypeModuleTemp, TypeType
+from pystatic.typesys import TypeIns, TypeType
+from pystatic.predefined import TypeModuleTemp
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.exprparse import eval_expr

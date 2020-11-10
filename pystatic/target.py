@@ -1,7 +1,8 @@
 import ast
-from enum import IntEnum
+from enum import IntEnum, Enum, auto
 from typing import TYPE_CHECKING, Optional
-from pystatic.typesys import TypeClassTemp, TypeModuleTemp
+from pystatic.typesys import TypeClassTemp
+from pystatic.predefined import TypeModuleTemp
 from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
@@ -26,9 +27,9 @@ class BlockTarget:
                  stage: Stage = Stage.Preprocess) -> None:
         self.symid = symid
         self.symtable = symtable
-        self.stage = stage
         self.mbox: 'MessageBox' = mbox
         self.ast: Optional[ast.AST] = None
+        self.stage = stage
 
 
 class MethodTarget(BlockTarget):

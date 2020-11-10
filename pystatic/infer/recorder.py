@@ -1,7 +1,8 @@
 import ast
 from typing import List, Dict, Set
 from pystatic.errorcode import SymbolUndefined, ErrorCode
-from pystatic.typesys import TypeIns, TypeType, any_type, TypeFuncIns
+from pystatic.typesys import TypeIns, TypeType, any_type
+from pystatic.predefined import TypeFuncIns
 from pystatic.option import Option
 from pystatic.symtable import SymTable
 
