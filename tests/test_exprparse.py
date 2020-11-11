@@ -34,6 +34,9 @@ def test_exprparse():
     int_typetype = manager.get_sym_type('builtins', 'int')
     assert int_typetype
     assert isinstance(int_typetype, TypeType)
+    str_typetype = manager.get_sym_type('builtins', 'str')
+    assert str_typetype
+    assert isinstance(str_typetype, TypeType)
 
     a = manager.get_sym_type(src, 'a')
     assert a
@@ -44,8 +47,8 @@ def test_exprparse():
     A = manager.get_sym_type(src, 'A')
     B = manager.get_sym_type(src, 'B')
 
-    assert isinstance(c, TypeIns)
-    assert isinstance(d, TypeIns)
+    assert isinstance(c, TypeIns) and not isinstance(c, TypeType)
+    assert isinstance(d, TypeIns) and not isinstance(d, TypeType)
     assert isinstance(A, TypeType)
     assert isinstance(B, TypeType)
     assert c.temp == A.temp
@@ -58,3 +61,21 @@ def test_exprparse():
     eval_res = eval_option.value
     assert isinstance(eval_res, TypeIns)
     assert eval_res.temp == B.temp
+
+    # container
+    e = manager.get_sym_type(src, 'e')
+    assert isinstance(e, TypeIns) and not isinstance(e, TypeType)
+    assert e.bindlist
+    e_fst = e.bindlist[0]
+    assert isinstance(e_fst, TypeIns) and not isinstance(e_fst, TypeType)
+    assert e_fst.temp == int_typetype.temp
+
+    f = manager.get_sym_type(src, 'f')
+    assert isinstance(f, TypeIns) and not isinstance(f, TypeType)
+    assert f.bindlist
+    f_fst = f.bindlist[0]
+    f_snd = f.bindlist[1]
+    assert isinstance(f_fst, TypeIns) and not isinstance(f_fst, TypeType)
+    assert isinstance(f_snd, TypeIns) and not isinstance(f_snd, TypeType)
+    assert f_fst.temp == str_typetype.temp
+    assert f_snd.temp == int_typetype.temp

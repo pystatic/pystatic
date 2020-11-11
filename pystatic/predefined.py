@@ -207,7 +207,7 @@ class TypeNoneTemp(TypeTemp):
         # TODO: warning
         return Option(self._cached_ins)
 
-    def getitem(self, item: GetItemType,
+    def getitem(self, item: GetItemArg,
                 bindlist: BindList) -> Option['TypeIns']:
         # TODO: warning
         return Option(self._cached_ins)
@@ -230,7 +230,7 @@ class TypeNoneTemp(TypeTemp):
         return Option(self._cached_ins)
 
     def get_typetype(self, bindlist: Optional[BindList],
-                     item: Optional[GetItemType]) -> Option['TypeType']:
+                     item: Optional[GetItemArg]) -> Option['TypeType']:
         return Option(self._cached_typetype)
 
     def get_default_ins(self) -> Option['TypeIns']:
@@ -359,7 +359,7 @@ class TypeGenericTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
-    def getitem(self, item: GetItemType,
+    def getitem(self, item: GetItemArg,
                 bindlist: BindList) -> Option['TypeIns']:
         res = TypeIns(generic_temp, None)
         option_res = Option(res)
