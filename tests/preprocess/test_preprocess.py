@@ -54,6 +54,9 @@ def test_preprocess():
     assert isinstance(ret_ins, TypeIns) and not isinstance(ret_ins, TypeType)
     assert ret_ins.temp == A.temp
 
+    assert manager.get_sym_type(src, 'c')
+    assert manager.get_sym_type(src, 'd')
+
 
 def test_import():
     src = 'preprocess_import'
