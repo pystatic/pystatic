@@ -1,7 +1,7 @@
 """Data structures and helper functions used in exprparse"""
 import ast
 from typing import (Generic, TYPE_CHECKING, List, Dict, Tuple, Union, TypeVar,
-                    Any)
+                    Any, Sequence)
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
@@ -19,6 +19,7 @@ class WithAst(Generic[T]):
 
 
 InsWithAst = WithAst['TypeIns']
+GetItemArg = WithAst[Union[Tuple['GetItemArg'], List['GetItemArg'], 'TypeIns']]
 
 
 class ApplyArgs:
@@ -80,8 +81,3 @@ def apply(param: 'Argument', applyargs: ApplyArgs) -> ApplyResult:
     }  # *kwargs, name that used before should not be collected here
 
     return origin_res, star_arg_res, star_kw_res
-
-
-__GetItemType = Union[Tuple['GetItemType', ...], List['GetItemType'],
-                      InsWithAst]
-GetItemType = WithAst[__GetItemType]
