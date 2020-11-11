@@ -17,22 +17,11 @@ class SupportGetAttribute(Protocol):
 
 
 def eval_expr(node: ast.AST, attr_consultant: SupportGetAttribute):
-    """
-    consultant:
-        support getattribute(str, ast.AST) -> Option[TypeIns]
-
-    is_record:
-        report error or not.
-    """
     return ExprParser(attr_consultant).accept(node)
 
 
 class ExprParser(NoGenVisitor):
     def __init__(self, consultant: SupportGetAttribute) -> None:
-        """
-        is_record:
-            whether report error or not.
-        """
         self.consultant = consultant
         self.errors = []
 

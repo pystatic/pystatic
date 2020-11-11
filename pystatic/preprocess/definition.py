@@ -1,7 +1,7 @@
 import ast
 from contextlib import contextmanager
-from typing import List, Optional, TYPE_CHECKING
-from pystatic.visitor import BaseVisitor
+from typing import List, Optional, TYPE_CHECKING, Union
+from pystatic.visitor import BaseVisitor, NoGenVisitor
 from pystatic.typesys import TypeClassTemp, TypeType
 from pystatic.predefined import TypeVarTemp, TypeVarIns
 from pystatic.message import MessageBox
@@ -119,65 +119,63 @@ class TypeDefVisitor(BaseVisitor):
     def cur_clsname(self):
         return '.'.join(self._clsname)
 
-    def _is_new_def(self, node: ast.AST) -> Optional[str]:
-        """Whether the node stands for a new definition"""
-        if isinstance(node, ast.Name):
-            fake_data = get_fake_data(self.symtable)
-            name = node.id
-            if (name in fake_data.fun or name in fake_data.local
-                    or name in fake_data.impt):
-                return None
-            else:
-                return name
+    def collect_typevar(self, node: AssignNode) -> Optional[TypeVarIns]:
+        def get_name(node: ast.AST) -> Optional[str]:
+            if isinstance(node, ast.Name):
+                return node.id
+            return None
+
+        value_node = node.value
+        if isinstance(value_node, ast.Call):
+            f_ins = eval_expr(value_node.func, self.symtable).value
+            if isinstance(f_ins, TypeType) and isinstance(f_ins.temp, TypeVarTemp):
+                typevar = eval_expr(node, self.symtable).value
+                assert isinstance(typevar, TypeVarIns)
+
+                if isinstance(node, ast.AnnAssign):
+                    typevar_name = get_name(node)
+                    assert typevar_name  # TODO: error
+                elif isinstance(node, ast.Assign):
+                    assert node.targets[0]  # TODO: error
+                    typevar_name = get_name(node.targets[0])
+                    assert typevar_name  # TODO: error
+                else:
+                    raise TypeError()
+
+                self.fake_data.add_typevar_def(typevar_name, typevar, node)
+                return typevar
         return None
 
-    def _is_typevar(self, node: ast.expr) -> Optional[TypeVarIns]:
-        if isinstance(node, ast.Call):
-            f_ins = eval_expr(node.func, self.symtable).value
-            if isinstance(f_ins, TypeType) and isinstance(
-                    f_ins.temp, TypeVarTemp):
-                res = eval_expr(node, self.symtable).value
-                assert isinstance(res, TypeVarIns), "TODO"
-                return res
-        return None
+    def collect_definition(self, node: Union[ast.Assign, ast.AnnAssign]):
+        def check_single_expr(target: ast.AST, defnode: ast.AST):
+            if isinstance(target, ast.Name):
+                name = target.id
+                if not self.fake_data.name_collide(name):
+                    self.fake_data.add_local_def(name, defnode)
+            elif isinstance(target, ast.Tuple):
+                for elt in target.elts:
+                    check_single_expr(elt, defnode)
+            elif self._is_method:
+                self._try_attr(defnode, target)
+
+        assert node.value  # TODO: deal standalone declaration like a: A
+        if not self.collect_typevar(node):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    check_single_expr(target, node)
+
+            elif isinstance(node, ast.AnnAssign):
+                check_single_expr(node.target, node)
+
+            else:
+                raise TypeError()
 
     def visit_Assign(self, node: ast.Assign):
         # TODO: here pystatic haven't add redefine warning and check consistence
-        tpvarins = self._is_typevar(node.value)
-        if tpvarins:
-            assert isinstance(tpvarins, TypeVarIns)
-            last_target = node.targets[-1]
-            assert isinstance(last_target, ast.Name), "TODO"
-
-            tpvarins.tpvar_name = last_target.id
-            self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
-
-        else:
-            for target in node.targets:
-                name = self._is_new_def(target)
-                if name:
-                    add_local_var(self.symtable, self.fake_data, name, node)
-                elif self._is_method:
-                    self._try_attr(node, target)
+        self.collect_definition(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        tpvarins = None
-        if node.value:
-            tpvarins = self._is_typevar(node.value)
-        if tpvarins:
-            assert isinstance(tpvarins, TypeVarIns)
-            last_target = node.target
-            assert isinstance(last_target, ast.Name), "TODO"
-
-            tpvarins.tpvar_name = last_target.id
-            self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
-
-        else:
-            name = self._is_new_def(node.target)
-            if name:
-                add_local_var(self.symtable, self.fake_data, name, node)
-            elif self._is_method:
-                self._try_attr(node, node.target)
+        self.collect_definition(node)
 
     def visit_ClassDef(self, node: ast.ClassDef):
         clsname = node.name
