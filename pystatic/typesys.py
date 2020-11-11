@@ -3,7 +3,7 @@ import copy
 from abc import ABC, abstractmethod
 from typing import (Any, Optional, List, Final, Dict, TYPE_CHECKING)
 from pystatic.option import Option
-from pystatic.evalutil import ApplyArgs, GetItemType
+from pystatic.evalutil import ApplyArgs, GetItemArg
 from pystatic.errorcode import NoAttribute
 
 if TYPE_CHECKING:
@@ -74,7 +74,7 @@ class TypeIns:
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         return self.temp.call(applyargs, self.bindlist)
 
-    def getitem(self, item: GetItemType) -> Option['TypeIns']:
+    def getitem(self, item: GetItemArg) -> Option['TypeIns']:
         # TODO: add error
         return self.temp.getitem(item, self.bindlist)
 
@@ -159,7 +159,7 @@ class TypeType(TypeIns):
             option_res.set_value(ins_res)
         return option_res
 
-    def getitem(self, item: GetItemType) -> Option['TypeIns']:
+    def getitem(self, item: GetItemArg) -> Option['TypeIns']:
         return self.temp.get_typetype(self.bindlist, item)
 
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
@@ -219,7 +219,7 @@ class TypeTemp(ABC):
         # call_option.add_err(...)
         return call_option
 
-    def getitem(self, item: GetItemType,
+    def getitem(self, item: GetItemArg,
                 bindlist: BindList) -> Option['TypeIns']:
         option_res = Option(any_ins)
         # TODO: add error
@@ -259,31 +259,36 @@ class TypeTemp(ABC):
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
 
-    def get_typetype(self,
-                     bindlist: Optional[BindList] = None,
-                     item: Optional[GetItemType] = None) -> Option['TypeType']:
+    def get_typetype(
+            self,
+            bindlist: Optional[BindList] = None,
+            itemarg: Optional[GetItemArg] = None) -> Option['TypeType']:
         """Mainly used for TypeType to generate correct TypeType"""
         res_option = Option(any_type)
-        if not item:
+        if not itemarg:
             return Option(TypeType(self, None))
         else:
-            if isinstance(item.ins, (tuple, list)):
+            if isinstance(itemarg.ins, (tuple, list)):
                 tpins_list: List[TypeIns] = []
-                for singleitem in item.ins:
+                for singleitem in itemarg.ins:
                     cur_ins = singleitem.ins
                     if isinstance(cur_ins, TypeType):
-                        tpins = cur_ins.getins(res_option)  # type: ignore
+                        tpins = cur_ins.getins(res_option)
                         tpins_list.append(tpins)
                     elif isinstance(cur_ins, TypeIns):
                         tpins_list.append(cur_ins)
                     else:
-                        # TODO: add warning here
+                        # TODO: warning: class Type doesn't support this syntax
                         pass
                 res_option.value = TypeType(self, tpins_list)
 
             else:
-                if isinstance(item.ins, TypeIns):
-                    res_option.value = TypeType(self, [item.ins])
+                item_ins = itemarg.ins
+                if isinstance(item_ins, TypeType):
+                    res_option.value = TypeType(self,
+                                                [item_ins.getins(res_option)])
+                elif isinstance(item_ins, TypeIns):
+                    res_option.value = TypeType(self, [item_ins])
                 else:
                     # TODO: add warning here
                     res_option.value = TypeType(self, None)
@@ -453,7 +458,7 @@ class TypeAnyTemp(TypeTemp):
              bindlist: BindList) -> Option['TypeIns']:
         return Option(self._cached_ins)
 
-    def getitem(self, item: GetItemType,
+    def getitem(self, item: GetItemArg,
                 bindlist: BindList) -> Option['TypeIns']:
         return Option(self._cached_ins)
 
@@ -471,8 +476,8 @@ class TypeAnyTemp(TypeTemp):
         return Option(self._cached_ins)
 
     def get_typetype(self, bindlist: Optional[BindList],
-                     item: Optional[GetItemType]) -> Option['TypeType']:
-        # TODO: check here
+                     item: Optional[GetItemArg]) -> Option['TypeType']:
+        # TODO: warning: if bindlist is non-empty, then report an error
         return Option(self._cached_typetype)
 
     def get_default_typetype(self) -> 'TypeType':
