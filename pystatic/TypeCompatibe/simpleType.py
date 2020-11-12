@@ -298,8 +298,7 @@ class TypeCompatible:
         print(a.value,b.value)
         print(type(a.value),type(b.value))
         return type(a.value)==type(b.value) and  a.value == b.value
-        return False
-
+        
     def SpecificClassTypeCom(self, a: Union[TypeIns,TypeType], b: Union[TypeIns,TypeType],
                              state: compatibleState) -> bool:
         tempa:TypeClassTemp = a.temp
