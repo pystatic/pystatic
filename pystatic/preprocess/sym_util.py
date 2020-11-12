@@ -1,23 +1,51 @@
 import ast
-from typing import Optional, TYPE_CHECKING, Dict, List
+from typing import Optional, TYPE_CHECKING, Dict, List, TypeVar, Union
 from pystatic.symid import (absolute_symidlist, SymId, symid2list,
                             rel2abssymid, symid_parent)
 from pystatic.typesys import TypeClassTemp, TypeIns, TypeType
 from pystatic.predefined import (TypeModuleTemp, TypePackageIns,
-                                 TypePackageTemp)
+                                 TypePackageTemp, TypeVarIns)
 
-from pystatic.symtable import SymTable, ImportNode
+from pystatic.symtable import SymTable, ImportNode, Entry
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
 
+AssignNode = Union[ast.Assign, ast.AnnAssign]
+
 
 class FakeData:
-    def __init__(self):
+    def __init__(self, symtable: 'SymTable'):
+        self.typevar_def: Dict[str, 'fake_typevar_def'] = {}
         self.fun: Dict[str, 'fake_fun_entry'] = {}
-        self.local: Dict[str, 'fake_local_entry'] = {}
+        self.local: Dict[str, 'fake_local_def'] = {}
         self.impt: Dict[str, 'fake_impt_entry'] = {}
         self.cls_defs: Dict[str, 'fake_clsdef_entry'] = {}
+
+        self.symtable = symtable
+
+    def name_collide(self, name: str):
+        return (name in self.typevar_def or name in self.fun
+                or name in self.local or name in self.cls_defs)
+
+    def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
+                        defnode: AssignNode):
+        self.typevar_def[name] = fake_typevar_def(name, typevar, defnode)
+        self.symtable.add_entry(name, Entry(typevar, defnode))
+
+    def add_local_def(self, name: str, defnode: ast.AST):
+        local_def = fake_local_def(name, defnode)
+        self.local[name] = local_def
+
+
+class fake_typevar_def:
+    __slots__ = ['name', 'typevar', 'defnode']
+
+    def __init__(self, name: str, typevar: 'TypeVarIns',
+                 defnode: AssignNode) -> None:
+        self.name = name
+        self.typevar = typevar
+        self.defnode = defnode
 
 
 class fake_clsdef_entry:
@@ -47,7 +75,9 @@ class fake_fun_entry:
         return self.defnodes[0].name
 
 
-class fake_local_entry:
+class fake_local_def:
+    __slots__ = ['name', 'defnode']
+
     def __init__(self, name: str, defnode: ast.AST) -> None:
         self.name = name
         self.defnode = defnode
@@ -70,7 +100,7 @@ class fake_impt_entry:
 
 def get_fake_data(symtable: 'SymTable') -> FakeData:
     if not hasattr(symtable, 'fake_data'):
-        setattr(symtable, 'fake_data', FakeData())
+        setattr(symtable, 'fake_data', FakeData(symtable))
     fake_data = getattr(symtable, 'fake_data')
     assert isinstance(fake_data, FakeData)
     return fake_data
@@ -104,12 +134,6 @@ def add_fun_def(symtable: 'SymTable', fake_data: 'FakeData',
         fake_data.fun[name].defnodes.append(node)
     else:
         fake_data.fun[name] = fake_fun_entry(node)
-
-
-def add_local_var(symtable: 'SymTable', fake_data: 'FakeData', name: str,
-                  node: ast.AST):
-    entry = fake_local_entry(name, node)
-    fake_data.local[name] = entry
 
 
 def analyse_import_stmt(node: ImportNode,

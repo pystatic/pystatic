@@ -20,7 +20,7 @@ def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
 
     new_entry = {}
     for name, entry in fake_data.local.items():
-        assert isinstance(entry, fake_local_entry)
+        assert isinstance(entry, fake_local_def)
         # entry may also be temporary fake_imp_entry which should not be
         # resolved here.
         defnode = entry.defnode
