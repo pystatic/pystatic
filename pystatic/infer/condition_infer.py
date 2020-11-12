@@ -56,7 +56,7 @@ class ConditionInfer(BaseVisitor):
         return self.reach_stack[-1]
 
     def save_type(self, name: str):
-        tp = self.recorder.get_run_time_type(name)
+        tp = self.recorder.get_comment_type(name)
         if name in self.cur_condition.dirty_map:
             return
         self.cur_condition.dirty_map[name] = tp

@@ -6,6 +6,7 @@ from pystatic.typesys import *
 from pystatic.predefined import *
 from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
+from pystatic.plugin import Plugin
 from pystatic.errorcode import *
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
@@ -24,7 +25,8 @@ class InferVisitor(BaseVisitor):
                  mbox: MessageBox, config: Config):
         self.root = node
         self.mbox = mbox
-        self.err_maker = ErrorMaker(mbox)
+        # self.plugin = Plugin()
+        self.err_maker = ErrorMaker(self.mbox)
         self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
         self.config = config
@@ -64,7 +66,6 @@ class InferVisitor(BaseVisitor):
         if not self.recorder.is_defined(name):
             self.recorder.set_type(target.id, comment)
         if not self.type_consistent(comment, rtype):
-            self.set_type(name, comment)
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
@@ -123,7 +124,6 @@ class InferVisitor(BaseVisitor):
         if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
-            self.set_type(name, comment)
         else:
             self.set_type(name, rtype)
 
@@ -262,12 +262,15 @@ class InferVisitor(BaseVisitor):
 
     def visit_For(self, node: ast.For):
         container = self.get_type(node.iter)
+        print(container.bindlist)
+        print(container.temp.placeholders)
         get_element_type_in_container(container)
 
-def get_element_type_in_container(container: TypeIns):
-    print(container)
-    print(container.bindlist)
 
+def get_element_type_in_container(container: TypeIns):
+    # print(container)
+    # print(container.bindlist)
+    pass
 
 
 class InferStarter:

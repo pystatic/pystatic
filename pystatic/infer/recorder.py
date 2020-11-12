@@ -112,8 +112,10 @@ class SymbolRecorder:
                     tp = table.lookup_local(name)
                 if tp:
                     return tp
-        table = self.stack[-1].tp.get_inner_symtable()
-        return table.legb_lookup(name)
+        if len(self.stack) != 1:
+            table = self.stack[-1].tp.get_inner_symtable()
+            return table.legb_lookup(name)
+        return None
 
     def getattribute(self, name, node: ast.AST) -> Option:
         tp = self.get_run_time_type(name)
@@ -127,8 +129,8 @@ class SymbolRecorder:
     def clean_dirty(self, dirty_map: Dict[str, TypeIns]):
         for name, pre_type in dirty_map.items():
             cur_type = self.get_run_time_type(name)
-            print("pre",pre_type)
-            print("cur",cur_type)
+            print("pre", pre_type)
+            print("cur", cur_type)
             if type_consistent(pre_type, cur_type):
                 self.set_type(name, pre_type)
             else:

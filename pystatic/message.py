@@ -2,6 +2,7 @@ import ast
 from typing import Optional, List, TYPE_CHECKING
 from pystatic.errorcode import ErrorCode, CodeUnreachable, Level
 from pystatic.option import Option
+from pystatic.plugin import Plugin
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
@@ -36,8 +37,7 @@ class Message(object):
     def __str__(self):
         return f'line {self.lineno} col {self.col_offset}: ' + self.msg
 
-
-class TypeNode:
+class NodeType:
     def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
                  end_col_offset: Optional[int], node_type: 'TypeIns'):
         self.lineno = lineno
@@ -56,13 +56,10 @@ class MessageBox(object):
     def __init__(self, module_symid: str):
         self.module_symid = module_symid
         self.error: List[Message] = []
-        self.types: List[TypeNode] = []
+        self.node_types: List[NodeType] = []
 
     def add_err(self, node: ast.AST, msg: str):
         self.error.append(Message.from_node(node, msg))
-
-    def add_type(self, node: ast.AST, tp: 'TypeIns'):
-        self.types.append(TypeNode.from_node(node, tp))
 
     def make(self, error: ErrorCode):
         node, msg = error.make()
@@ -89,10 +86,8 @@ class ErrorMaker:
     def add_err(self, err: ErrorCode):
         self.mbox.make(err)
 
-    def add_type(self, node: Optional[ast.AST], tp: 'TypeIns'):
-        if node is None:
-            return
-        self.mbox.add_type(node, tp)
+    def add_type(self, node: ast.AST, node_type: 'TypeIns'):
+        self.mbox.node_types.append(NodeType.from_node(node, node_type))
 
     def exsit_error(self, option: Option) -> bool:
         return option.haserr()
