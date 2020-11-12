@@ -5,7 +5,7 @@ from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.visitor import val_unparse, VisitException
 from pystatic.message import ErrorMaker
-from pystatic.predefined import TypeLiteralIns
+from pystatic.predefined import TypeLiteralIns, TypeIns
 from pystatic.errorcode import *
 from pystatic.config import Config
 from pystatic.infer.recorder import SymbolRecorder
@@ -169,18 +169,15 @@ class ConditionInfer(BaseVisitor):
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
         option: Option = eval_expr(test, self.recorder)
-        literal_ins: TypeLiteralIns = self.err_maker.dump_option(option)
         if self.err_maker.exsit_error(option):
-            if self.err_maker.level_error_in_option(option):
-                return Reach.ALWAYS_FALSE
-            else:
-                return Reach.UNKNOWN
+            return self.dispose_error_condition(option)
+        literal_ins: TypeLiteralIns = self.err_maker.dump_option(option)
         if literal_ins.value:
             return Reach.ALWAYS_TRUE
         else:
             return Reach.ALWAYS_FALSE
 
-    def infer_value_of_unary_op(self, test: ast.UnaryOp):
+    def infer_value_of_unary_op(self, test: ast.UnaryOp) -> Reach:
         op = test.op
         res = self.infer_value_of_condition(test.operand)
         if isinstance(op, ast.Not):
@@ -195,7 +192,7 @@ class ConditionInfer(BaseVisitor):
         else:
             return Reach.UNKNOWN
 
-    def infer_value_of_bool_op(self, test: ast.BoolOp):
+    def infer_value_of_bool_op(self, test: ast.BoolOp) -> Reach:
         op = test.op
         if isinstance(op, ast.And):
             return self.infer_value_of_and_op(test)
@@ -204,7 +201,7 @@ class ConditionInfer(BaseVisitor):
         else:
             assert False, "not reach here"
 
-    def infer_value_of_and_op(self, test: ast.BoolOp):
+    def infer_value_of_and_op(self, test: ast.BoolOp) -> Reach:
         for value in test.values:
             value_reach = self.infer_value_of_condition(value)
             if value_reach == Reach.ALWAYS_FALSE:
@@ -213,7 +210,7 @@ class ConditionInfer(BaseVisitor):
                 return Reach.UNKNOWN
         return Reach.ALWAYS_TRUE
 
-    def infer_value_of_or_op(self, test: ast.BoolOp):
+    def infer_value_of_or_op(self, test: ast.BoolOp) -> Reach:
         for value in test.values:
             value_reach = self.infer_value_of_condition(value)
             if value_reach == Reach.ALWAYS_TRUE:
@@ -222,14 +219,11 @@ class ConditionInfer(BaseVisitor):
                 return Reach.UNKNOWN
         return Reach.ALWAYS_FALSE
 
-    def infer_value_of_name_node(self, test: ast.Name):
+    def infer_value_of_name_node(self, test: ast.Name) -> Reach:
         option: Option = eval_expr(test, self.recorder)
-        tp = self.err_maker.dump_option(option)
         if self.err_maker.exsit_error(option):
-            if self.err_maker.level_error_in_option(option):
-                return Reach.ALWAYS_FALSE
-            else:
-                return Reach.UNKNOWN
+            return self.dispose_error_condition(option)
+        tp = self.err_maker.dump_option(option)
         if isinstance(tp, TypeLiteralIns):
             if tp.value:
                 return Reach.ALWAYS_TRUE
@@ -238,7 +232,7 @@ class ConditionInfer(BaseVisitor):
         else:
             return Reach.UNKNOWN
 
-    def infer_value_of_compare(self, test: ast.Compare):
+    def infer_value_of_compare(self, test: ast.Compare) -> Reach:
         left = test.left
         for cmpa, op in zip(test.comparators, test.ops):
             right = cmpa
@@ -247,19 +241,64 @@ class ConditionInfer(BaseVisitor):
             elif is_cmp_python_version(right):
                 res = compare_python_version(right, left, op, self.config, True)
             else:
-                return Reach.UNKNOWN
+                res = self.get_value_of_normal_compare(left, right, op)
             if not is_true(res, False):
                 return res
             left = cmpa
         return Reach.ALWAYS_TRUE
 
+    def get_value_of_normal_compare(self, left: ast.expr, right: ast.expr, op: ast.cmpop) -> Reach:
+        option: Option = eval_expr(left, self.recorder)
+        if self.err_maker.exsit_error(option):
+            return self.dispose_error_condition(option)
+        left_tp = self.err_maker.dump_option(option)
+        option = eval_expr(right, self.recorder)
+        if self.err_maker.exsit_error(option):
+            return self.dispose_error_condition(option)
+        right_tp = self.err_maker.dump_option(option)
+        if is_cmp_between_constant(left_tp, right_tp):
+            return cmp_by_op(left_tp.value, right_tp.value, op)
+        else:
+            return Reach.UNKNOWN
 
-def is_cmp_python_version(node: ast.expr):
+    def dispose_error_condition(self, option: Option) -> Reach:
+        if self.err_maker.level_error_in_option(option):
+            return Reach.ALWAYS_FALSE
+        else:
+            return Reach.UNKNOWN
+
+
+def is_cmp_between_constant(left: TypeIns, right: TypeIns) -> bool:
+    if isinstance(left, TypeLiteralIns) and isinstance(right, TypeLiteralIns):
+        return True
+    return False
+
+
+def is_cmp_python_version(node: ast.expr) -> bool:
     if (isinstance(node, ast.Attribute) and node.attr == 'version_info'
             and isinstance(node.value, ast.Name) and node.value.id == 'sys'):
         return True
     else:
         return False
+
+
+def cmp_by_op(left, right, op: ast.cmpop) -> Reach:
+    cond_map = {False: Reach.ALWAYS_FALSE, True: Reach.ALWAYS_TRUE}
+    try:
+        if isinstance(op, ast.Eq):
+            return cond_map[left == right]
+        elif isinstance(op, ast.Gt):
+            return cond_map[left > right]
+        elif isinstance(op, ast.GtE):
+            return cond_map[left >= right]
+        elif isinstance(op, ast.Lt):
+            return cond_map[left < right]
+        elif isinstance(op, ast.LtE):
+            return cond_map[left <= right]
+        else:
+            return Reach.UNKNOWN
+    except TypeError:
+        return Reach.UNKNOWN
 
 
 def compare_python_version(sys_node: ast.expr,
@@ -278,17 +317,4 @@ def compare_python_version(sys_node: ast.expr,
     left = py_version
     if atright:
         left, right = right, left
-
-    cond_map = {False: Reach.ALWAYS_FALSE, True: Reach.ALWAYS_TRUE}
-    if isinstance(op, ast.Eq):
-        return cond_map[left == right]
-    elif isinstance(op, ast.Gt):
-        return cond_map[left > right]
-    elif isinstance(op, ast.GtE):
-        return cond_map[left >= right]
-    elif isinstance(op, ast.Lt):
-        return cond_map[left < right]
-    elif isinstance(op, ast.LtE):
-        return cond_map[left <= right]
-    else:
-        return Reach.UNKNOWN
+    return cmp_by_op(left, right, op)

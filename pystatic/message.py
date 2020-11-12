@@ -36,6 +36,7 @@ class Message(object):
     def __str__(self):
         return f'line {self.lineno} col {self.col_offset}: ' + self.msg
 
+
 class NodeType:
     def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
                  end_col_offset: Optional[int], node_type: 'TypeIns'):
@@ -54,24 +55,18 @@ class NodeType:
 class MessageBox(object):
     def __init__(self, module_symid: str):
         self.module_symid = module_symid
-        self.error: List[Message] = []
+        self.error: List[ErrorCode] = []
         self.node_types: List[NodeType] = []
 
-    def add_err(self, node: ast.AST, msg: str):
-        self.error.append(Message.from_node(node, msg))
-
-    def make(self, error: ErrorCode):
-        node, msg = error.make()
-        if node is None:
-            return
-        self.add_err(node, msg)
+    def add_err(self, err: ErrorCode):
+        self.error.append(err)
 
     def clear(self):
         self.error = []
 
     def report(self):
         for err in self.error:
-            print(err)
+            print(Message.from_node(err.make()))
 
 
 class ErrorMaker:
@@ -83,7 +78,7 @@ class ErrorMaker:
         return option.value
 
     def add_err(self, err: ErrorCode):
-        self.mbox.make(err)
+        self.mbox.add_err(err)
 
     def add_type(self, node: ast.AST, node_type: 'TypeIns'):
         self.mbox.node_types.append(NodeType.from_node(node, node_type))

@@ -2,7 +2,7 @@ import argparse
 import os
 from pystatic.config import Config
 from pystatic.manager import Manager
-from pystatic.message import MessageBox
+from pystatic.message import MessageBox, Message
 from pystatic.cmdline.shell import run_shell
 
 
@@ -59,10 +59,12 @@ def cmdline_main():
         manager.infer()
 
         for err in cmdline_mbox.error:
-            print(f'{err}\n')
+            # print(f'{err}\n')
+            print(f"{Message.from_node(*err.make())}\n")
 
         for mod in cmd_res.module:
             mbox = manager.get_mbox(mod)
 
             for err in mbox.error:
-                print(f'{err}\n')
+                # print(f'{err}\n')
+                print(f"{Message.from_node(*err.make())}\n")

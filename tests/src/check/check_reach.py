@@ -57,7 +57,6 @@ if unknown:  # E Cannot determine type of 'unknown'(unresolved reference 'unknow
     a = 1  # E This code is unreachable
 t: int = 1
 
-
 if True:
     a = 1
 else:
@@ -100,3 +99,5 @@ while True:
         break
         b = 1  # E This code is unreachable
     b = 1  # E This code is unreachable
+
+
