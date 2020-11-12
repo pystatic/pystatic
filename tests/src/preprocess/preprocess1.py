@@ -12,3 +12,6 @@ a: A = A()
 
 def f(a: B, c: A) -> A:
     return A()
+
+
+c, d = 1, 2

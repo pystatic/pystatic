@@ -1,7 +1,7 @@
 import os
 import logging
 from collections import deque
-from typing import Optional, Dict, TYPE_CHECKING
+from typing import Optional, Dict, TYPE_CHECKING, Deque
 from pystatic.config import Config
 from pystatic.exprparse import eval_expr
 from pystatic.errorcode import *
@@ -13,8 +13,8 @@ from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
                                  get_init_module_symtable)
 from pystatic.symid import SymId, relpath2symid, symid2list
-from pystatic.typesys import (TypeModuleTemp, TypePackageTemp, TypeIns,
-                              any_ins)
+from pystatic.typesys import TypeIns, any_ins
+from pystatic.predefined import TypeModuleTemp, TypePackageTemp
 from pystatic.target import BlockTarget, Target, Stage, PackageTarget
 
 if TYPE_CHECKING:
@@ -32,8 +32,8 @@ class Manager:
         self.pre_proc = Preprocessor(self)
         self.targets: Dict[SymId, Target] = {}
 
-        self.q_preprocess = deque()
-        self.q_infer = deque()
+        self.q_preprocess: Deque[BlockTarget] = deque()
+        self.q_infer: Deque[BlockTarget] = deque()
 
         if not config.no_typeshed:
             self.__init_typeshed()
@@ -160,6 +160,7 @@ class Manager:
     def get_module_temp(self, symid: 'SymId') -> Optional[TypeModuleTemp]:
         if symid in self.targets:
             return self.targets[symid].module_temp
+        return None
 
     def add_check_file(self, path: FilePath) -> Option[bool]:
         path = self.fsys.realpath(path)
@@ -210,7 +211,7 @@ class Manager:
         pass
 
     def infer(self):
-        InferStarter(self.targets).start_infer()
+        InferStarter(self.targets, self.config).start_infer()
 
     def get_sym_type(self, module_symid: SymId,
                      var_symid: SymId) -> Optional['TypeIns']:
@@ -231,9 +232,9 @@ class Manager:
         try:
             astnode = ast.parse(expr, mode='eval')
             module_temp = self.get_module_temp(module_symid)
-            module_ins = module_temp.get_default_ins().value
             if not module_temp:
                 return None
+            module_ins = module_temp.get_default_ins().value
             res_option = eval_expr(astnode.body, module_ins)  # type: ignore
             if res_option.haserr():
                 return None

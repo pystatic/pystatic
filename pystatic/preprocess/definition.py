@@ -1,18 +1,18 @@
 import ast
 from contextlib import contextmanager
-from typing import List, Optional, TYPE_CHECKING
-from pystatic.visitor import BaseVisitor
-from pystatic.typesys import (TypeClassTemp, TpState, TypeVarIns, TypeVarTemp,
-                              TypeType)
+from typing import List, Optional, TYPE_CHECKING, Union
+from pystatic.visitor import BaseVisitor, NoGenVisitor
+from pystatic.typesys import TypeClassTemp, TypeType
+from pystatic.predefined import TypeVarTemp, TypeVarIns
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.symid import SymId
 from pystatic.exprparse import eval_expr
 from pystatic.preprocess.sym_util import *
+from pystatic.target import BlockTarget, MethodTarget
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
-    from pystatic.target import BlockTarget, MethodTarget
 
 
 def get_definition(target: 'BlockTarget', manager: 'Manager',
@@ -21,7 +21,14 @@ def get_definition(target: 'BlockTarget', manager: 'Manager',
     symtable = target.symtable
     symid = target.symid
     assert cur_ast
-    return TypeDefVisitor(manager, symtable, mbox, symid).accept(cur_ast)
+
+    TypeDefVisitor(manager, symtable, mbox, symid).accept(cur_ast)
+    fake_data = get_fake_data(symtable)
+    for name, clsentry in fake_data.cls_defs.items():
+        clstype = clsentry.clstemp.get_default_typetype()
+        # predefined typetype may be re-added to symtable here
+        entry = Entry(clstype, clsentry.defnode)
+        symtable.add_entry(name, entry)
 
 
 def get_definition_in_method(target: 'MethodTarget', manager: 'Manager',
@@ -45,6 +52,7 @@ class TypeDefVisitor(BaseVisitor):
                  is_method=False) -> None:
         super().__init__()
         self.symtable = symtable
+        self.fake_data = get_fake_data(symtable)
         self.mbox = mbox
         self.manager = manager
         self.symid = symid
@@ -93,8 +101,10 @@ class TypeDefVisitor(BaseVisitor):
     def enter_class(self, new_symtable: 'SymTable', clsname: str):
         old_symtable = self.symtable
         old_is_method = self._is_method
+        old_fake_data = self.fake_data
 
         self.symtable = new_symtable
+        self.fake_data = get_fake_data(new_symtable)
         self._clsname.append(clsname)
         self._is_method = False
 
@@ -103,76 +113,79 @@ class TypeDefVisitor(BaseVisitor):
         self._is_method = old_is_method
         self._clsname.pop()
         self.symtable = old_symtable
+        self.fake_data = old_fake_data
 
     @property
     def cur_clsname(self):
         return '.'.join(self._clsname)
 
-    def _is_new_def(self, node: ast.AST) -> Optional[str]:
-        """Whether the node stands for a new definition"""
-        if isinstance(node, ast.Name):
-            fake_data = get_fake_data(self.symtable)
-            name = node.id
-            if (name in fake_data.fun or name in fake_data.local
-                    or name in fake_data.impt):
-                return None
-            else:
-                return name
+    def collect_typevar(self, node: AssignNode) -> Optional[TypeVarIns]:
+        def get_name(node: ast.AST) -> Optional[str]:
+            if isinstance(node, ast.Name):
+                return node.id
+            return None
+
+        value_node = node.value
+        if isinstance(value_node, ast.Call):
+            f_ins = eval_expr(value_node.func, self.symtable).value
+            if isinstance(f_ins, TypeType) and isinstance(f_ins.temp, TypeVarTemp):
+                typevar = eval_expr(node, self.symtable).value
+                assert isinstance(typevar, TypeVarIns)
+
+                if isinstance(node, ast.AnnAssign):
+                    typevar_name = get_name(node)
+                    assert typevar_name  # TODO: error
+                elif isinstance(node, ast.Assign):
+                    assert node.targets[0]  # TODO: error
+                    typevar_name = get_name(node.targets[0])
+                    assert typevar_name  # TODO: error
+                else:
+                    raise TypeError()
+
+                self.fake_data.add_typevar_def(typevar_name, typevar, node)
+                return typevar
         return None
 
-    def _is_typevar(self, node: ast.expr) -> Optional[TypeVarIns]:
-        if isinstance(node, ast.Call):
-            f_ins = eval_expr(node.func, self.symtable).value
-            if isinstance(f_ins, TypeType) and isinstance(
-                    f_ins.temp, TypeVarTemp):
-                res = eval_expr(node, self.symtable).value
-                assert isinstance(res, TypeVarIns), "TODO"
-                return res
-        return None
+    def collect_definition(self, node: Union[ast.Assign, ast.AnnAssign]):
+        def check_single_expr(target: ast.AST, defnode: ast.AST):
+            if isinstance(target, ast.Name):
+                name = target.id
+                if not self.fake_data.name_collide(name):
+                    self.fake_data.add_local_def(name, defnode)
+            elif isinstance(target, ast.Tuple):
+                for elt in target.elts:
+                    check_single_expr(elt, defnode)
+            elif self._is_method:
+                self._try_attr(defnode, target)
+
+        assert node.value  # TODO: deal standalone declaration like a: A
+        if not self.collect_typevar(node):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    check_single_expr(target, node)
+
+            elif isinstance(node, ast.AnnAssign):
+                check_single_expr(node.target, node)
+
+            else:
+                raise TypeError()
 
     def visit_Assign(self, node: ast.Assign):
         # TODO: here pystatic haven't add redefine warning and check consistence
-        tpvarins = self._is_typevar(node.value)
-        if tpvarins:
-            assert isinstance(tpvarins, TypeVarIns)
-            last_target = node.targets[-1]
-            assert isinstance(last_target, ast.Name), "TODO"
-
-            tpvarins.tpvar_name = last_target.id
-            self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
-
-        else:
-            for target in node.targets:
-                name = self._is_new_def(target)
-                if name:
-                    add_local_var(self.symtable, name, node)
-                elif self._is_method:
-                    self._try_attr(node, target)
+        self.collect_definition(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        tpvarins = None
-        if node.value:
-            tpvarins = self._is_typevar(node.value)
-        if tpvarins:
-            assert isinstance(tpvarins, TypeVarIns)
-            last_target = node.target
-            assert isinstance(last_target, ast.Name), "TODO"
-
-            tpvarins.tpvar_name = last_target.id
-            self.symtable.add_entry(last_target.id, Entry(tpvarins, node))
-
-        else:
-            name = self._is_new_def(node.target)
-            if name:
-                add_local_var(self.symtable, name, node)
-            elif self._is_method:
-                self._try_attr(node, node.target)
+        self.collect_definition(node)
 
     def visit_ClassDef(self, node: ast.ClassDef):
         clsname = node.name
-        if self.symtable.lookup_local(clsname):
-            # FIXME: class definition should take higher priority
-            self.mbox.add_err(node, f'{clsname} is already defined')
+
+        if (clstemp := self.symtable.get_type_def(clsname)):
+            assert isinstance(clstemp, TypeClassTemp)
+            new_symtable = clstemp.get_inner_symtable()
+            # predefined class may not set it defnode
+            clstemp._defnode = node
+
         else:
             cur_clsname = self.cur_clsname
             if cur_clsname:
@@ -182,18 +195,18 @@ class TypeDefVisitor(BaseVisitor):
 
             new_symtable = self.symtable.new_symtable(clsname,
                                                       TableScope.CLASS)
-            clstemp = TypeClassTemp(abs_clsname, self.glob_symid,
-                                    TpState.FRESH, self.symtable, new_symtable,
-                                    node)
-            clstype = clstemp.get_default_typetype()
-            entry = Entry(clstype, node)
-            self.symtable.add_entry(clsname, entry)
-            add_cls_def(self.symtable, clsname, clstemp)
+            clstemp = TypeClassTemp(abs_clsname, self.symtable, new_symtable, node)
 
-            # enter class scope
-            with self.enter_class(new_symtable, clsname):
-                for body in node.body:
-                    self.visit(body)
+        # clstype = clstemp.get_default_typetype()
+        # entry = Entry(clstype, node)
+        # self.symtable.add_entry(clsname, entry)
+        assert isinstance(clstemp, TypeClassTemp)
+        add_cls_def(self.symtable, self.fake_data, clstemp, node)
+
+        # enter class scope
+        with self.enter_class(new_symtable, clsname):
+            for body in node.body:
+                self.visit(body)
 
     def visit_Import(self, node: ast.Import):
         info_list = analyse_import_stmt(node, self.symid)
@@ -262,4 +275,4 @@ class TypeDefVisitor(BaseVisitor):
             fake_data.impt[infoitem.asname] = infoitem
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        add_fun_def(self.symtable, node.name, node)
+        add_fun_def(self.symtable, self.fake_data, node)

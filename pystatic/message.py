@@ -94,7 +94,9 @@ class ErrorMaker:
     def add_err(self, err: ErrorCode):
         self.mbox.make(err)
 
-    def add_type(self, node: ast.AST, tp: 'TypeIns'):
+    def add_type(self, node: Optional[ast.AST], tp: 'TypeIns'):
+        if node is None:
+            return
         self.mbox.add_type(node, tp)
 
     def exsit_error(self, option: Option) -> bool:

@@ -4,7 +4,8 @@ import os
 
 sys.path.extend(['.', '..'])
 
-from pystatic.typesys import TypeFuncIns, TypeIns, TypeModuleTemp, TypeType
+from pystatic.typesys import TypeIns, TypeType
+from pystatic.predefined import TypeModuleTemp, TypeFuncIns
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.exprparse import eval_expr
@@ -52,6 +53,9 @@ def test_preprocess():
     ret_ins = f.overloads[0].ret_type
     assert isinstance(ret_ins, TypeIns) and not isinstance(ret_ins, TypeType)
     assert ret_ins.temp == A.temp
+
+    assert manager.get_sym_type(src, 'c')
+    assert manager.get_sym_type(src, 'd')
 
 
 def test_import():

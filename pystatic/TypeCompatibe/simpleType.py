@@ -1,8 +1,9 @@
 import ast
 import enum
-from pystatic.typesys import TypeLiteralIns
+from pystatic.predefined import TypeLiteralIns
 from typing import Callable, Tuple, Optional, Type, TypeVar, Union
-from pystatic.typesys import TypeIns, TypeTemp, TypeOptionalTemp, TypeTupleTemp, TypeClassTemp,TypeType
+from pystatic.typesys import TypeIns, TypeTemp,  TypeClassTemp,TypeType
+from pystatic.predefined import TypeOptionalTemp, TypeTupleTemp,TypeCallableTemp
 from pystatic.TypeCompatibe.type2TypeTemp import Literal2Type
 
 class compatibleState(enum.IntEnum):
@@ -24,7 +25,7 @@ class TypeCompatible:
         
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        print(a,b,tempa.name,tempb.name)
+        print(a,b)
        
         
      
@@ -91,13 +92,13 @@ class TypeCompatible:
 
         return False
 
-    def TypeTypeCom(self,a:TypeType,TypeType,state:compatibleState):
+    def TypeTypeCom(self,a:TypeType,b:TypeType,state:compatibleState):
         return self.SpecificClassTypeCom(a,b,state)
 
     def BaseTypeCom(self, a: TypeIns, b: TypeIns,
                     state: compatibleState) -> bool:
-        tempa = a.temp
-        tempb = b.temp
+        tempa:TypeTemp = a.temp
+        tempb:TypeTemp = b.temp
         if tempb.name == 'Literal':
             b = self.literal2Type.Literal2SpecTypeIns(b)
             tempb= b.temp
@@ -151,8 +152,8 @@ class TypeCompatible:
 
     def SpecialTypeCom(self,a:TypeIns, b:TypeIns,
                        state: compatibleState) -> bool:
-        tempa = a.temp
-        tempb=b.temp
+        tempa:TypeTemp= a.temp
+        tempb:TypeTemp=b.temp
        
         tempb = b.temp
         if tempa.name == 'Any' or tempb.name == 'Any':
@@ -228,8 +229,8 @@ class TypeCompatible:
 
     def CollectionsTypeCom(self, a: TypeIns, b: TypeIns,
                            state: compatibleState) -> bool:
-        tempa=a.temp
-        tempb=b.temp
+        tempa:TypeTemp = a.temp
+        tempb:TypeTemp = b.temp
         
         
         if tempa.name == 'Set':
