@@ -2,7 +2,6 @@ import ast
 from typing import Optional, List, TYPE_CHECKING
 from pystatic.errorcode import ErrorCode, CodeUnreachable, Level
 from pystatic.option import Option
-from pystatic.plugin import Plugin
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns

@@ -6,7 +6,6 @@ from pystatic.typesys import *
 from pystatic.predefined import *
 from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
-from pystatic.plugin import Plugin
 from pystatic.errorcode import *
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
@@ -91,19 +90,17 @@ class InferVisitor(BaseVisitor):
             return
         if len(target) < len(type_list):
             self.err_maker.add_err(
-                NeedMoreValuesToUnpack(rnode, len(target), len(type_list)))
-            return
+                TooMoreValuesToUnpack(rnode, len(target), len(type_list)))
         elif len(target) > len(type_list):
             self.err_maker.add_err(
-                TooMoreValuesToUnpack(rnode, len(target), len(type_list)))
-            return
+                NeedMoreValuesToUnpack(rnode, len(target), len(type_list)))
         for lvalue, tp, node in zip(target, type_list, rnode.elts):
             if isinstance(lvalue, ast.Name):
-                self.infer_name_node_of_assign(lvalue, rtype, node)
+                self.infer_name_node_of_assign(lvalue, tp, node)
             elif isinstance(lvalue, (ast.List, ast.Tuple)):
-                self.check_multi_left_of_assign(lvalue.elts, rtype, node)
+                self.check_multi_left_of_assign(lvalue.elts, tp, node)
             else:
-                self.check_composed_node_of_assign(lvalue, rtype, node)
+                self.check_composed_node_of_assign(lvalue, tp, node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         rtype: TypeIns = self.get_type(node.value)
