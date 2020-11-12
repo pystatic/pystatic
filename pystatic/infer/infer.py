@@ -199,7 +199,7 @@ class InferVisitor(BaseVisitor):
         ret_list = list(ret_set)
         ret_annotation = self.recorder.get_ret_annotation()
         num = len(ret_list)
-        if num == 0:
+        if not is_any(ret_annotation) and num == 0:
             self.err_maker.add_err(ReturnValueExpected(node))
         else:
             # TODO

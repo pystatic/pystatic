@@ -46,7 +46,7 @@ def test_check():
         manager.infer()
         mbox = manager.get_mbox(file_path)
         msg_list = parse_file(file_path)
-        for true_msg, test_msg in zip(msg_list, mbox.error):
+        for true_msg, test_msg in zip(msg_list, mbox.to_message()):
             assert test_msg.lineno == true_msg.lineno, src
             assert test_msg.msg == true_msg.msg, src
 

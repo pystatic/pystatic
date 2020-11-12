@@ -61,6 +61,9 @@ class MessageBox(object):
     def add_err(self, err: ErrorCode):
         self.error.append(err)
 
+    def to_message(self):
+        return [Message.from_node(*err.make()) for err in self.error]
+
     def clear(self):
         self.error = []
 

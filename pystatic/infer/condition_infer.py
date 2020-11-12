@@ -169,9 +169,9 @@ class ConditionInfer(BaseVisitor):
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
         option: Option = eval_expr(test, self.recorder)
+        literal_ins: TypeLiteralIns = self.err_maker.dump_option(option)
         if self.err_maker.exsit_error(option):
             return self.dispose_error_condition(option)
-        literal_ins: TypeLiteralIns = self.err_maker.dump_option(option)
         if literal_ins.value:
             return Reach.ALWAYS_TRUE
         else:
@@ -221,9 +221,9 @@ class ConditionInfer(BaseVisitor):
 
     def infer_value_of_name_node(self, test: ast.Name) -> Reach:
         option: Option = eval_expr(test, self.recorder)
+        tp = self.err_maker.dump_option(option)
         if self.err_maker.exsit_error(option):
             return self.dispose_error_condition(option)
-        tp = self.err_maker.dump_option(option)
         if isinstance(tp, TypeLiteralIns):
             if tp.value:
                 return Reach.ALWAYS_TRUE
@@ -248,14 +248,15 @@ class ConditionInfer(BaseVisitor):
         return Reach.ALWAYS_TRUE
 
     def get_value_of_normal_compare(self, left: ast.expr, right: ast.expr, op: ast.cmpop) -> Reach:
+        # TODO: modify after eval_expr suppose compare
         option: Option = eval_expr(left, self.recorder)
-        if self.err_maker.exsit_error(option):
-            return self.dispose_error_condition(option)
         left_tp = self.err_maker.dump_option(option)
-        option = eval_expr(right, self.recorder)
         if self.err_maker.exsit_error(option):
             return self.dispose_error_condition(option)
+        option = eval_expr(right, self.recorder)
         right_tp = self.err_maker.dump_option(option)
+        if self.err_maker.exsit_error(option):
+            return self.dispose_error_condition(option)
         if is_cmp_between_constant(left_tp, right_tp):
             return cmp_by_op(left_tp.value, right_tp.value, op)
         else:

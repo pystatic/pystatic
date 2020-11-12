@@ -58,13 +58,13 @@ def cmdline_main():
         manager.preprocess()
         manager.infer()
 
-        for err in cmdline_mbox.error:
-            # print(f'{err}\n')
-            print(f"{Message.from_node(*err.make())}\n")
+        # for err in cmdline_mbox.error:
+        for err in cmdline_mbox.to_message():
+            print(f'{err}\n')
 
         for mod in cmd_res.module:
             mbox = manager.get_mbox(mod)
 
-            for err in mbox.error:
-                # print(f'{err}\n')
-                print(f"{Message.from_node(*err.make())}\n")
+            # for err in mbox.error:
+            for err in mbox.to_message():
+                print(f'{err}\n')
