@@ -97,6 +97,7 @@ class TypeCompatible:
 
     def BaseTypeCom(self, a: TypeIns, b: TypeIns,
                     state: compatibleState) -> bool:
+        
         tempa:TypeTemp = a.temp
         tempb:TypeTemp = b.temp
         if tempb.name == 'Literal':
@@ -315,10 +316,13 @@ class TypeCompatible:
                     return True
             return False
         elif state == compatibleState.CONTRIVARIANT:
-            for index in range(len(tempb.baseclass)):
-                if tempb.baseclass[index].temp.name == tempa.name:
-                    return True
-            return False
+            if str(type(tempb))[-15:-2] == 'TypeClassTemp':
+                for index in range(len(tempb.baseclass)):
+                    if tempb.baseclass[index].temp.name == tempa.name:
+                        return True
+                return False
+            else:
+                return False 
         else:
             return False
 
