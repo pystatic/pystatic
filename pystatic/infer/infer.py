@@ -23,7 +23,9 @@ class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleTemp,
                  mbox: MessageBox, config: Config):
         self.root = node
-        self.err_maker = ErrorMaker(mbox)
+        self.mbox = mbox
+        # self.plugin = Plugin()
+        self.err_maker = ErrorMaker(self.mbox)
         self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
         self.config = config
@@ -34,17 +36,21 @@ class InferVisitor(BaseVisitor):
 
     def get_type(self, node: Optional[ast.AST]) -> TypeIns:
         option = eval_expr(node, self.recorder)
-        self.err_maker.handle_err(option.errors)
+        option.dump_to_box(self.mbox)
         return option.value
+
+    def set_type(self, name: str, cur_type: TypeIns):
+        self.cond_infer.save_type(name)
+        self.recorder.set_type(name, cur_type)
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
         return type_consistent(ltype, rtype)
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
-        self.err_maker.add_type(node.value, rtype)
+        self.err_maker.add_type(node.value, rtype)  # TODO:plugin
         for target in node.targets:
-            self.err_maker.add_type(target, rtype)  # TODO
+            self.err_maker.add_type(target, rtype)  # plugin
             if isinstance(target, ast.Name):
                 self.infer_name_node_of_assign(target, rtype, node.value)
             elif isinstance(target, (ast.List, ast.Tuple)):
@@ -59,11 +65,10 @@ class InferVisitor(BaseVisitor):
         if not self.recorder.is_defined(name):
             self.recorder.set_type(target.id, comment)
         if not self.type_consistent(comment, rtype):
-            self.recorder.set_type(name, comment)
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
-            self.recorder.set_type(target.id, rtype)
+            self.set_type(name, rtype)
 
     def check_composed_node_of_assign(self, target: ast.AST, rtype: TypeIns,
                                       rnode: Optional[ast.AST]):
@@ -85,23 +90,21 @@ class InferVisitor(BaseVisitor):
             return
         if len(target) < len(type_list):
             self.err_maker.add_err(
-                NeedMoreValuesToUnpack(rnode, len(target), len(type_list)))
-            return
+                TooMoreValuesToUnpack(rnode, len(target), len(type_list)))
         elif len(target) > len(type_list):
             self.err_maker.add_err(
-                TooMoreValuesToUnpack(rnode, len(target), len(type_list)))
-            return
+                NeedMoreValuesToUnpack(rnode, len(target), len(type_list)))
         for lvalue, tp, node in zip(target, type_list, rnode.elts):
             if isinstance(lvalue, ast.Name):
-                self.infer_name_node_of_assign(lvalue, rtype, node)
+                self.infer_name_node_of_assign(lvalue, tp, node)
             elif isinstance(lvalue, (ast.List, ast.Tuple)):
-                self.check_multi_left_of_assign(lvalue.elts, rtype, node)
+                self.check_multi_left_of_assign(lvalue.elts, tp, node)
             else:
-                self.check_composed_node_of_assign(lvalue, rtype, node)
+                self.check_composed_node_of_assign(lvalue, tp, node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
         rtype: TypeIns = self.get_type(node.value)
-        self.err_maker.add_type(node.target, rtype)
+        self.err_maker.add_type(node.target, rtype)  # TODO:plugin
         self.err_maker.add_type(node.value, rtype)
         target = node.target
         if isinstance(target, ast.Name):
@@ -118,9 +121,8 @@ class InferVisitor(BaseVisitor):
         if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
-            self.recorder.set_type(name, comment)
         else:
-            self.recorder.set_type(name, rtype)
+            self.set_type(name, rtype)
 
     def check_composed_node_of_annassign(self, target: ast.AST, rtype: TypeIns,
                                          rnode: Optional[ast.AST]):
@@ -245,14 +247,27 @@ class InferVisitor(BaseVisitor):
     def visit_If(self, node: ast.If):
         with self.visit_condition(node):
             self.visit_stmt_after_condition(node.body, ConditionStmtType.IF)
-            self.cond_infer.flip()
-            self.visit_stmt_after_condition(node.orelse, ConditionStmtType.IF)
+            if node.orelse:
+                self.cond_infer.flip()
+                self.visit_stmt_after_condition(node.orelse, ConditionStmtType.IF)
 
     def visit_Break(self, node: ast.Break):
         self.cond_infer.accept(node)
 
     def visit_Continue(self, node: ast.Continue):
         self.cond_infer.accept(node)
+
+    def visit_For(self, node: ast.For):
+        container = self.get_type(node.iter)
+        print(container.bindlist)
+        print(container.temp.placeholders)
+        get_element_type_in_container(container)
+
+
+def get_element_type_in_container(container: TypeIns):
+    # print(container)
+    # print(container.bindlist)
+    pass
 
 
 class InferStarter:
