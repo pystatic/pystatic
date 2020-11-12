@@ -130,59 +130,13 @@ class ConditionInfer(BaseVisitor):
 
     def infer_value_of_condition(self, test: ast.expr) -> Reach:
         if isinstance(test, ast.Constant):
-            res = self.infer_value_of_constant(test)
-            return res
+            return self.infer_value_of_constant(test)
         elif isinstance(test, ast.UnaryOp):
-            op = test.op
-            res = self.infer_value_of_condition(test.operand)
-            # print(res)
-            if isinstance(op, ast.Not):
-                return cal_neg(res)
-            elif isinstance(op, ast.UAdd):
-                return res
-            elif isinstance(op, ast.USub):
-                if isinstance(test.operand, ast.Constant):  # -1 1 0 -0
-                    return res
-                else:  # -False -True
-                    return cal_neg(res)
-            else:
-                return Reach.UNKNOWN
+            return self.infer_value_of_unary_op(test)
         elif isinstance(test, ast.Compare):
-            left = test.left
-            # option = eval_expr(test, self.recorder)
-            # option.dump_to_box()
-            for cmpa, op in zip(test.comparators, test.ops):
-                right = cmpa
-                if is_cmp_python_version(left):
-                    res = compare_python_version(left, right, op, self.config, False)
-                elif is_cmp_python_version(right):
-                    res = compare_python_version(right, left, op, self.config, True)
-                else:
-                    return Reach.UNKNOWN
-                if not is_true(res, False):
-                    return res
-                left = cmpa
-            return Reach.ALWAYS_TRUE
+            return self.infer_value_of_compare(test)
         elif isinstance(test, ast.BoolOp):
-            op = test.op
-            if isinstance(op, ast.And):
-                for value in test.values:
-                    value_reach = self.infer_value_of_condition(value)
-                    if value_reach == Reach.ALWAYS_FALSE:
-                        return Reach.ALWAYS_FALSE
-                    elif value_reach == Reach.UNKNOWN:
-                        return Reach.UNKNOWN
-                return Reach.ALWAYS_TRUE
-            elif isinstance(op, ast.Or):
-                for value in test.values:
-                    value_reach = self.infer_value_of_condition(value)
-                    if value_reach == Reach.ALWAYS_TRUE:
-                        return Reach.ALWAYS_TRUE
-                    elif value_reach == Reach.UNKNOWN:
-                        return Reach.UNKNOWN
-                return Reach.ALWAYS_FALSE
-            else:
-                assert False, "not reach here"
+            return self.infer_value_of_bool_op(test)
         elif isinstance(test, ast.Call):
             return self.infer_value_of_call(test)
         elif isinstance(test, ast.Name):
@@ -226,6 +180,48 @@ class ConditionInfer(BaseVisitor):
         else:
             return Reach.ALWAYS_FALSE
 
+    def infer_value_of_unary_op(self, test: ast.UnaryOp):
+        op = test.op
+        res = self.infer_value_of_condition(test.operand)
+        if isinstance(op, ast.Not):
+            return cal_neg(res)
+        elif isinstance(op, ast.UAdd):
+            return res
+        elif isinstance(op, ast.USub):
+            if isinstance(test.operand, ast.Constant):  # -1 1 0 -0
+                return res
+            else:  # -False -True
+                return cal_neg(res)
+        else:
+            return Reach.UNKNOWN
+
+    def infer_value_of_bool_op(self, test: ast.BoolOp):
+        op = test.op
+        if isinstance(op, ast.And):
+            return self.infer_value_of_and_op(test)
+        elif isinstance(op, ast.Or):
+            return self.infer_value_of_or_op(test)
+        else:
+            assert False, "not reach here"
+
+    def infer_value_of_and_op(self, test: ast.BoolOp):
+        for value in test.values:
+            value_reach = self.infer_value_of_condition(value)
+            if value_reach == Reach.ALWAYS_FALSE:
+                return Reach.ALWAYS_FALSE
+            elif value_reach == Reach.UNKNOWN:
+                return Reach.UNKNOWN
+        return Reach.ALWAYS_TRUE
+
+    def infer_value_of_or_op(self, test: ast.BoolOp):
+        for value in test.values:
+            value_reach = self.infer_value_of_condition(value)
+            if value_reach == Reach.ALWAYS_TRUE:
+                return Reach.ALWAYS_TRUE
+            elif value_reach == Reach.UNKNOWN:
+                return Reach.UNKNOWN
+        return Reach.ALWAYS_FALSE
+
     def infer_value_of_name_node(self, test: ast.Name):
         option: Option = eval_expr(test, self.recorder)
         tp = self.err_maker.dump_option(option)
@@ -241,6 +237,21 @@ class ConditionInfer(BaseVisitor):
                 return Reach.ALWAYS_FALSE
         else:
             return Reach.UNKNOWN
+
+    def infer_value_of_compare(self, test: ast.Compare):
+        left = test.left
+        for cmpa, op in zip(test.comparators, test.ops):
+            right = cmpa
+            if is_cmp_python_version(left):
+                res = compare_python_version(left, right, op, self.config, False)
+            elif is_cmp_python_version(right):
+                res = compare_python_version(right, left, op, self.config, True)
+            else:
+                return Reach.UNKNOWN
+            if not is_true(res, False):
+                return res
+            left = cmpa
+        return Reach.ALWAYS_TRUE
 
 
 def is_cmp_python_version(node: ast.expr):
