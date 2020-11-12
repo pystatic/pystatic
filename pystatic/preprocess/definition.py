@@ -158,17 +158,20 @@ class TypeDefVisitor(BaseVisitor):
             elif self._is_method:
                 self._try_attr(defnode, target)
 
-        assert node.value  # TODO: deal standalone declaration like a: A
-        if not self.collect_typevar(node):
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    check_single_expr(target, node)
+        if not node.value:
+            assert isinstance(node, ast.AnnAssign)
+            check_single_expr(node.target, node)
+        else:
+            if not self.collect_typevar(node):
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        check_single_expr(target, node)
 
-            elif isinstance(node, ast.AnnAssign):
-                check_single_expr(node.target, node)
+                elif isinstance(node, ast.AnnAssign):
+                    check_single_expr(node.target, node)
 
-            else:
-                raise TypeError()
+                else:
+                    raise TypeError()
 
     def visit_Assign(self, node: ast.Assign):
         # TODO: here pystatic haven't add redefine warning and check consistence

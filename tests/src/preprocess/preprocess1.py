@@ -7,7 +7,8 @@ class B:
     pass
 
 
-a: A = A()
+a: A
+a = A()
 
 
 def f(a: B, c: A) -> A:
