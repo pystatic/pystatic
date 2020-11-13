@@ -4,7 +4,7 @@ from typing import List, Optional, Protocol, Sequence
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
 from pystatic.typesys import TypeIns, any_ins
-from pystatic.predefined import (TypeLiteralIns, none_ins, list_temp,
+from pystatic.predefined import (TypeLiteralIns, none_ins, bool_ins, list_temp,
                                  tuple_temp, dict_temp, set_temp)
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
@@ -220,3 +220,7 @@ class ExprParser(NoGenVisitor):
 
     def visit_Index(self, node: ast.Index):
         return self.visit(node.value)
+
+    def visit_Compare(self, node: ast.Compare):
+        self.add_to_container(bool_ins, node)
+        return bool_ins

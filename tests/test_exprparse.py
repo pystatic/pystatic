@@ -116,3 +116,9 @@ def test_exprparse():
     assert isinstance(f_snd, TypeIns) and not isinstance(f_snd, TypeType)
     assert f_fst.temp == str_typetype.temp
     assert f_snd.temp == int_typetype.temp
+
+    cmp_node = parse_expr('a < b')
+    cmp_res_option = eval_expr(cmp_node, module_ins)
+    assert not cmp_res_option.haserr()
+    cmp_res = cmp_res_option.value
+    assert cmp_res is bool_ins
