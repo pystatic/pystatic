@@ -5,7 +5,7 @@ import os
 sys.path.extend(['.', '..'])
 
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import TypeModuleTemp
+from pystatic.predefined import TypeModuleTemp, bool_ins
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.exprparse import eval_expr
@@ -79,3 +79,7 @@ def test_exprparse():
     assert isinstance(f_snd, TypeIns) and not isinstance(f_snd, TypeType)
     assert f_fst.temp == str_typetype.temp
     assert f_snd.temp == int_typetype.temp
+
+    g = manager.get_sym_type(src, 'g')
+    assert isinstance(g, TypeIns) and not isinstance(g, TypeType)
+    assert g is bool_ins  # there should be only one instance after cache

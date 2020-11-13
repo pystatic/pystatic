@@ -18,3 +18,4 @@ d: B = B()
 
 e: Tuple[int] = (3, )
 f: Tuple[str, int] = ('hello', 3)
+g = a < b
