@@ -80,6 +80,8 @@ def test_exprparse():
     assert f_fst.temp == str_typetype.temp
     assert f_snd.temp == int_typetype.temp
 
-    g = manager.get_sym_type(src, 'g')
-    assert isinstance(g, TypeIns) and not isinstance(g, TypeType)
-    assert g is bool_ins  # there should be only one instance after cache
+    cmp_node = parse_expr('a < b')
+    cmp_res_option = eval_expr(cmp_node, module_ins)
+    assert not cmp_res_option.haserr()
+    cmp_res = cmp_res_option.value
+    assert cmp_res is bool_ins
