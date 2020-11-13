@@ -1,5 +1,6 @@
 import ast
 from pystatic.option import Option
+from enum import Enum
 from typing import Tuple, Optional, TYPE_CHECKING
 from pystatic.error_register import *
 
@@ -7,6 +8,12 @@ if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
     from pystatic.fsys import FilePath
     from pystatic.symid import SymId
+
+
+class Level(Enum):
+    HINT = 1  # code unreachable
+    WARN = 2  # type error
+    ERROR = 3  # will cause runtime error
 
 
 class ErrorCode:
@@ -29,6 +36,7 @@ class IncompatibleTypeInAssign(ErrorCode):
         self.node = node
         self.expect_type = expect_type
         self.expr_type = expr_type
+        self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = INCOMPATIBLE_TYPE_IN_ASSIGN
@@ -41,6 +49,7 @@ class SymbolUndefined(ErrorCode):
         super().__init__()
         self.node = node
         self.name = name
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = SYMBOL_UNDEFINED.format(self.name)
@@ -55,6 +64,7 @@ class SymbolRedefine(ErrorCode):
         self.node = node
         self.name = name
         self.old_node = old_node
+        self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = SYMBOL_REDEFINE.format(self.name)
@@ -72,6 +82,7 @@ class IncompatibleReturnType(ErrorCode):
         self.node = node
         self.expect_type = expect_type
         self.ret_type = ret_type
+        self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = INCOMPATIBLE_RETURN_TYPE
@@ -87,6 +98,7 @@ class IncompatibleArgument(ErrorCode):
         self.func_name = func_name
         self.annotation = annotation
         self.real_type = real_type
+        self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = INCOMPATIBLE_ARGUMENT.format(self.func_name)
@@ -99,6 +111,7 @@ class TooFewArgument(ErrorCode):
         super().__init__()
         self.node = node
         self.func_name = func_name
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, TOO_FEW_ARGUMENT_FOR_FUNC.format(self.func_name)
@@ -109,6 +122,7 @@ class TooMoreArgument(ErrorCode):
         super().__init__()
         self.node = node
         self.func_name = func_name
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, TOO_MORE_ARGUMENT_FOR_FUNC.format(self.func_name)
@@ -120,6 +134,7 @@ class TooMoreValuesToUnpack(ErrorCode):
         self.node = node
         self.expected_num = expected_num
         self.got_num = got_num
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = TOO_MORE_VALUES_TO_UNPACK
@@ -133,6 +148,7 @@ class NeedMoreValuesToUnpack(ErrorCode):
         self.node = node
         self.expected_num = expected_num
         self.got_num = got_num
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = NEED_MORE_VALUES_TO_UNPACK
@@ -144,6 +160,7 @@ class ReturnValueExpected(ErrorCode):
     def __init__(self, node: Optional[ast.AST]):
         super().__init__()
         self.node = node
+        self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, RETURN_VALUE_EXPECTED
@@ -156,6 +173,7 @@ class NoAttribute(ErrorCode):
         self.node = node
         self.target_type = target_type
         self.attr_name = attr_name
+        self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         msg = NO_ATTRIBUTE.format(self.target_type, self.attr_name)
@@ -170,6 +188,7 @@ class UnsupportedBinOperand(ErrorCode):
         self.operand = operand
         self.left_type = left_type
         self.right_type = right_type
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = UNSUPPORTED_OPERAND.format(self.operand)
@@ -181,6 +200,7 @@ class CodeUnreachable(ErrorCode):
     def __init__(self, node: Optional[ast.AST]):
         super().__init__()
         self.node = node
+        self.level = Level.HINT
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, CODE_UNREACHABLE
@@ -191,6 +211,7 @@ class FileNotFound(ErrorCode):
     def __init__(self, path: 'FilePath') -> None:
         super().__init__()
         self.path = path
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return None, FILE_NOT_FOUND.format(self.path)
@@ -200,6 +221,7 @@ class ModuleNotFound(ErrorCode):
     def __init__(self, symid: 'SymId') -> None:
         super().__init__()
         self.symid = symid
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return None, MODULE_NOT_FOUND.format(self.symid)

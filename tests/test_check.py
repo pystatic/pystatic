@@ -4,18 +4,15 @@ import os
 from collections import namedtuple
 
 sys.path.extend(['.', '..'])
-
-from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import TypeModuleTemp
 from pystatic.config import Config
 from pystatic.manager import Manager
-from pystatic.exprparse import eval_expr
+
+MsgWithLine = namedtuple("MsgWithLine", ["lineno", "msg"])
 
 
 def parse_file(file_path):
     with open(file_path) as f:
         lines = f.readlines()
-    MsgWithLine = namedtuple("MsgWithLine", ["lineno", "msg"])
     msg_list = []
 
     lineno = 1
@@ -32,7 +29,8 @@ def parse_file(file_path):
 file_list = [
     'check_assign',
     'check_attribute',
-    'check_reach'
+    'check_reach',
+    'check_tuple'
 ]
 
 
@@ -49,7 +47,7 @@ def test_check():
         mbox = manager.get_mbox(file_path)
         msg_list = parse_file(file_path)
         for true_msg, test_msg in zip(msg_list, mbox.error):
-            assert true_msg.lineno == test_msg.lineno, src
-            assert true_msg.msg == test_msg.msg, src
+            assert test_msg.lineno == true_msg.lineno, src
+            assert test_msg.msg == true_msg.msg, src
 
-        assert len(msg_list) == len(mbox.error), src
+        assert len(mbox.error) == len(msg_list), src
