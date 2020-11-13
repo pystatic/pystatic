@@ -1,6 +1,6 @@
 import ast
 import contextlib
-from typing import List, Optional, Protocol
+from typing import List, Optional, Protocol, Sequence
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
 from pystatic.typesys import TypeIns, any_ins
@@ -16,13 +16,17 @@ class SupportGetAttribute(Protocol):
         ...
 
 
-def eval_expr(node: ast.AST, attr_consultant: SupportGetAttribute):
-    return ExprParser(attr_consultant).accept(node)
+def eval_expr(node: ast.AST,
+              attr_consultant: SupportGetAttribute,
+              explicit=False):
+    return ExprParser(attr_consultant, explicit).accept(node)
 
 
 class ExprParser(NoGenVisitor):
-    def __init__(self, consultant: SupportGetAttribute) -> None:
+    def __init__(self, consultant: SupportGetAttribute,
+                 explicit: bool) -> None:
         self.consultant = consultant
+        self.explicit = explicit
         self.errors = []
 
         self.in_subs = False  # under a subscription node?
@@ -47,6 +51,23 @@ class ExprParser(NoGenVisitor):
         """If under subscript node, then will add item to current container"""
         if self.in_subs:
             self.container.append(WithAst(item, node))
+
+    def get_type_from_astlist(self, typeins: Optional[TypeIns],
+                              astlist: Sequence[Optional[ast.AST]]) -> TypeIns:
+        """Get type from a ast node list"""
+        for node in astlist:
+            if node:
+                new_typeins = self.visit(node)
+                assert isinstance(new_typeins, TypeIns)
+                if isinstance(new_typeins, TypeLiteralIns):
+                    new_typeins = new_typeins.get_value_type()
+
+                if not typeins:
+                    typeins = new_typeins
+                else:
+                    if not typeins.equiv(new_typeins):
+                        return any_ins
+        return typeins or any_ins
 
     def accept(self, node: ast.AST) -> Option[TypeIns]:
         self.errors = []
@@ -157,13 +178,7 @@ class ExprParser(NoGenVisitor):
             self.add_to_container(lst, node)
             return lst
         else:
-            inner_type = None
-            for subnode in node.elts:
-                typeins = self.visit(subnode)
-                assert isinstance(typeins, TypeIns)
-                inner_type = typeins
-
-            inner_type = inner_type or any_ins
+            inner_type = self.get_type_from_astlist(None, node.elts)
             return list_temp.getins([inner_type]).value
 
     def visit_Tuple(self, node: ast.Tuple):
@@ -180,33 +195,21 @@ class ExprParser(NoGenVisitor):
             for subnode in node.elts:
                 typeins = self.visit(subnode)
                 assert isinstance(typeins, TypeIns)
+                if not self.explicit and isinstance(typeins, TypeLiteralIns):
+                    typeins = typeins.get_value_type()
                 inner_type_list.append(typeins)
             return tuple_temp.getins(inner_type_list).value
 
     def visit_Dict(self, node: ast.Dict):
-        key_type = any_ins
-        value_type = any_ins
-        for key_node in node.keys:
-            if key_node:
-                # TODO: key type is not the same?
-                key_type = self.visit(key_node)
-                assert isinstance(key_type, TypeIns)
-
-        for value_node in node.values:
-            # TODO: value type is not the same?
-            value_type = self.visit(value_node)
-            assert isinstance(value_type, TypeIns)
+        key_type = self.get_type_from_astlist(None, node.keys)
+        value_type = self.get_type_from_astlist(None, node.values)
 
         res = dict_temp.getins([key_type, value_type]).value
         self.add_to_container(res, node)
         return res
 
     def visit_Set(self, node: ast.Set):
-        set_type = any_ins
-        for subnode in node.elts:
-            # TODO: value type is not the same?
-            set_type = self.visit(subnode)
-            assert isinstance(set_type, TypeIns)
+        set_type = self.get_type_from_astlist(None, node.elts)
 
         res = set_temp.getins([set_type]).value
         self.add_to_container(res, node)
