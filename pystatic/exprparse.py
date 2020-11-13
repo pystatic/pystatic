@@ -219,4 +219,5 @@ class ExprParser(NoGenVisitor):
         return self.visit(node.value)
 
     def visit_Compare(self, node: ast.Compare):
+        self.add_to_container(bool_ins, node)
         return bool_ins
