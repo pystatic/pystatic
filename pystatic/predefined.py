@@ -405,6 +405,40 @@ class TypeLiteralIns(TypeIns):
         assert self.bindlist
         return self.bindlist[0]
 
+    def get_value_type(self) -> TypeIns:
+        value = self.value
+        if isinstance(value, bool):
+            return bool_ins
+        if isinstance(value, int):
+            return int_ins
+        elif isinstance(value, float):
+            return float_ins
+        elif isinstance(value, bytes):
+            return byte_ins
+        elif isinstance(value, complex):
+            return complex_ins
+        elif isinstance(value, str):
+            return str_ins
+        else:
+            raise TypeError(value)
+            return any_ins
+
+    def equiv(self, other):
+        if other.__class__ != self.__class__:
+            return False
+
+        s_bindlist = self.bindlist or []
+        o_bindlist = other.bindlist or []
+        listlen = len(s_bindlist)
+        if listlen != len(o_bindlist):
+            return False
+
+        for i in range(listlen):
+            if s_bindlist[i] != o_bindlist[i]:
+                return False
+
+        return True
+
     def __str__(self):
         assert self.bindlist
         assert len(self.bindlist) == 1
