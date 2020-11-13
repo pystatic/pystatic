@@ -8,8 +8,10 @@ from pystatic.message import MessageBox
 from pystatic.symtable import Entry, SymTable, TableScope, ImportNode
 from pystatic.symid import SymId
 from pystatic.exprparse import eval_expr
-from pystatic.preprocess.sym_util import *
 from pystatic.target import BlockTarget, MethodTarget
+
+from pystatic.preprocess.util import omit_inst_typetype
+from pystatic.preprocess.fake_data import *
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -24,7 +26,7 @@ def get_definition(target: 'BlockTarget', manager: 'Manager',
 
     TypeDefVisitor(manager, symtable, mbox, symid).accept(cur_ast)
     fake_data = get_fake_data(symtable)
-    for name, clsentry in fake_data.cls_defs.items():
+    for name, clsentry in fake_data.cls_def.items():
         clstype = clsentry.clstemp.get_default_typetype()
         # predefined typetype may be re-added to symtable here
         entry = Entry(clstype, clsentry.defnode)
@@ -145,6 +147,11 @@ class TypeDefVisitor(BaseVisitor):
                 self.fake_data.add_typevar_def(typevar_name, typevar, node)
                 return typevar
         return None
+    
+    # def collect_type_alias(self, node: AssignNode) -> Optional[TypeType]:
+    #     typetype = omit_inst_typetype(node.value, self.fake_data)
+    #     if typetype:
+    #         self.fake_data.add_type_alias()
 
     def collect_definition(self, node: Union[ast.Assign, ast.AnnAssign]):
         def check_single_expr(target: ast.AST, defnode: ast.AST):
@@ -186,7 +193,7 @@ class TypeDefVisitor(BaseVisitor):
         if (clstemp := self.symtable.get_type_def(clsname)):
             assert isinstance(clstemp, TypeClassTemp)
             new_symtable = clstemp.get_inner_symtable()
-            # predefined class may not set it defnode
+            # predefined class may not set its defnode
             clstemp._defnode = node
 
         else:
@@ -200,11 +207,8 @@ class TypeDefVisitor(BaseVisitor):
                                                       TableScope.CLASS)
             clstemp = TypeClassTemp(abs_clsname, self.symtable, new_symtable, node)
 
-        # clstype = clstemp.get_default_typetype()
-        # entry = Entry(clstype, node)
-        # self.symtable.add_entry(clsname, entry)
         assert isinstance(clstemp, TypeClassTemp)
-        add_cls_def(self.symtable, self.fake_data, clstemp, node)
+        self.fake_data.add_cls_def(self.symtable, clstemp, node)
 
         # enter class scope
         with self.enter_class(new_symtable, clsname):

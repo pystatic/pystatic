@@ -10,9 +10,9 @@ from pystatic.predefined import TypeVarIns, TypeModuleTemp
 from pystatic.symid import symid2list
 from pystatic.symtable import ImportEntry, SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
-from pystatic.preprocess.sym_util import (fake_impt_entry,
-                                          update_symtable_import_cache,
-                                          get_fake_data, try_get_fake_data)
+from pystatic.preprocess.fake_data import (fake_impt_entry,
+                                           update_symtable_import_cache,
+                                           get_fake_data, try_get_fake_data)
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -63,7 +63,7 @@ def resolve_import_type(symtable: SymTable, manager: 'Manager'):
 
     fake_data.impt = new_impt_dict
 
-    for clsentry in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_def.values():
         tp_temp = clsentry.clstemp
         assert isinstance(tp_temp, TypeClassTemp)
         inner_symtable = tp_temp.get_inner_symtable()
@@ -79,7 +79,7 @@ def resolve_import_ins(symtable: SymTable, manager: 'Manager'):
         assert asname
         _resolve_import_chain(symtable, asname, manager, False)
 
-    for clsentry in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_def.values():
         tp_temp = clsentry.clstemp
         assert isinstance(tp_temp, TypeClassTemp)
         inner_symtable = tp_temp.get_inner_symtable()

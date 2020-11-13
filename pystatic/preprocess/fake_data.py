@@ -7,6 +7,7 @@ from pystatic.predefined import (TypeModuleTemp, TypePackageIns,
                                  TypePackageTemp, TypeVarIns)
 
 from pystatic.symtable import SymTable, ImportNode, Entry
+from pystatic.option import Option
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -20,13 +21,21 @@ class FakeData:
         self.fun: Dict[str, 'fake_fun_entry'] = {}
         self.local: Dict[str, 'fake_local_def'] = {}
         self.impt: Dict[str, 'fake_impt_entry'] = {}
-        self.cls_defs: Dict[str, 'fake_clsdef_entry'] = {}
+        self.cls_def: Dict[str, 'fake_clsdef_entry'] = {}
+        self.type_alias: Dict[str, 'fake_type_alias'] = {}
 
         self.symtable = symtable
 
     def name_collide(self, name: str):
         return (name in self.typevar_def or name in self.fun
-                or name in self.local or name in self.cls_defs)
+                or name in self.local or name in self.cls_def)
+
+    def add_cls_def(self, symtable: 'SymTable', temp: TypeClassTemp,
+                    node: ast.ClassDef):
+        name = node.name
+        cls_def = fake_clsdef_entry(temp, node)
+        self.cls_def[name] = cls_def
+        symtable.add_type_def(name, temp)
 
     def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
                         defnode: AssignNode):
@@ -37,6 +46,13 @@ class FakeData:
         local_def = fake_local_def(name, defnode)
         self.local[name] = local_def
 
+    def add_type_alias(self, alias: str, typetype: TypeType, defnode: ast.AST):
+        type_alias = fake_type_alias(typetype, defnode)
+        self.type_alias[alias] = type_alias
+
+    def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
+        pass
+
 
 class fake_typevar_def:
     __slots__ = ['name', 'typevar', 'defnode']
@@ -45,6 +61,14 @@ class fake_typevar_def:
                  defnode: AssignNode) -> None:
         self.name = name
         self.typevar = typevar
+        self.defnode = defnode
+
+
+class fake_type_alias:
+    __slots__ = ['typetype', 'defnode']
+
+    def __init__(self, typetype: 'TypeType', defnode: ast.AST) -> None:
+        self.typetype = typetype
         self.defnode = defnode
 
 
@@ -113,18 +137,10 @@ def try_get_fake_data(symtable: 'SymTable') -> Optional[FakeData]:
 def clear_fake_data(symtable: 'SymTable'):
     if hasattr(symtable, 'fake_data'):
         fake_data: FakeData = symtable.fake_data  # type: ignore
-        for clsentry in fake_data.cls_defs.values():
+        for clsentry in fake_data.cls_def.values():
             tp_temp = clsentry.clstemp
             clear_fake_data(tp_temp.get_inner_symtable())
         del symtable.fake_data  # type: ignore
-
-
-def add_cls_def(symtable: SymTable, fake_data: 'FakeData', temp: TypeClassTemp,
-                node: ast.ClassDef):
-    name = node.name
-    fake_entry = fake_clsdef_entry(temp, node)
-    fake_data.cls_defs[name] = fake_entry
-    symtable.add_type_def(name, temp)
 
 
 def add_fun_def(symtable: 'SymTable', fake_data: 'FakeData',

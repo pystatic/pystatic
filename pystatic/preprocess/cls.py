@@ -17,8 +17,8 @@ from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.message import MessageBox
 from pystatic.symtable import Entry, TableScope
 from pystatic.preprocess.dependency import DependencyGraph
-from pystatic.preprocess.sym_util import (add_baseclass, get_cls_defnode,
-                                          get_fake_data)
+from pystatic.preprocess.fake_data import (add_baseclass, get_cls_defnode,
+                                           get_fake_data)
 from pystatic.arg import Argument
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
     graph = DependencyGraph()
     for target in targets:
         fake_data = get_fake_data(target.symtable)
-        for clsentry in fake_data.cls_defs.values():
+        for clsentry in fake_data.cls_def.values():
             tp_temp = clsentry.clstemp
             assert isinstance(tp_temp, TypeClassTemp)
             _build_graph_cls(tp_temp, graph)
@@ -64,7 +64,7 @@ def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
 
     _build_graph_inh(clstemp, graph)
 
-    for clsentry in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_def.values():
         tp_temp = clsentry.clstemp
         assert isinstance(tp_temp, TypeClassTemp)
         _build_graph_cls(tp_temp, graph)
@@ -228,13 +228,13 @@ def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
                        mbox: 'MessageBox'):
     # symid here is not set correctly
     fake_data = get_fake_data(symtable)
-    for clsentry in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_def.values():
         tp_temp = clsentry.clstemp
         method_targets = _resolve_cls_method(symid, tp_temp, mbox)
         for blk_target in method_targets:
             manager.preprocess_block(blk_target)
 
-    for clsentry in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_def.values():
         tp_temp = clsentry.clstemp
         new_symid = '.'.join([symid, tp_temp.basename])
         resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, manager,
@@ -306,14 +306,14 @@ def _resolve_cls_method(symid: str, clstemp: 'TypeClassTemp',
         ins.add_overload(args, ret)
 
     template_resolve_fun(symtable, add_def, add_overload, mbox)
-    symtable._func_defs = new_fun_defs
+    symtable._func_def = new_fun_defs
 
     return targets
 
 
 def resolve_cls_attr(symtable: 'SymTable', mbox: 'MessageBox'):
     fake_data = get_fake_data(symtable)
-    for clsentry in fake_data.cls_defs.values():
+    for clsentry in fake_data.cls_def.values():
         tp_temp = clsentry.clstemp
         _resolve_cls_attr(tp_temp, mbox)
         resolve_cls_attr(tp_temp.get_inner_symtable(), mbox)

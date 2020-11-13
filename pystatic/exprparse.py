@@ -216,7 +216,7 @@ class ExprParser(NoGenVisitor):
         return res
 
     def visit_Slice(self, node: ast.Slice):
-        assert False, "TODO"
+        raise NotImplementedError()
 
     def visit_Index(self, node: ast.Index):
         return self.visit(node.value)

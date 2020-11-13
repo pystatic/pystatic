@@ -173,6 +173,15 @@ class TypeType(TypeIns):
         return "Type[" + s + ']'
 
 
+class TypeAlias(TypeType):
+    def __init__(self, alias: str, typetype: TypeType):
+        super().__init__(typetype.temp, typetype.bindlist)
+        self.alias = alias
+
+    def __str__(self):
+        return self.alias
+
+
 class TypeTemp(ABC):
     def __init__(self, name: str):
         self.name = name
@@ -394,9 +403,9 @@ class TypeClassTemp(TypeTemp):
         return self._def_symtable.glob_symid
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
-        cls_defs = self._inner_symtable._tp_defs
-        if name in cls_defs:
-            return cls_defs[name]
+        cls_def = self._inner_symtable._tp_def
+        if name in cls_def:
+            return cls_def[name]
         else:
             return None
 

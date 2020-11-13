@@ -1,6 +1,5 @@
 import ast
 from typing import TYPE_CHECKING
-from collections import deque
 from typing import TYPE_CHECKING, Deque, List
 from pystatic.preprocess.definition import (get_definition,
                                             get_definition_in_method)
@@ -8,7 +7,7 @@ from pystatic.preprocess.impt import resolve_import_type, resolve_import_ins
 from pystatic.preprocess.cls import (resolve_cls, resolve_cls_method,
                                      resolve_cls_attr)
 from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
-from pystatic.preprocess.sym_util import clear_fake_data
+from pystatic.preprocess.fake_data import clear_fake_data
 from pystatic.target import BlockTarget, MethodTarget, Target, Stage
 
 if TYPE_CHECKING:

@@ -118,8 +118,8 @@ class SymTable:
 
         # inner data structure to store important information about this
         # symtable, used heavily in the preprocess stage.
-        self._tp_defs: Dict[str, 'TypeTemp'] = {}
-        self._func_defs: Dict[str, 'TypeFuncIns'] = {}
+        self._tp_def: Dict[str, 'TypeTemp'] = {}
+        self._func_def: Dict[str, 'TypeFuncIns'] = {}
 
     @property
     def glob_symid(self):
@@ -144,13 +144,13 @@ class SymTable:
         return find(self.builtins, name)
 
     def add_type_def(self, name: str, temp: 'TypeTemp'):
-        self._tp_defs[name] = temp
+        self._tp_def[name] = temp
 
     def get_type_def(self, name: str) -> Optional['TypeTemp']:
         findlist = name.split('.')
         assert findlist
-        if name in self._tp_defs:
-            cur_temp = self._tp_defs[name]
+        if name in self._tp_def:
+            cur_temp = self._tp_def[name]
         else:
             return None
 

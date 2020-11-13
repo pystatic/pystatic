@@ -7,7 +7,7 @@ from pystatic.arg import Argument, Arg
 from pystatic.option import Option
 from pystatic.exprparse import eval_expr
 from pystatic.message import MessageBox
-from pystatic.preprocess.sym_util import *
+from pystatic.preprocess.fake_data import *
 
 
 def eval_typedef_expr(node: TypeDefNode,
