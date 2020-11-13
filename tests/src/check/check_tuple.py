@@ -8,11 +8,11 @@ a, b = 1, 2
 
 c: int = 1
 d: str = "s"
-c, d = 1, 2  # E Incompatible type in assignment(expression has type 'Literal[2]', variable has type 'str')
-d, c = 1, 2  # E Incompatible type in assignment(expression has type 'Literal[1]', variable has type 'str')
+c, d = 1, 2  # E Incompatible type in assignment(expression has type 'int', variable has type 'str')
+d, c = 1, 2  # E Incompatible type in assignment(expression has type 'int', variable has type 'str')
 
 t1: Tuple[int, str] = (1, "s")
-t1 = ("s", 1)# E Incompatible type in assignment(expression has type 'Tuple[Literal['s'],Literal[1]]', variable has type 'Tuple[int,str]')
+t1 = ("s", 1)# E Incompatible type in assignment(expression has type 'Tuple[str,int]', variable has type 'Tuple[int,str]')
 t1 = 1  # E Incompatible type in assignment(expression has type 'Literal[1]', variable has type 'Tuple[int,str]')
 t1 = "s"  # E Incompatible type in assignment(expression has type 'Literal['s']', variable has type 'Tuple[int,str]')
 

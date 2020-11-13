@@ -34,7 +34,7 @@ class Option(Generic[T]):
     def dump_to_box(self, mbox: 'MessageBox'):
         if self.errors:
             for error in self.errors:
-                mbox.make(error)
+                mbox.add_err(error)
 
     def haserr(self):
         return self.errors and len(self.errors) > 0

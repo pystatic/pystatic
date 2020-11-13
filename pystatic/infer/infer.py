@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from typing import Optional, Set
 from pystatic.typesys import *
 from pystatic.predefined import *
+from pystatic.target import BlockTarget, Target
 from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
 from pystatic.errorcode import *
@@ -21,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleTemp,
-                 mbox: MessageBox, config: Config):
+                 mbox: MessageBox, symid: SymId, config: Config):
         self.root = node
         self.mbox = mbox
-        # self.plugin = Plugin()
+        self.symid = symid
         self.err_maker = ErrorMaker(self.mbox)
         self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
@@ -167,6 +168,7 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         with self.visit_condition(node):
             with self.visit_scope(node) as func_type:
+                # block_target = BlockTarget(self.symid)
                 argument, ret_annotation = func_type.get_func_def()
                 self.recorder.enter_func(func_type,
                                          self.infer_argument(argument),
@@ -197,7 +199,7 @@ class InferVisitor(BaseVisitor):
         ret_list = list(ret_set)
         ret_annotation = self.recorder.get_ret_annotation()
         num = len(ret_list)
-        if num == 0:
+        if not is_any(ret_annotation) and num == 0:
             self.err_maker.add_err(ReturnValueExpected(node))
         else:
             # TODO
@@ -264,14 +266,14 @@ class InferVisitor(BaseVisitor):
         get_element_type_in_container(container)
 
 
-def get_element_type_in_container(container: TypeIns):
+def get_element_type_in_container(container):
     # print(container)
     # print(container.bindlist)
     pass
 
 
 class InferStarter:
-    def __init__(self, sources, config):
+    def __init__(self, sources: Dict[SymId, Target], config: Config):
         self.sources = sources
         self.config = config
 
@@ -279,5 +281,5 @@ class InferStarter:
         for symid, target in self.sources.items():
             logger.info(f'Type infer in module \'{symid}\'')
             infer_visitor = InferVisitor(target.ast, target.module_temp,
-                                         target.mbox, self.config)
+                                         target.mbox, symid, self.config)
             infer_visitor.infer()
