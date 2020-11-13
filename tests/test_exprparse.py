@@ -5,7 +5,7 @@ import os
 sys.path.extend(['.', '..'])
 
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import TypeModuleTemp
+from pystatic.predefined import *
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.exprparse import eval_expr
@@ -14,6 +14,43 @@ from pystatic.exprparse import eval_expr
 def parse_expr(expr: str):
     astnode = ast.parse(expr, mode='eval')
     return astnode.body  # type: ignore
+
+
+def parse_eval_check(expr: str,
+                     module_ins,
+                     expect: TypeIns,
+                     equiv,
+                     explicit=False):
+    astnode = parse_expr(expr)
+    eval_option = eval_expr(astnode, module_ins, explicit)
+    eval_res = eval_option.value
+    if equiv:
+        assert eval_res.equiv(expect)
+    else:
+        assert eval_res is expect
+
+
+def test_exprparse_basic():
+    cwd = os.path.dirname(__file__)
+    manager = Manager(Config({'cwd': cwd}))
+    module_temp = manager.get_module_temp('builtins')
+    module_ins = module_temp.get_default_ins().value
+
+    parse_eval_check('1', module_ins, TypeLiteralIns(1), True)
+    parse_eval_check("'hello'", module_ins, TypeLiteralIns('hello'), True)
+    # parse_eval_check('1 < 2', module_ins, bool_ins, False)
+    parse_eval_check('[1, 2]', module_ins, TypeIns(list_temp, [int_ins]), True)
+    parse_eval_check("[1, 'hello']", module_ins, TypeIns(list_temp, [any_ins]),
+                     True)
+    parse_eval_check('(1, 2)', module_ins,
+                     TypeIns(tuple_temp, [int_ins, int_ins]), True)
+    parse_eval_check(
+        '(1, 2)', module_ins,
+        TypeIns(tuple_temp,
+                [TypeLiteralIns(1), TypeLiteralIns(2)]), True, True)
+    parse_eval_check('{1, 2}', module_ins, TypeIns(set_temp, [int_ins]), True)
+    parse_eval_check('{1: "good", 2: "good"}', module_ins,
+                     TypeIns(dict_temp, [int_ins, str_ins]), True)
 
 
 def test_exprparse():
@@ -79,3 +116,9 @@ def test_exprparse():
     assert isinstance(f_snd, TypeIns) and not isinstance(f_snd, TypeType)
     assert f_fst.temp == str_typetype.temp
     assert f_snd.temp == int_typetype.temp
+
+    cmp_node = parse_expr('a < b')
+    cmp_res_option = eval_expr(cmp_node, module_ins)
+    assert not cmp_res_option.haserr()
+    cmp_res = cmp_res_option.value
+    assert cmp_res is bool_ins
