@@ -1,5 +1,5 @@
 import ast
-from enum import IntEnum, Enum, auto
+from enum import IntEnum
 from typing import TYPE_CHECKING, Optional
 from pystatic.typesys import TypeClassTemp
 from pystatic.predefined import TypeModuleTemp

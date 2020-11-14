@@ -1,7 +1,3 @@
-"""
-Resolve class related type information.
-"""
-
 import ast
 import contextlib
 from pystatic.target import MethodTarget
@@ -15,100 +11,91 @@ from pystatic.predefined import (TypeGenericTemp, TypeModuleTemp, TypeVarIns,
 from pystatic.exprparse import eval_expr
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.message import MessageBox
-from pystatic.symtable import Entry, TableScope
-from pystatic.preprocess.dependency import DependencyGraph
-from pystatic.preprocess.fake_data import (add_baseclass, get_cls_defnode,
-                                           get_fake_data)
+from pystatic.symtable import Entry, TableScope, SymTable
 from pystatic.arg import Argument
+from pystatic.preprocess.dependency import DependencyGraph
+from pystatic.preprocess.util import add_baseclass
+from pystatic.preprocess.prepinfo import *
 
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
-    from pystatic.symtable import SymTable
-    from pystatic.manager import Manager
 
 
-def resolve_cls(targets: List['BlockTarget'], manager: 'Manager'):
+def resolve_cls(targets: List['BlockTarget'], env: 'PrepEnvironment'):
     """Get class information(inheritance, placeholders)"""
-    graph = _build_graph(targets)
+    graph = _build_graph(targets, env)
     resolve_order = graph.toposort()
 
     # placeholders
-    for temp in resolve_order:
-        temp_mbox = manager.get_mbox_by_symid(temp.module_symid)
+    for clsdef in resolve_order:
+        temp_mbox = env.manager.get_mbox_by_symid(clsdef.clstemp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
-        _resolve_cls_placeholder(temp, temp_mbox)
+        _resolve_cls_placeholder(clsdef, temp_mbox)
 
     # inheritance
-    for temp in resolve_order:
-        temp_mbox = manager.get_mbox_by_symid(temp.module_symid)
+    for clsdef in resolve_order:
+        temp_mbox = env.manager.get_mbox_by_symid(clsdef.clstemp.module_symid)
         assert temp_mbox, "This should always true because pystatic must have added the mbox before"
-        _resolve_cls_inh(temp, temp_mbox)
+        _resolve_cls_inh(clsdef, temp_mbox)
 
 
-def _build_graph(targets: List['BlockTarget']) -> 'DependencyGraph':
+def _build_graph(targets: List['BlockTarget'],
+                 env: 'PrepEnvironment') -> 'DependencyGraph':
     """Build dependency graph"""
     graph = DependencyGraph()
     for target in targets:
-        fake_data = get_fake_data(target.symtable)
-        for clsentry in fake_data.cls_def.values():
-            tp_temp = clsentry.clstemp
-            assert isinstance(tp_temp, TypeClassTemp)
-            _build_graph_cls(tp_temp, graph)
+        prepinfo = env.get_target_prepinfo(target)
+        assert prepinfo
+        for clsdef in prepinfo.cls_def.values():
+            assert isinstance(clsdef.clstemp, TypeClassTemp)
+            _build_graph_cls(clsdef, graph, prepinfo)
     return graph
 
 
-def _build_graph_cls(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
+def _build_graph_cls(clsdef: 'prep_clsdef', graph: 'DependencyGraph',
+                     prepinfo: 'PrepInfo'):
     """Add dependency relations about a class"""
-    inner_sym = clstemp.get_inner_symtable()
-    fake_data = get_fake_data(inner_sym)
+    _build_graph_inh(clsdef, prepinfo, graph)
 
-    _build_graph_inh(clstemp, graph)
-
-    for clsentry in fake_data.cls_def.values():
-        tp_temp = clsentry.clstemp
-        assert isinstance(tp_temp, TypeClassTemp)
-        _build_graph_cls(tp_temp, graph)
+    for subclsdef in clsdef.prepinfo.cls_def.values():
+        _build_graph_cls(subclsdef, graph, prepinfo)
         # add dependency relations due to containment
-        graph.add_dependency(clstemp, tp_temp)
+        graph.add_dependency(clsdef, subclsdef)
 
 
-def _build_graph_inh(clstemp: 'TypeClassTemp', graph: 'DependencyGraph'):
+def _build_graph_inh(clsdef: 'prep_clsdef', prepinfo: 'PrepInfo',
+                     graph: 'DependencyGraph'):
     """Add dependency relations that due to the inheritance"""
-    graph.add_typetemp(clstemp)
+    clstemp = clsdef.clstemp
+    graph.add_clsdef(clsdef)
     assert isinstance(
         clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
-    defnode = get_cls_defnode(clstemp)
+    defnode = clsdef.defnode
 
-    def_sym = clstemp.get_def_symtable()
-    visitor = _FirstClassTempVisitor(def_sym)
+    visitor = _FirstClassTempVisitor(prepinfo)
     for basenode in defnode.bases:
-        first_temp = visitor.accept(basenode)
-        assert isinstance(first_temp, TypeTemp) and not isinstance(
-            first_temp,
-            TypeModuleTemp)  # FIXME: if the result is a module, warninng here
-        if first_temp:
-            assert isinstance(first_temp, TypeTemp)
-            assert isinstance(first_temp, TypeClassTemp)
-            graph.add_dependency(clstemp, first_temp)
+        inh_clsdef = visitor.accept(basenode)
+        if inh_clsdef:
+            assert isinstance(inh_clsdef, prep_clsdef)
+            graph.add_dependency(clsdef, inh_clsdef)
 
 
-def _resolve_cls_placeholder(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
+def _resolve_cls_placeholder(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     """Resolve placeholders of a class"""
+    clstemp = clsdef.clstemp
     symtable = clstemp.get_def_symtable()
     visitor = _TypeVarVisitor(symtable, mbox)
-    defnode = get_cls_defnode(clstemp)
-    for base_node in defnode.bases:
+    for base_node in clsdef.defnode.bases:
         visitor.accept(base_node)
 
     clstemp.placeholders = visitor.get_typevar_list()
 
 
-def _resolve_cls_inh(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
+def _resolve_cls_inh(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
-    symtable = clstemp.get_def_symtable()
-    defnode = get_cls_defnode(clstemp)
-
-    for base_node in defnode.bases:
+    clstemp = clsdef.clstemp
+    symtable = clstemp.get_inner_symtable()
+    for base_node in clsdef.defnode.bases:
         base_option = eval_typedef_expr(base_node, symtable)
         base_option.dump_to_box(mbox)
         res_type = base_option.value
@@ -123,22 +110,23 @@ class _FirstClassTempVisitor(NoGenVisitor):
     Used to build dependency graph. For example class C inherits A.B,
     this should return A's template so you can add edge from C to A.
     """
-    def __init__(self, symtable: 'SymTable') -> None:
-        self.symtable = symtable
+    def __init__(self, prepinfo: 'PrepInfo') -> None:
+        self.prepinfo = prepinfo
 
     def accept(self, node):
         try:
-            return self.visit(node).temp
+            return self.visit(node)
         except VisitorMethodNotFound:
             return None
 
-    def visit_Name(self,
-                   node: ast.Name,
-                   symtable: Optional['SymTable'] = None):
-        symtable = symtable or self.symtable
-        return symtable.lookup(node.id)
+    def visit_Name(self, node: ast.Name):
+        prep_def = self.prepinfo.get_prep_def(node.id)
+        if not isinstance(prep_def, prep_clsdef):
+            return None
+        return prep_def
 
     def visit_Attribute(self, node: ast.Attribute):
+        raise NotImplementedError()
         res = self.visit(node.value)
         if isinstance(res.temp, TypeModuleTemp):
             return res.temp.get_inner_typedef(node.attr).get_default_typetype()
@@ -224,28 +212,26 @@ class _TypeVarVisitor(BaseVisitor):
         return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(symtable: 'SymTable', symid: str, manager: 'Manager',
-                       mbox: 'MessageBox'):
+def resolve_cls_method(cls_def: 'prep_clsdef', symid: str,
+                       env: 'PrepEnvironment', mbox: 'MessageBox'):
     # symid here is not set correctly
-    fake_data = get_fake_data(symtable)
-    for clsentry in fake_data.cls_def.values():
-        tp_temp = clsentry.clstemp
-        method_targets = _resolve_cls_method(symid, tp_temp, mbox)
+    manager = env.manager
+    prepinfo = cls_def.prepinfo
+    for clsdef in prepinfo.cls_def.values():
+        method_targets = _resolve_cls_method(symid, clsdef, mbox)
         for blk_target in method_targets:
             manager.preprocess_block(blk_target)
 
-    for clsentry in fake_data.cls_def.values():
-        tp_temp = clsentry.clstemp
-        new_symid = '.'.join([symid, tp_temp.basename])
-        resolve_cls_method(tp_temp.get_inner_symtable(), new_symid, manager,
-                           mbox)
+    for clsdef in prepinfo.cls_def.values():
+        new_symid = '.'.join([symid, clsdef.clstemp.basename])
+        resolve_cls_method(clsdef, new_symid, env, mbox)
 
 
-def _resolve_cls_method(symid: str, clstemp: 'TypeClassTemp',
-                        mbox: 'MessageBox'):
+def _resolve_cls_method(symid: str, clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     targets = []
     new_fun_defs = {}
-    symtable = clstemp.get_inner_symtable()
+    symtable = clsdef.clstemp.get_inner_symtable()
+    clstemp = clsdef.clstemp
 
     def get_method_kind(node: ast.FunctionDef):
         """classmethod or staticmethod"""
@@ -311,16 +297,15 @@ def _resolve_cls_method(symid: str, clstemp: 'TypeClassTemp',
     return targets
 
 
-def resolve_cls_attr(symtable: 'SymTable', mbox: 'MessageBox'):
-    fake_data = get_fake_data(symtable)
-    for clsentry in fake_data.cls_def.values():
-        tp_temp = clsentry.clstemp
-        _resolve_cls_attr(tp_temp, mbox)
-        resolve_cls_attr(tp_temp.get_inner_symtable(), mbox)
+def resolve_cls_attr(prepinfo: 'PrepInfo', mbox: 'MessageBox'):
+    for clsdef in prepinfo.cls_def.values():
+        _resolve_cls_attr(clsdef, mbox)
+        resolve_cls_attr(clsdef.prepinfo, mbox)
 
 
-def _resolve_cls_attr(clstemp: 'TypeClassTemp', mbox: 'MessageBox'):
+def _resolve_cls_attr(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     true_var_attr = {}
+    clstemp = clsdef.clstemp
     for name, tp_attr in clstemp.var_attr.items():
         # tp_attr is the temporary dict set in definition.py
         typenode = tp_attr.get('node')  # type: ignore

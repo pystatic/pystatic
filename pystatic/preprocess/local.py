@@ -4,7 +4,6 @@ Resolve type instance for symbols defined locally.
 
 import ast
 from pystatic.arg import Argument
-from pystatic.preprocess.fake_data import *
 from pystatic.symtable import SymTable
 from pystatic.typesys import TypeClassTemp, any_ins, TypeIns
 from pystatic.predefined import TypeFuncIns
@@ -12,20 +11,19 @@ from pystatic.symtable import Entry
 from pystatic.message import MessageBox
 from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,
                                           template_resolve_fun)
+from pystatic.preprocess.prepinfo import *
 
 
-def resolve_local_typeins(symtable: 'SymTable', mbox: 'MessageBox'):
+def resolve_local_typeins(prepinfo: 'PrepInfo', mbox: 'MessageBox'):
     """Resolve local symbols' TypeIns"""
-    fake_data = get_fake_data(symtable)
-
     new_entry = {}
-    for name, entry in fake_data.local.items():
-        assert isinstance(entry, fake_local_def)
+    for name, entry in prepinfo.local.items():
+        assert isinstance(entry, prep_local_def)
         # entry may also be temporary fake_imp_entry which should not be
         # resolved here.
         defnode = entry.defnode
 
-        tpins_option = eval_typedef_expr(defnode, symtable)
+        tpins_option = eval_typedef_expr(defnode, prepinfo)
         tpins = tpins_option.value
 
         tpins_option.dump_to_box(mbox)

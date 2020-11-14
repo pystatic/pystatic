@@ -382,11 +382,8 @@ class ModuleNamedTypeTemp(TypeTemp):
 
 
 class TypeClassTemp(TypeTemp):
-    def __init__(self,
-                 clsname: str,
-                 def_symtable: 'SymTable',
-                 inner_symtable: 'SymTable',
-                 defnode: Optional[ast.ClassDef] = None):
+    def __init__(self, clsname: str, def_symtable: 'SymTable',
+                 inner_symtable: 'SymTable'):
         super().__init__(clsname)
 
         self.baseclass: 'List[TypeType]'
@@ -396,7 +393,6 @@ class TypeClassTemp(TypeTemp):
 
         self._inner_symtable = inner_symtable  # symtable belongs to this cls
         self._def_symtable = def_symtable  # symtable where this cls is defined
-        self._defnode = defnode
 
     @property
     def module_symid(self) -> str:

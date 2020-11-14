@@ -10,9 +10,7 @@ from pystatic.predefined import TypeVarIns, TypeModuleTemp
 from pystatic.symid import symid2list
 from pystatic.symtable import ImportEntry, SymTable, Entry
 from pystatic.typesys import any_ins, TypeIns
-from pystatic.preprocess.fake_data import (fake_impt_entry,
-                                           update_symtable_import_cache,
-                                           get_fake_data, try_get_fake_data)
+from pystatic.preprocess.prepinfo import PrepInfo
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager

@@ -1,10 +1,11 @@
 from typing import List, Dict, Deque
 from collections import deque
 from pystatic.typesys import TypeClassTemp
+from pystatic.preprocess.prepinfo import prep_clsdef
 
 
 class _Node:
-    def __init__(self, clstemp: TypeClassTemp) -> None:
+    def __init__(self, clstemp: 'prep_clsdef') -> None:
         self.clstemp = clstemp
         self.dependency: List['_Node'] = []
 
@@ -18,24 +19,24 @@ class _Node:
 class DependencyGraph:
     def __init__(self) -> None:
         self._nodes: List['_Node'] = []
-        self._mapping: Dict[TypeClassTemp, _Node] = {}
+        self._mapping: Dict[prep_clsdef, _Node] = {}
 
-    def lookup(self, temp: TypeClassTemp):
-        if temp not in self._mapping:
-            newnode = _Node(temp)
+    def lookup(self, clsdef: 'prep_clsdef'):
+        if clsdef not in self._mapping:
+            newnode = _Node(clsdef)
             self._nodes.append(newnode)
-            self._mapping[temp] = newnode
-        return self._mapping[temp]
+            self._mapping[clsdef] = newnode
+        return self._mapping[clsdef]
 
-    def add_dependency(self, temp_from: TypeClassTemp, temp_to: TypeClassTemp):
-        from_node = self.lookup(temp_from)
-        to_node = self.lookup(temp_to)
+    def add_dependency(self, cls_from: prep_clsdef, cls_to: prep_clsdef):
+        from_node = self.lookup(cls_from)
+        to_node = self.lookup(cls_to)
         from_node.add_dependency(to_node)
 
-    def add_typetemp(self, temp: TypeClassTemp):
-        self.lookup(temp)
+    def add_clsdef(self, clsdef: prep_clsdef):
+        self.lookup(clsdef)
 
-    def toposort(self) -> List['TypeClassTemp']:
+    def toposort(self) -> List['prep_clsdef']:
         que: Deque['_Node'] = deque()
         for node in self._nodes:
             node.indeg = 0
