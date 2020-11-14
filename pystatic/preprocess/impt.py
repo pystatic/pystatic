@@ -4,21 +4,21 @@ Resovle import related type information.
 
 import ast
 import copy
-from typing import TYPE_CHECKING, Tuple, List, Dict, Any, Optional
+from typing import TYPE_CHECKING, Tuple, List, Dict, Optional
 from pystatic.typesys import TypeClassTemp, TypeType
 from pystatic.predefined import TypeVarIns, TypeModuleTemp
 from pystatic.symid import symid2list
-from pystatic.symtable import ImportEntry, SymTable, Entry
+from pystatic.symtable import ImportEntry, SymTable
 from pystatic.typesys import any_ins, TypeIns
-from pystatic.preprocess.prepinfo import PrepInfo
+from pystatic.preprocess.prepinfo import *
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 
-def resolve_import_type(symtable: SymTable, manager: 'Manager'):
+def resolve_import_type(symtable: SymTable, env: 'PrepEnvironment'):
     """Resolve types(class definition) imported from other module"""
-    new_impt_dict: Dict[str, fake_impt_entry] = {}
+    new_impt_dict: Dict[str, prep_impt] = {}
     fake_data = get_fake_data(symtable)
     cache = symtable.import_cache
 

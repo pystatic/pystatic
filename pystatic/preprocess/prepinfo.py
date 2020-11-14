@@ -32,9 +32,9 @@ class PrepInfo:
                 or name in self.local or name in self.cls_def)
 
     def add_cls_def(self, temp: TypeClassTemp, prepinfo: 'PrepInfo',
-                    node: ast.ClassDef):
+                    def_prepinfo: 'PrepInfo', node: ast.ClassDef):
         name = node.name
-        cls_def = prep_clsdef(temp, prepinfo, node)
+        cls_def = prep_clsdef(temp, prepinfo, def_prepinfo, node)
         self.cls_def[name] = cls_def
 
     def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
@@ -111,10 +111,11 @@ class prep_type_alias:
 
 class prep_clsdef:
     def __init__(self, clstemp: 'TypeClassTemp', prepinfo: 'PrepInfo',
-                 defnode: ast.ClassDef) -> None:
+                 def_prepinfo: 'PrepInfo', defnode: ast.ClassDef) -> None:
         assert isinstance(defnode, ast.ClassDef)
         self.clstemp = clstemp
         self.prepinfo = prepinfo
+        self.def_prepinfo = def_prepinfo
         self.defnode = defnode
 
     @property

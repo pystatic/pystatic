@@ -214,7 +214,7 @@ class TypeDefVisitor(BaseVisitor):
 
         assert isinstance(clstemp, TypeClassTemp)
         new_prepinfo = PrepInfo(new_symtable)
-        self.prepinfo.add_cls_def(clstemp, new_prepinfo, node)
+        self.prepinfo.add_cls_def(clstemp, new_prepinfo, self.prepinfo, node)
         # enter class scope
         with self.enter_class(new_prepinfo, clsname):
             for body in node.body:
@@ -234,33 +234,31 @@ class TypeDefVisitor(BaseVisitor):
     def _add_import_info(self, node: 'ImportNode',
                          info_list: List[prep_impt]):
         """Add import information to the symtable"""
-        raise NotImplementedError("import system not implemented yet")
-        read_typing = False  # flag, if True typing module has been read
-        typing_temp = None
         manager = self.env.manager
         for infoitem in info_list:
             # when the imported module is typing.py, pystatic will add symbols
             # imported from it as soon as possible because some types (such as
             # TypeVar) may affect how pystatic judge whether an assignment
             # statement stands for a special type definition or not.
-            if infoitem.symid == 'typing':
-                if not read_typing:
-                    typing_temp = manager.get_module_temp('typing')
-                    read_typing = True
 
-                if typing_temp:
-                    if infoitem.is_import_module():
-                        self.symtable.add_entry(
-                            'typing',
-                            Entry(typing_temp.get_default_ins().value, node))
-                    else:
-                        symtb = typing_temp.get_inner_symtable()
-                        typing_tpins = symtb.lookup_local(infoitem.origin_name)
+            # if infoitem.symid == 'typing':
+            #     if not read_typing:
+            #         typing_temp = manager.get_module_temp('typing')
+            #         read_typing = True
 
-                        if typing_tpins:
-                            self.symtable.add_entry(infoitem.asname,
-                                                    Entry(typing_tpins, node))
-                            continue
+            #     if typing_temp:
+            #         if infoitem.is_import_module():
+            #             self.symtable.add_entry(
+            #                 'typing',
+            #                 Entry(typing_temp.get_default_ins().value, node))
+            #         else:
+            #             symtb = typing_temp.get_inner_symtable()
+            #             typing_tpins = symtb.lookup_local(infoitem.origin_name)
+
+            #             if typing_tpins:
+            #                 self.symtable.add_entry(infoitem.asname,
+            #                                         Entry(typing_tpins, node))
+            #                 continue
 
             # must analyse all possible module that will be used when
             # constructing symtable's import_cache because when constructing
@@ -275,11 +273,12 @@ class TypeDefVisitor(BaseVisitor):
                     cur_prefix += f'.{subid}'
                 else:
                     cur_prefix = subid
-                self.manager.add_check_symid(cur_prefix)
+                manager.add_check_symid(cur_prefix)
 
             if not infoitem.is_import_module():
                 origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
-                if self.manager.is_module(origin_symid):
-                    self.manager.add_check_symid(origin_symid)
+                if manager.is_module(origin_symid):
+                    manager.add_check_symid(origin_symid)
 
-            self.fake_data.impt[infoitem.asname] = infoitem
+            # TODO: error check name collision here
+            self.prepinfo.impt[infoitem.asname] = infoitem

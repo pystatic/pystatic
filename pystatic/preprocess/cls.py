@@ -4,8 +4,8 @@ from pystatic.target import MethodTarget
 from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
                                           eval_typedef_expr,
                                           template_resolve_fun)
-from typing import List, TYPE_CHECKING, Optional
-from pystatic.typesys import (TypeClassTemp, TypeTemp, TypeIns, TypeType)
+from typing import List, TYPE_CHECKING
+from pystatic.typesys import (TypeClassTemp, TypeIns, TypeType)
 from pystatic.predefined import (TypeGenericTemp, TypeModuleTemp, TypeVarIns,
                                  TypeFuncIns)
 from pystatic.exprparse import eval_expr
@@ -94,9 +94,8 @@ def _resolve_cls_placeholder(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
 def _resolve_cls_inh(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
     clstemp = clsdef.clstemp
-    symtable = clstemp.get_inner_symtable()
     for base_node in clsdef.defnode.bases:
-        base_option = eval_typedef_expr(base_node, symtable)
+        base_option = eval_typedef_expr(base_node, clsdef.def_prepinfo)
         base_option.dump_to_box(mbox)
         res_type = base_option.value
         assert isinstance(res_type, TypeType)
@@ -230,8 +229,9 @@ def resolve_cls_method(cls_def: 'prep_clsdef', symid: str,
 def _resolve_cls_method(symid: str, clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     targets = []
     new_fun_defs = {}
-    symtable = clsdef.clstemp.get_inner_symtable()
+    prepinfo = clsdef.prepinfo
     clstemp = clsdef.clstemp
+    symtable = clstemp.get_inner_symtable()
 
     def get_method_kind(node: ast.FunctionDef):
         """classmethod or staticmethod"""
@@ -256,9 +256,9 @@ def _resolve_cls_method(symid: str, clsdef: 'prep_clsdef', mbox: 'MessageBox'):
             argument.args[0].ann = default_ins_option.value
 
     def add_def(node: ast.FunctionDef) -> TypeFuncIns:
-        nonlocal symtable, new_fun_defs, mbox
-        argument_option = eval_argument_type(node.args, symtable)
-        return_option = eval_return_type(node.returns, symtable)
+        nonlocal prepinfo, new_fun_defs, mbox
+        argument_option = eval_argument_type(node.args, prepinfo)
+        return_option = eval_return_type(node.returns, prepinfo)
 
         argument_option.dump_to_box(mbox)
         return_option.dump_to_box(mbox)
@@ -291,7 +291,7 @@ def _resolve_cls_method(symid: str, clsdef: 'prep_clsdef', mbox: 'MessageBox'):
         modify_argument(args, is_classmethod, is_staticmethod)
         ins.add_overload(args, ret)
 
-    template_resolve_fun(symtable, add_def, add_overload, mbox)
+    template_resolve_fun(prepinfo, add_def, add_overload, mbox)
     symtable._func_def = new_fun_defs
 
     return targets
