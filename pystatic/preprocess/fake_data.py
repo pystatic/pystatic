@@ -2,7 +2,7 @@ import ast
 from typing import Optional, TYPE_CHECKING, Dict, List, TypeVar, Union
 from pystatic.symid import (absolute_symidlist, SymId, symid2list,
                             rel2abssymid, symid_parent)
-from pystatic.typesys import TypeClassTemp, TypeIns, TypeType, any_ins
+from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
 from pystatic.predefined import (TypeModuleTemp, TypePackageIns,
                                  TypePackageTemp, TypeVarIns)
 
@@ -49,6 +49,8 @@ class FakeData:
     def add_type_alias(self, alias: str, typetype: TypeType, defnode: ast.AST):
         type_alias = fake_type_alias(typetype, defnode)
         self.type_alias[alias] = type_alias
+        self.symtable.add_entry(alias,
+                                Entry(TypeAlias(alias, typetype), defnode))
 
     def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
         if name in self.cls_def:

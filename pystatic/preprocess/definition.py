@@ -149,21 +149,21 @@ class TypeDefVisitor(BaseVisitor):
         return None
     
     def collect_type_alias(self, node: AssignNode) -> Optional[TypeType]:
+        if isinstance(node, ast.AnnAssign):
+            # assignment with type annotation is not a type alias.
+            return None
+
         if node.value:
-            typetype = omit_inst_typetype(node.value, self.fake_data, True)
+            typetype = omit_inst_typetype(node.value, self.fake_data, False)
             if typetype:
                 if isinstance(typetype, tuple):
                     raise NotImplementedError()
                 else:
-                    assert isinstance(typetype, TypeType)
-                    if isinstance(node, ast.AnnAssign):
-                        target = node.target
+                    if len(node.targets) != 1:
+                        return None
                     else:
-                        if len(node.targets) != 1:
-                            return None
-                        else:
-                            target = node.targets[0]
-                    
+                        target = node.targets[0]
+                
                     if isinstance(target, ast.Name):
                         self.fake_data.add_type_alias(target.id, typetype, node)
                         return typetype
