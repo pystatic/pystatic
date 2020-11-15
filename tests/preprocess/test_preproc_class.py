@@ -11,7 +11,7 @@ from pystatic.exprparse import eval_expr
 
 
 def test_class():
-    symid = 'preproc_cls'
+    symid = 'prep_cls'
     cwd = os.path.dirname(os.path.dirname(__file__))
     config = Config({'cwd': cwd})
     manager = Manager(config)
