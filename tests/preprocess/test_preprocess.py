@@ -42,10 +42,6 @@ def test_preprocess():
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
     assert a.temp == A.temp
 
-    a_dot_a = manager.get_sym_type(src, 'a.a')
-    assert isinstance(a_dot_a, TypeIns) and not isinstance(a_dot_a, TypeType)
-    assert a_dot_a.temp == int_typetype.temp
-
     f = manager.get_sym_type(src, 'f')
     assert isinstance(f, TypeFuncIns)
 
@@ -56,6 +52,10 @@ def test_preprocess():
 
     assert manager.get_sym_type(src, 'c')
     assert manager.get_sym_type(src, 'd')
+
+    a_dot_a = manager.get_sym_type(src, 'a.a')
+    assert isinstance(a_dot_a, TypeIns) and not isinstance(a_dot_a, TypeType)
+    assert a_dot_a.temp == int_typetype.temp
 
 
 def test_import():

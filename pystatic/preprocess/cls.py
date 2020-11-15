@@ -1,10 +1,11 @@
 import ast
 import contextlib
+from collections import deque
 from pystatic.target import MethodTarget
 from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
                                           eval_typedef_expr,
                                           template_resolve_fun)
-from typing import List, TYPE_CHECKING
+from typing import Deque, List, TYPE_CHECKING
 from pystatic.typesys import (TypeClassTemp, TypeIns, TypeType)
 from pystatic.predefined import (TypeGenericTemp, TypeModuleTemp, TypeVarIns,
                                  TypeFuncIns)
@@ -211,26 +212,31 @@ class _TypeVarVisitor(BaseVisitor):
         return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(cls_def: 'prep_clsdef', symid: str,
-                       env: 'PrepEnvironment', mbox: 'MessageBox'):
-    # symid here is not set correctly
+def resolve_cls_method(target: 'BlockTarget', env: 'PrepEnvironment',
+                       mbox: 'MessageBox'):
+    # TODO: symid here is not set correctly
+    init_prepinfo = env.get_target_prepinfo(target)
+    assert init_prepinfo
     manager = env.manager
-    prepinfo = cls_def.prepinfo
-    for clsdef in prepinfo.cls_def.values():
-        method_targets = _resolve_cls_method(symid, clsdef, mbox)
-        for blk_target in method_targets:
-            manager.preprocess_block(blk_target)
+    queue: Deque['PrepInfo'] = deque()
+    queue.append(init_prepinfo)
 
-    for clsdef in prepinfo.cls_def.values():
-        new_symid = '.'.join([symid, clsdef.clstemp.basename])
-        resolve_cls_method(clsdef, new_symid, env, mbox)
+    while len(queue):
+        cur_prepinfo = queue.popleft()
+        for clsdef in cur_prepinfo.cls_def.values():
+            method_targets = _resolve_cls_method(clsdef, mbox)
+            for blk_target in method_targets:
+                manager.preprocess_block(blk_target)
+
+            for subclsdef in clsdef.prepinfo.cls_def.values():
+                queue.append(subclsdef.prepinfo)
 
 
-def _resolve_cls_method(symid: str, clsdef: 'prep_clsdef', mbox: 'MessageBox'):
+def _resolve_cls_method(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     targets = []
-    new_fun_defs = {}
     prepinfo = clsdef.prepinfo
     clstemp = clsdef.clstemp
+    symid = clstemp.name
     symtable = clstemp.get_inner_symtable()
 
     def get_method_kind(node: ast.FunctionDef):
@@ -255,8 +261,8 @@ def _resolve_cls_method(symid: str, clsdef: 'prep_clsdef', mbox: 'MessageBox'):
             default_ins_option.dump_to_box(mbox)
             argument.args[0].ann = default_ins_option.value
 
-    def add_def(node: ast.FunctionDef) -> TypeFuncIns:
-        nonlocal prepinfo, new_fun_defs, mbox
+    def add_func_def(node: ast.FunctionDef) -> TypeFuncIns:
+        nonlocal prepinfo, mbox
         argument_option = eval_argument_type(node.args, prepinfo)
         return_option = eval_return_type(node.returns, prepinfo)
 
@@ -266,15 +272,16 @@ def _resolve_cls_method(symid: str, clsdef: 'prep_clsdef', mbox: 'MessageBox'):
         argument = argument_option.value
         ret_ins = return_option.value
 
-        name = node.name
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(argument, is_classmethod, is_staticmethod)
 
+        name = node.name
         inner_symtable = symtable.new_symtable(name, TableScope.FUNC)
         func_ins = TypeFuncIns(name, symtable.glob_symid, inner_symtable,
                                argument, ret_ins)
-        symtable.add_entry(name, Entry(func_ins, node))
-        new_fun_defs[name] = func_ins
+
+        func_entry = prepinfo.func[name]
+        func_entry.value = func_ins
 
         # get attribute because of assignment of self
         if not is_staticmethod:
@@ -285,38 +292,26 @@ def _resolve_cls_method(symid: str, clsdef: 'prep_clsdef', mbox: 'MessageBox'):
 
         return func_ins
 
-    def add_overload(ins: TypeFuncIns, args: Argument, ret: TypeIns,
-                     node: ast.FunctionDef):
+    def add_func_overload(ins: TypeFuncIns, args: Argument, ret: TypeIns,
+                          node: ast.FunctionDef):
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(args, is_classmethod, is_staticmethod)
         ins.add_overload(args, ret)
 
-    template_resolve_fun(prepinfo, add_def, add_overload, mbox)
-    symtable._func_def = new_fun_defs
+    template_resolve_fun(prepinfo, add_func_def, add_func_overload, mbox)
 
     return targets
 
 
-def resolve_cls_attr(prepinfo: 'PrepInfo', mbox: 'MessageBox'):
-    for clsdef in prepinfo.cls_def.values():
-        _resolve_cls_attr(clsdef, mbox)
-        resolve_cls_attr(clsdef.prepinfo, mbox)
+def dump_to_symtable(target: 'BlockTarget', env: 'PrepEnvironment'):
+    init_prepinfo = env.get_target_prepinfo(target)
+    assert init_prepinfo
+    queue: Deque[PrepInfo] = deque()
+    queue.append(init_prepinfo)
 
+    while len(queue):
+        cur_prepinfo = queue.popleft()
+        cur_prepinfo.dump()
 
-def _resolve_cls_attr(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
-    true_var_attr = {}
-    clstemp = clsdef.clstemp
-    for name, tp_attr in clstemp.var_attr.items():
-        # tp_attr is the temporary dict set in definition.py
-        typenode = tp_attr.get('node')  # type: ignore
-        symtb = tp_attr.get('symtable')  # type: ignore
-        assert typenode
-        assert symtb
-        var_option = eval_typedef_expr(typenode, symtb)
-        var_ins = var_option.value
-
-        var_option.dump_to_box(mbox)
-
-        true_var_attr[name] = var_ins
-
-    clstemp.var_attr = true_var_attr
+        for clsdef in cur_prepinfo.cls_def.values():
+            queue.append(clsdef.prepinfo)

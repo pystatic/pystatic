@@ -165,7 +165,7 @@ TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef],
                            None]
 
 
-def template_resolve_fun(prepinfo: 'PrepInfo', add_func_define: TAddFunDef,
+def template_resolve_fun(prepinfo: 'PrepInfo', add_func_def: TAddFunDef,
                          add_func_overload: TAddFunOverload,
                          mbox: 'MessageBox'):
     """Template to resolve functions"""
@@ -196,11 +196,11 @@ def template_resolve_fun(prepinfo: 'PrepInfo', add_func_define: TAddFunDef,
 
         # TODO: name collision check
         if len(overload_list) > 0:
-            func_temp = add_func_define(overload_list[0][0])
+            func_ins = add_func_def(overload_list[0][0])
 
             for node, argument, ret_ins in overload_list[1:]:
-                add_func_overload(func_temp, argument, ret_ins, node)
+                add_func_overload(func_ins, argument, ret_ins, node)
 
         else:
             assert not_overload
-            add_func_define(not_overload)
+            add_func_def(not_overload)

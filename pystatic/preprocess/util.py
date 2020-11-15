@@ -8,10 +8,11 @@ from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
 from pystatic.option import Option
 from pystatic.symtable import ImportNode, SymTable
 from pystatic.symid import SymId, rel2abssymid, symid_parent, absolute_symidlist
-from pystatic.preprocess.prepinfo import prep_impt
+from pystatic.preprocess.prepinfo import prep_impt, PrepInfo, PrepEnvironment
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
+    from pystatic.target import BlockTarget, Target
 
 
 def omit_inst_typetype(node: ast.AST, consultant: SupportGetAttribute,
@@ -75,7 +76,8 @@ class TypeTypeGetter(NoGenVisitor):
             raise ParseError()
 
 
-def analyse_import_stmt(node: ImportNode, symid: SymId) -> List[prep_impt]:
+def analyse_import_stmt(prepinfo: 'PrepInfo', node: ImportNode,
+                        symid: SymId) -> List[prep_impt]:
     """Extract import information stored in import ast node."""
     info_list: List[prep_impt] = []
     pkg_symid = symid_parent(symid)
@@ -83,7 +85,8 @@ def analyse_import_stmt(node: ImportNode, symid: SymId) -> List[prep_impt]:
         for alias in node.names:
             module_symid = alias.name
             as_name = alias.asname or module_symid
-            info_list.append(prep_impt(module_symid, '', as_name, node))
+            info_list.append(
+                prep_impt(module_symid, '', as_name, prepinfo, node))
 
     elif isinstance(node, ast.ImportFrom):
         imp_name = '.' * node.level
@@ -94,7 +97,8 @@ def analyse_import_stmt(node: ImportNode, symid: SymId) -> List[prep_impt]:
             attr_name = alias.name
             as_name = alias.asname or attr_name
             imported.append((as_name, attr_name))
-            info_list.append(prep_impt(module_symid, attr_name, as_name, node))
+            info_list.append(
+                prep_impt(module_symid, attr_name, as_name, prepinfo, node))
 
     else:
         raise TypeError("node doesn't stand for an import statement")
@@ -167,7 +171,6 @@ def update_symtable_import_cache(symtable: 'SymTable', entry: 'prep_impt',
             if temp:
                 cur_ins.add_submodule(entry.origin_name,
                                       temp.get_default_ins().value)
-
     return cur_ins
 
 
