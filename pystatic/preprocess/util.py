@@ -174,6 +174,6 @@ def update_symtable_import_cache(symtable: 'SymTable', entry: 'prep_impt',
     return cur_ins
 
 
-def add_baseclass(temp: TypeClassTemp, basecls: 'TypeType'):
+def add_baseclass(temp: TypeClassTemp, basecls: 'TypeIns'):
     if basecls not in temp.baseclass:
         temp.baseclass.append(basecls)

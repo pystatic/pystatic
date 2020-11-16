@@ -386,7 +386,7 @@ class TypeClassTemp(TypeTemp):
                  inner_symtable: 'SymTable'):
         super().__init__(clsname)
 
-        self.baseclass: 'List[TypeType]'
+        self.baseclass: 'List[TypeIns]'
         self.baseclass = []
 
         self.var_attr: Dict[str, 'TypeIns'] = {}

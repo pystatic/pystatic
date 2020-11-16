@@ -39,12 +39,14 @@ def test_typevar():
     H = manager.get_sym_type(src, 'H')
     A = manager.get_sym_type(src, 'A')
     B = manager.get_sym_type(src, 'B')
+    I = manager.get_sym_type(src, 'I')
     assert isinstance(A, TypeType)
     assert isinstance(B, TypeType)
     assert isinstance(T, TypeVarIns)
     assert isinstance(F, TypeVarIns)
     assert isinstance(G, TypeVarIns)
     assert isinstance(H, TypeVarIns)
+    assert isinstance(I, TypeVarIns)
 
     assert len(F.constrains) == 2
     assert F.constrains[0] is int_ins
@@ -52,3 +54,21 @@ def test_typevar():
     assert G.bound is int_ins
     assert H.bound is str_ins
     assert H.kind == TpVarKind.COVARIANT
+    assert I.kind == TpVarKind.INVARIANT
+    assert I.bound is int_ins
+
+    A_temp = A.temp
+    B_temp = B.temp
+    assert len(A_temp.placeholders) == 4
+    assert A_temp.placeholders[0] is T
+    assert A_temp.placeholders[1] is G
+    assert A_temp.placeholders[2] is H
+    assert A_temp.placeholders[3] is I
+    assert len(B_temp.placeholders) == 1
+    assert B_temp.placeholders[0] is F
+
+    assert isinstance(B_temp, TypeClassTemp)
+    assert len(B_temp.baseclass) == 1
+    assert isinstance(B_temp.baseclass[0], TypeIns) and not isinstance(
+        B_temp.baseclass[0], TypeType)
+    assert B_temp.baseclass[0].temp is A_temp

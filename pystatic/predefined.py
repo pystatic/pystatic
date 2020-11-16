@@ -121,32 +121,28 @@ class TypeVarTemp(TypeClassTemp):
                 default_ins.constrains.append(rangeins)
 
         cova = applyargs.kwargs.get('covariant')
+        contra = applyargs.kwargs.get('contravariant')
         if not cova:
             covariant = False
         else:
             covariant = extract_value(cova, bool)
-            if not covariant:
-                assert False, "TODO"
-
-        contra = applyargs.kwargs.get('contravariant')
         if not contra:
             contravariant = False
         else:
             contravariant = extract_value(contra, bool)
-            if not contravariant:
-                assert False, "TODO"
 
         bound_ins_ast = applyargs.kwargs.get('bound')
         if bound_ins_ast:
             if default_ins.constrains:
-                assert False, "TODO"
+                raise NotImplementedError()
             bound = bound_ins_ast.ins
             assert isinstance(bound, TypeType), "TODO"
             default_ins.bound = bound.get_default_ins()
 
         if covariant and contravariant:
-            assert False, "TODO"
+            raise NotImplementedError()
 
+        # TODO: warning if both covariant and contravariant is True
         if covariant:
             default_ins.kind = TpVarKind.COVARIANT
         elif contravariant:

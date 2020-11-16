@@ -3,7 +3,8 @@ from typing import TYPE_CHECKING, List
 from pystatic.preprocess.definition import (get_definition,
                                             get_definition_in_method)
 from pystatic.preprocess.impt import resolve_import
-from pystatic.preprocess.cls import (dump_to_symtable, resolve_cls_dependency,
+from pystatic.preprocess.cls import (resolve_cls_placeholder, dump_to_symtable,
+                                     resolve_cls_dependency,
                                      resolve_cls_inheritence,
                                      resolve_cls_method)
 from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
@@ -63,6 +64,11 @@ class Preprocessor:
                 resolve_local_func(target, self.env, target.mbox)
                 resolve_local_typeins(target, self.env, target.mbox)
 
+            for clsdef in cls_resolve_order:
+                temp_mbox = self.env.manager.get_mbox_by_symid(
+                    clsdef.clstemp.module_symid)
+                assert temp_mbox, "This should always true because pystatic must have added the mbox before"
+                resolve_cls_placeholder(clsdef, temp_mbox)
             # for target in to_check:
             #     resolve_import_ins(target.symtable, self.manager)
 

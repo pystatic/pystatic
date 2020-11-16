@@ -12,7 +12,7 @@ from pystatic.predefined import (TypeGenericTemp, TypeModuleTemp, TypeVarIns,
 from pystatic.exprparse import eval_expr
 from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
 from pystatic.message import MessageBox
-from pystatic.symtable import Entry, TableScope, SymTable
+from pystatic.symtable import TableScope
 from pystatic.arg import Argument
 from pystatic.preprocess.dependency import DependencyGraph
 from pystatic.preprocess.util import add_baseclass
@@ -65,11 +65,10 @@ def build_inheritance_graph(clsdef: 'prep_clsdef', prepinfo: 'PrepInfo',
             graph.add_dependency(clsdef, inh_clsdef)
 
 
-def _resolve_cls_placeholder(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
+def resolve_cls_placeholder(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     """Resolve placeholders of a class"""
     clstemp = clsdef.clstemp
-    symtable = clstemp.get_def_symtable()
-    visitor = _TypeVarVisitor(symtable, mbox)
+    visitor = _TypeVarVisitor(clsdef.prepinfo, mbox)
     for base_node in clsdef.defnode.bases:
         visitor.accept(base_node)
 
@@ -85,7 +84,7 @@ def resolve_cls_inheritence(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
         res_type = base_option.value
         assert isinstance(res_type, TypeType)
         if res_type:
-            add_baseclass(clstemp, res_type)
+            add_baseclass(clstemp, res_type.get_default_ins())
 
 
 class _FirstClassTempVisitor(NoGenVisitor):
@@ -126,8 +125,8 @@ class _TypeVarVisitor(BaseVisitor):
 
     Used to generate correct placeholders.
     """
-    def __init__(self, symtable: 'SymTable', mbox: 'MessageBox') -> None:
-        self.symtable = symtable
+    def __init__(self, prepinfo: 'PrepInfo', mbox: 'MessageBox') -> None:
+        self.prepinfo = prepinfo
         self.typevars: List['TypeVarIns'] = []
         self.generic_tpvars: List['TypeVarIns'] = []
         self.mbox = mbox
@@ -168,7 +167,7 @@ class _TypeVarVisitor(BaseVisitor):
                 self.typevars.append(tpvarins)
 
     def visit_Name(self, node: ast.Name):
-        name_option = eval_expr(node, self.symtable)
+        name_option = eval_expr(node, self.prepinfo)
         if isinstance(name_option.value, TypeVarIns):
             self.add_tpvar(name_option.value)
         name_option.dump_to_box(self.mbox)
