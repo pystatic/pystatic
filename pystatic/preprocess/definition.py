@@ -59,7 +59,7 @@ class TypeDefVisitor(BaseVisitor):
                     return node.attr
         return None
 
-    def _try_attr(self, node: ast.AST, target: ast.AST):
+    def _try_attr(self, node: AssignNode, target: ast.AST):
         attr = self._is_self_def(target)
         if attr:
             prepinfo = self.prepinfo
@@ -86,58 +86,8 @@ class TypeDefVisitor(BaseVisitor):
         self.is_method = old_is_method
         self.prepinfo = old_prepinfo
 
-    def collect_typevar(self, node: AssignNode) -> Optional[TypeVarIns]:
-        def get_name(node: ast.AST) -> Optional[str]:
-            if isinstance(node, ast.Name):
-                return node.id
-            return None
-
-        value_node = node.value
-        if isinstance(value_node, ast.Call):
-            f_ins = eval_expr(value_node.func, self.prepinfo.symtable).value
-            if isinstance(f_ins, TypeType) and isinstance(f_ins.temp, TypeVarTemp):
-                typevar = eval_expr(node, self.prepinfo.symtable).value
-                assert isinstance(typevar, TypeVarIns)
-
-                if isinstance(node, ast.AnnAssign):
-                    typevar_name = get_name(node)
-                    assert typevar_name  # TODO: error
-                elif isinstance(node, ast.Assign):
-                    assert node.targets[0]  # TODO: error
-                    typevar_name = get_name(node.targets[0])
-                    assert typevar_name  # TODO: error
-                else:
-                    raise TypeError()
-
-                self.prepinfo.add_typevar_def(typevar_name, typevar, node)
-                return typevar
-        return None
-    
-    def collect_type_alias(self, node: AssignNode) -> Optional[TypeType]:
-        if isinstance(node, ast.AnnAssign):
-            # assignment with type annotation is not a type alias.
-            return None
-
-        if node.value:
-            typetype = omit_inst_typetype(node.value, self.prepinfo, False)
-            if typetype:
-                if isinstance(typetype, tuple):
-                    raise NotImplementedError()
-                else:
-                    if len(node.targets) != 1:
-                        return None
-                    else:
-                        target = node.targets[0]
-                
-                    if isinstance(target, ast.Name):
-                        self.prepinfo.add_type_alias(target.id, typetype, node)
-                        return typetype
-                    else:
-                        raise NotImplementedError()
-        return None
-
     def collect_definition(self, node: Union[ast.Assign, ast.AnnAssign]):
-        def check_single_expr(target: ast.AST, defnode: ast.AST):
+        def check_single_expr(target: ast.AST, defnode: AssignNode):
             if isinstance(target, ast.Name):
                 name = target.id
                 if not self.prepinfo.name_collide(name):
@@ -152,8 +102,6 @@ class TypeDefVisitor(BaseVisitor):
             assert isinstance(node, ast.AnnAssign)
             check_single_expr(node.target, node)
         else:
-            # if not self.collect_type_alias(node):
-            #     if not self.collect_typevar(node):
             if isinstance(node, ast.Assign):
                 for target in node.targets:
                     check_single_expr(target, node)
@@ -213,35 +161,6 @@ class TypeDefVisitor(BaseVisitor):
         """Add import information to the symtable"""
         manager = self.env.manager
         for infoitem in info_list:
-            # when the imported module is typing.py, pystatic will add symbols
-            # imported from it as soon as possible because some types (such as
-            # TypeVar) may affect how pystatic judge whether an assignment
-            # statement stands for a special type definition or not.
-
-            # if infoitem.symid == 'typing':
-            #     if not read_typing:
-            #         typing_temp = manager.get_module_temp('typing')
-            #         read_typing = True
-
-            #     if typing_temp:
-            #         if infoitem.is_import_module():
-            #             self.symtable.add_entry(
-            #                 'typing',
-            #                 Entry(typing_temp.get_default_ins().value, node))
-            #         else:
-            #             symtb = typing_temp.get_inner_symtable()
-            #             typing_tpins = symtb.lookup_local(infoitem.origin_name)
-
-            #             if typing_tpins:
-            #                 self.symtable.add_entry(infoitem.asname,
-            #                                         Entry(typing_tpins, node))
-            #                 continue
-
-            # must analyse all possible module that will be used when
-            # constructing symtable's import_cache because when constructing
-            # the import_cache it rely on the manager to return the correct
-            # module.
-
             # analyse all the package along the way
             symidlist = symid2list(infoitem.symid)
             cur_prefix = ''

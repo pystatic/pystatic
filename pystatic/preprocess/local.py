@@ -12,6 +12,7 @@ from pystatic.exprparse import eval_expr
 from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,
                                           template_resolve_fun)
 from pystatic.preprocess.prepinfo import *
+from pystatic.preprocess.util import omit_inst_typetype
 
 
 def resolve_typevar(prepinfo: 'PrepInfo', node: AssignNode):
@@ -39,6 +40,29 @@ def resolve_typevar(prepinfo: 'PrepInfo', node: AssignNode):
 
             prepinfo.add_typevar_def(typevar_name, typevar, node)
             return typevar
+    return None
+
+def collect_type_alias(self, node: AssignNode) -> Optional[TypeType]:
+    if isinstance(node, ast.AnnAssign):
+        # assignment with type annotation is not a type alias.
+        return None
+
+    if node.value:
+        typetype = omit_inst_typetype(node.value, self.prepinfo, False)
+        if typetype:
+            if isinstance(typetype, tuple):
+                raise NotImplementedError()
+            else:
+                if len(node.targets) != 1:
+                    return None
+                else:
+                    target = node.targets[0]
+            
+                if isinstance(target, ast.Name):
+                    self.prepinfo.add_type_alias(target.id, typetype, node)
+                    return typetype
+                else:
+                    raise NotImplementedError()
     return None
 
 

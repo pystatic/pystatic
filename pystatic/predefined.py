@@ -142,7 +142,7 @@ class TypeVarTemp(TypeClassTemp):
                 assert False, "TODO"
             bound = bound_ins_ast.ins
             assert isinstance(bound, TypeType), "TODO"
-            default_ins.bound = bound
+            default_ins.bound = bound.get_default_ins()
 
         if covariant and contravariant:
             assert False, "TODO"

@@ -53,7 +53,7 @@ class PrepInfo:
         self.typevar_def[name] = prep_typevar_def(name, typevar, defnode)
         self.symtable.add_entry(name, Entry(typevar, defnode))
 
-    def add_local_def(self, name: str, defnode: ast.AST):
+    def add_local_def(self, name: str, defnode: AssignNode):
         local_def = prep_local_def(name, defnode)
         self.local[name] = local_def
 

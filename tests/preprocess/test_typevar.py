@@ -1,14 +1,12 @@
 import sys
 import os
-import ast
 
 sys.path.extend(['.', '..'])
 
-from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import TypeModuleTemp, TypeFuncIns, TypeVarIns
+from pystatic.typesys import *
+from pystatic.predefined import *
 from pystatic.config import Config
 from pystatic.manager import Manager
-from pystatic.exprparse import eval_expr
 
 
 def test_typevar():
@@ -26,18 +24,31 @@ def test_typevar():
     assert module_temp.module_symid == src
 
     int_typetype = manager.get_sym_type('builtins', 'int')
-    assert int_typetype
+    int_ins = int_typetype.temp.get_default_ins().value
     assert isinstance(int_typetype, TypeType)
+    assert isinstance(int_ins, TypeIns)
 
     str_typetype = manager.get_sym_type('builtins', 'str')
-    assert str_typetype
+    str_ins = str_typetype.temp.get_default_ins().value
     assert isinstance(str_typetype, TypeType)
+    assert isinstance(str_ins, TypeIns)
 
     T = manager.get_sym_type(src, 'T')
     F = manager.get_sym_type(src, 'F')
+    G = manager.get_sym_type(src, 'G')
+    H = manager.get_sym_type(src, 'H')
     A = manager.get_sym_type(src, 'A')
     B = manager.get_sym_type(src, 'B')
     assert isinstance(A, TypeType)
     assert isinstance(B, TypeType)
     assert isinstance(T, TypeVarIns)
     assert isinstance(F, TypeVarIns)
+    assert isinstance(G, TypeVarIns)
+    assert isinstance(H, TypeVarIns)
+
+    assert len(F.constrains) == 2
+    assert F.constrains[0] is int_ins
+    assert F.constrains[1] is str_ins
+    assert G.bound is int_ins
+    assert H.bound is str_ins
+    assert H.kind == TpVarKind.COVARIANT
