@@ -8,11 +8,10 @@ from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
 from pystatic.option import Option
 from pystatic.symtable import ImportNode, SymTable
 from pystatic.symid import SymId, rel2abssymid, symid_parent, absolute_symidlist
-from pystatic.preprocess.prepinfo import prep_impt, PrepInfo, PrepEnvironment
+from pystatic.preprocess.prepinfo import prep_impt, PrepInfo
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
-    from pystatic.target import BlockTarget, Target
 
 
 def omit_inst_typetype(node: ast.AST, consultant: SupportGetAttribute,
@@ -23,14 +22,12 @@ def omit_inst_typetype(node: ast.AST, consultant: SupportGetAttribute,
     """
     try:
         res = TypeTypeGetter(consultant, allow_tuple).accept(node)
+        if not res:
+            return None
         assert isinstance(res, TypeType)
         return res
-    except (ParseError, VisitorMethodNotFound):
+    except VisitorMethodNotFound:
         return None
-
-
-class ParseError(Exception):
-    pass
 
 
 class TypeTypeGetter(NoGenVisitor):
@@ -41,25 +38,29 @@ class TypeTypeGetter(NoGenVisitor):
         self.consultant = consultant
         self.allow_tuple = allow_tuple
 
-    def visit_Name(self, node: ast.Name) -> TypeIns:
+    def visit_Name(self, node: ast.Name) -> Optional[TypeIns]:
         name_option = self.consultant.getattribute(node.id, node)
         assert isinstance(name_option, Option)
         res = name_option.value
         if not isinstance(res, TypeType):
-            raise ParseError()
+            return None
         return res
 
-    def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
+    def visit_Attribute(self, node: ast.Attribute) -> Optional[TypeIns]:
         res = self.visit(node.value)
+        if not res:
+            return None
         assert isinstance(res, TypeType)
         attr_option = res.getattribute(node.attr, node)
         attr_res = attr_option.value
         if not isinstance(attr_res, TypeType):
-            raise ParseError()
+            return None
         return attr_res
 
-    def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
+    def visit_Subscript(self, node: ast.Subscript) -> Optional[TypeIns]:
         left_ins = self.visit(node.value)
+        if not left_ins:
+            return None
         assert isinstance(left_ins, TypeType)
 
         return left_ins
@@ -69,11 +70,13 @@ class TypeTypeGetter(NoGenVisitor):
             typetype_list = []
             for subnode in node.elts:
                 cur_typetype = self.visit(subnode)
+                if not cur_typetype:
+                    return None
                 typetype_list.append(cur_typetype)
             return tuple(typetype_list)
 
         else:
-            raise ParseError()
+            return None
 
 
 def analyse_import_stmt(prepinfo: 'PrepInfo', node: ImportNode,

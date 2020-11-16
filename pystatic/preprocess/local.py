@@ -1,12 +1,9 @@
 import ast
 from collections import deque
-from inspect import isbuiltin
 from typing import Deque
 from pystatic.arg import Argument
-from pystatic.symtable import SymTable
-from pystatic.typesys import TypeClassTemp, any_ins, TypeIns
+from pystatic.typesys import TypeIns
 from pystatic.predefined import TypeFuncIns, TypeVarTemp
-from pystatic.symtable import Entry
 from pystatic.message import MessageBox
 from pystatic.exprparse import eval_expr
 from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,
@@ -42,13 +39,13 @@ def resolve_typevar(prepinfo: 'PrepInfo', node: AssignNode):
             return typevar
     return None
 
-def collect_type_alias(self, node: AssignNode) -> Optional[TypeType]:
+def resolve_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeType]:
     if isinstance(node, ast.AnnAssign):
         # assignment with type annotation is not a type alias.
         return None
 
     if node.value:
-        typetype = omit_inst_typetype(node.value, self.prepinfo, False)
+        typetype = omit_inst_typetype(node.value, prepinfo, False)
         if typetype:
             if isinstance(typetype, tuple):
                 raise NotImplementedError()
@@ -59,7 +56,7 @@ def collect_type_alias(self, node: AssignNode) -> Optional[TypeType]:
                     target = node.targets[0]
             
                 if isinstance(target, ast.Name):
-                    self.prepinfo.add_type_alias(target.id, typetype, node)
+                    prepinfo.add_type_alias(target.id, typetype, node)
                     return typetype
                 else:
                     raise NotImplementedError()
@@ -72,6 +69,9 @@ def resolve_local_typeins(target: 'BlockTarget', env: 'PrepEnvironment',
     def resolve_spt_def(prepinfo: 'PrepInfo', entry: 'prep_local_def'):
         if (typevar := resolve_typevar(prepinfo, entry.defnode)):
             entry.value = typevar
+            return True
+        elif (typetype := resolve_typealias(prepinfo, entry.defnode)):
+            entry.value = TypeAlias(entry.name, typetype)
             return True
         return False
 
