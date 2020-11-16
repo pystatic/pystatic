@@ -84,7 +84,7 @@ class TypeVarTemp(TypeClassTemp):
 
     def init_ins(self, applyargs: 'ApplyArgs',
                  bindlist: BindList) -> Option[TypeIns]:
-        def extract_value(ins_ast: Optional[InsWithAst], expect_type):
+        def extract_value(ins_ast: Optional['InsWithAst'], expect_type):
             if not ins_ast:
                 return None
 
@@ -518,8 +518,8 @@ class TypeFuncIns(TypeIns):
         return Option(self.overloads[0].ret_type)
 
 
-typevar_temp = TypeVarTemp()
-typevar_type = TypeType(typevar_temp, None)
+typevar_temp, typevar_type, _ = _add_spt_to_symtable(TypeVarTemp,
+                                                     typing_symtable)
 func_temp = TypeFuncTemp()
 
 _invariant_tpvar = TypeVarIns('_invariant_tpvar',

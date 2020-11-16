@@ -10,25 +10,21 @@ from pystatic.message import MessageBox
 from pystatic.preprocess.prepinfo import *
 
 
-def eval_typedef_expr(node: TypeDefNode,
-                      prepinfo: PrepInfo) -> Option[TypeIns]:
+def eval_typedef_expr(node: TypeDefNode, prepinfo: PrepInfo,
+                      annotation: bool) -> Option[TypeIns]:
     if isinstance(node, str):
-        return eval_str_type(node, prepinfo)
+        res_option = eval_str_type(node, prepinfo)
     elif isinstance(node, ast.Assign) or isinstance(node, ast.AnnAssign):
-        return eval_assign_type(node, prepinfo)
+        res_option = eval_assign_type(node, prepinfo)
     elif isinstance(node, ast.FunctionDef):
-        assert False, "Shouldn't reach here"
+        raise NotImplementedError()
     else:
-        return eval_expr(node, prepinfo)
-
-
-def eval_typedef_annotation(node: TypeDefNode,
-                            prepinfo: PrepInfo) -> Option[TypeIns]:
-    res_option = eval_typedef_expr(node, prepinfo)
-    res_type = res_option.value
-    if isinstance(res_type, TypeType):
-        tpins = res_type.getins(res_option)
-        res_option.value = tpins
+        res_option = eval_expr(node, prepinfo)
+    if annotation:
+        res_type = res_option.value
+        if isinstance(res_type, TypeType):
+            tpins = res_type.getins(res_option)
+            res_option.value = tpins
     return res_option
 
 
@@ -51,12 +47,12 @@ def eval_assign_type(node: Union[ast.Assign, ast.AnnAssign],
                      prepinfo: PrepInfo) -> Option[TypeIns]:
     if isinstance(node, ast.Assign):
         if node.type_comment:
-            return eval_typedef_annotation(node.type_comment, prepinfo)
+            return eval_typedef_expr(node.type_comment, prepinfo, True)
         else:
             return Option(any_ins)
 
     elif isinstance(node, ast.AnnAssign):
-        return eval_typedef_annotation(node.annotation, prepinfo)
+        return eval_typedef_expr(node.annotation, prepinfo, True)
 
     else:
         raise TypeError("node doesn't stands for an assignment statement")
@@ -73,7 +69,7 @@ def eval_func_type(node: ast.FunctionDef,
                           argument, any_ins)
 
     if node.returns:
-        return_option = eval_typedef_annotation(node.returns, prepinfo)
+        return_option = eval_typedef_expr(node.returns, prepinfo, True)
         ret_ins = return_option.value
     else:
         ret_ins = any_ins
@@ -89,7 +85,7 @@ def eval_func_type(node: ast.FunctionDef,
 def eval_return_type(node: Optional[TypeDefNode],
                      prepinfo: PrepInfo) -> Option[TypeIns]:
     if node:
-        return eval_typedef_annotation(node, prepinfo)
+        return eval_typedef_expr(node, prepinfo, True)
 
     else:
         return Option(any_ins)
@@ -154,7 +150,7 @@ def eval_arg_type(node: ast.arg, prepinfo: 'PrepInfo') -> Option[Arg]:
     new_arg = Arg(node.arg)
     res_option = Option(new_arg)
     if node.annotation:
-        ann_option = eval_typedef_annotation(node.annotation, prepinfo)
+        ann_option = eval_typedef_expr(node.annotation, prepinfo, True)
         res_option.combine_error(ann_option)
         new_arg.ann = ann_option.value
     return res_option

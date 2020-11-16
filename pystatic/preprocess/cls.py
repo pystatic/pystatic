@@ -96,7 +96,7 @@ def _resolve_cls_inh(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
     clstemp = clsdef.clstemp
     for base_node in clsdef.defnode.bases:
-        base_option = eval_typedef_expr(base_node, clsdef.def_prepinfo)
+        base_option = eval_typedef_expr(base_node, clsdef.def_prepinfo, False)
         base_option.dump_to_box(mbox)
         res_type = base_option.value
         assert isinstance(res_type, TypeType)

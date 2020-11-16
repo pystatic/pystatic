@@ -125,7 +125,7 @@ class MethodPrepInfo(PrepInfo):
         self.clstemp = clstemp
         self.var_attr: Dict[str, 'prep_local_def'] = {}
 
-    def add_attr_def(self, name: str, defnode: ast.AST):
+    def add_attr_def(self, name: str, defnode: AssignNode):
         attr_def = prep_local_def(name, defnode)
         self.var_attr[name] = attr_def
 
@@ -210,7 +210,7 @@ class prep_clsdef:
     def name(self):
         return self.defnode.name
 
-    def add_attr(self, name: str, defnode: ast.AST):
+    def add_attr(self, name: str, defnode: AssignNode):
         local_def = prep_local_def(name, defnode)
         self.var_attr[name] = local_def
 
@@ -240,7 +240,9 @@ class prep_func:
 class prep_local_def:
     __slots__ = ['name', 'defnode', 'value']
 
-    def __init__(self, name: str, defnode: ast.AST) -> None:
+    def __init__(self, name: str, defnode: AssignNode) -> None:
+        assert isinstance(defnode, ast.Assign) or isinstance(
+            defnode, ast.AnnAssign)
         self.name = name
         self.defnode = defnode
         self.value: Optional[TypeIns] = None
