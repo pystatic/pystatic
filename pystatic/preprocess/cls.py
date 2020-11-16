@@ -115,12 +115,7 @@ class _FirstClassTempVisitor(NoGenVisitor):
         return prep_def
 
     def visit_Attribute(self, node: ast.Attribute):
-        raise NotImplementedError()
-        res = self.visit(node.value)
-        if isinstance(res.temp, TypeModuleTemp):
-            return res.temp.get_inner_typedef(node.attr).get_default_typetype()
-        else:
-            return res
+        return self.visit(node.value)
 
     def visit_Subscript(self, node: ast.Subscript):
         return self.visit(node.value)
@@ -215,7 +210,11 @@ def resolve_cls_method(target: 'BlockTarget', env: 'PrepEnvironment',
         for clsdef in cur_prepinfo.cls_def.values():
             method_targets = _resolve_cls_method(clsdef, mbox)
             for blk_target in method_targets:
-                manager.add_check_target(blk_target)
+                # NOTE: here we add the target directly to the queue
+                # that get around manager, which may be problematic
+                env.add_target_prepinfo(
+                    blk_target, MethodPrepInfo(clsdef.clstemp, cur_prepinfo))
+                manager.q_preprocess.append(blk_target)
 
             for subclsdef in clsdef.prepinfo.cls_def.values():
                 queue.append(subclsdef.prepinfo)

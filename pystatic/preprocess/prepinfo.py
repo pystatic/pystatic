@@ -26,7 +26,9 @@ class PrepInfoItem(Protocol):
 
 
 class PrepInfo:
-    def __init__(self, symtable: 'SymTable'):
+    def __init__(self, symtable: 'SymTable', enclosing: Optional['PrepInfo']):
+        self.enclosing = enclosing
+
         self.cls_def: Dict[str, 'prep_clsdef'] = {}
         self.typevar_def: Dict[str, 'prep_typevar_def'] = {}
         self.type_alias: Dict[str, 'prep_type_alias'] = {}
@@ -85,10 +87,16 @@ class PrepInfo:
             return Option(self.cls_def[name].clstemp.get_default_typetype())
         elif name in self.impt:
             impt = self.impt[name]
-            res_option = Option(impt.getins())
-            return res_option
+            return Option(impt.getins())
         else:
-            return self.symtable.getattribute(name, node)
+            res = self.symtable.lookup(name)
+            if res:
+                return Option(res)
+            elif self.enclosing:
+                assert self.enclosing is not self
+                return self.enclosing.getattribute(name, node)
+            else:
+                return Option(any_ins)
 
     def dump(self):
         for name, clsdef in self.cls_def.items():
@@ -116,8 +124,9 @@ class PrepInfo:
 
 
 class MethodPrepInfo(PrepInfo):
-    def __init__(self, clstemp: TypeClassTemp):
-        super().__init__(clstemp.get_inner_symtable())
+    def __init__(self, clstemp: TypeClassTemp,
+                 enclosing: Optional['PrepInfo']):
+        super().__init__(clstemp.get_inner_symtable(), enclosing)
         self.clstemp = clstemp
         self.var_attr: Dict[str, 'prep_local_def'] = {}
 
@@ -148,6 +157,21 @@ class PrepEnvironment:
         self.target_prepinfo[target] = prepinfo
         if isinstance(target, Target):
             self.symid_prepinfo[target.symid] = prepinfo
+
+    def try_add_target_prepinfo(self, target: 'BlockTarget',
+                                prepinfo: 'PrepInfo'):
+        """Try to add a prepinfo into environment
+
+        If target already in environment, then prepinfo won't be added.
+
+        Return the prepinfo in the environment
+        """
+        if target not in self.target_prepinfo:
+            self.target_prepinfo[target] = prepinfo
+            if isinstance(target, Target):
+                self.symid_prepinfo[target.symid] = prepinfo
+            return prepinfo
+        return self.target_prepinfo[target]
 
     def get_target_prepinfo(self, target: 'BlockTarget'):
         return self.target_prepinfo.get(target)

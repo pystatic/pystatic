@@ -22,8 +22,7 @@ def get_definition(target: 'BlockTarget', env: 'PrepEnvironment',
     assert cur_ast
     assert not env.get_prepinfo(symid), "call get_definition with the same symid is invalid"
 
-    prepinfo = PrepInfo(symtable)
-    env.add_target_prepinfo(target, prepinfo)
+    prepinfo = env.try_add_target_prepinfo(target, PrepInfo(symtable, None))
 
     TypeDefVisitor(env, prepinfo, mbox).accept(cur_ast)
 
@@ -33,8 +32,8 @@ def get_definition_in_method(target: 'MethodTarget', env: 'PrepEnvironment',
     cur_ast = target.ast
     assert isinstance(cur_ast, ast.FunctionDef)
     clstemp = target.clstemp
-    prepinfo = MethodPrepInfo(clstemp)
-    env.add_target_prepinfo(target, prepinfo)
+    prepinfo = env.try_add_target_prepinfo(target, MethodPrepInfo(clstemp, None))
+    assert isinstance(prepinfo, MethodPrepInfo)
 
     return TypeDefVisitor(env, prepinfo, mbox, True).accept_func(cur_ast)
 
@@ -135,8 +134,8 @@ class TypeDefVisitor(BaseVisitor):
             clstemp = TypeClassTemp(clsname, self.prepinfo.symtable, new_symtable)
 
         assert isinstance(clstemp, TypeClassTemp)
-        new_prepinfo = PrepInfo(new_symtable)
 
+        new_prepinfo = PrepInfo(new_symtable, self.prepinfo)
         self.prepinfo.add_cls_def(clstemp, new_prepinfo, self.prepinfo, node)
         self.prepinfo.symtable.add_entry(clsname, Entry(clstemp.get_default_typetype(), node))
 
