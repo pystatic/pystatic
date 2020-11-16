@@ -71,10 +71,6 @@ class PrepInfo:
             self.func[name] = prep_func(node)
 
     def get_prep_def(self, name: str) -> Optional[PrepInfoItem]:
-        """
-        :param through: if name represents an prep_impt, if through is True,
-        then it will return its value, else the prep_impt itself is returned
-        """
         if name in self.cls_def:
             return self.cls_def[name]
         elif name in self.local:

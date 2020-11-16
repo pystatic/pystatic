@@ -22,50 +22,34 @@ if TYPE_CHECKING:
     from pystatic.target import BlockTarget
 
 
-def resolve_cls(targets: List['BlockTarget'], env: 'PrepEnvironment'):
-    """Get class information(inheritance, placeholders)"""
-    graph = _build_graph(targets, env)
-    resolve_order = graph.toposort()
-
-    # placeholders
-    for clsdef in resolve_order:
-        temp_mbox = env.manager.get_mbox_by_symid(clsdef.clstemp.module_symid)
-        assert temp_mbox, "This should always true because pystatic must have added the mbox before"
-        _resolve_cls_placeholder(clsdef, temp_mbox)
-
-    # inheritance
-    for clsdef in resolve_order:
-        temp_mbox = env.manager.get_mbox_by_symid(clsdef.clstemp.module_symid)
-        assert temp_mbox, "This should always true because pystatic must have added the mbox before"
-        _resolve_cls_inh(clsdef, temp_mbox)
-
-
-def _build_graph(targets: List['BlockTarget'],
-                 env: 'PrepEnvironment') -> 'DependencyGraph':
-    """Build dependency graph"""
+def resolve_cls_dependency(targets: List['BlockTarget'],
+                           env: 'PrepEnvironment'):
+    """Resolve dependencies between classes"""
     graph = DependencyGraph()
     for target in targets:
         prepinfo = env.get_target_prepinfo(target)
         assert prepinfo
         for clsdef in prepinfo.cls_def.values():
             assert isinstance(clsdef.clstemp, TypeClassTemp)
-            _build_graph_cls(clsdef, graph, prepinfo)
-    return graph
+            build_dependency_graph(clsdef, graph, prepinfo)
+
+    return graph.toposort()
 
 
-def _build_graph_cls(clsdef: 'prep_clsdef', graph: 'DependencyGraph',
-                     prepinfo: 'PrepInfo'):
+def build_dependency_graph(clsdef: 'prep_clsdef', graph: 'DependencyGraph',
+                           prepinfo: 'PrepInfo'):
     """Add dependency relations about a class"""
-    _build_graph_inh(clsdef, prepinfo, graph)
+    build_inheritance_graph(clsdef, prepinfo, graph)
 
+    # build dependencies of classes defined inside this class
     for subclsdef in clsdef.prepinfo.cls_def.values():
-        _build_graph_cls(subclsdef, graph, prepinfo)
+        build_dependency_graph(subclsdef, graph, prepinfo)
         # add dependency relations due to containment
         graph.add_dependency(clsdef, subclsdef)
 
 
-def _build_graph_inh(clsdef: 'prep_clsdef', prepinfo: 'PrepInfo',
-                     graph: 'DependencyGraph'):
+def build_inheritance_graph(clsdef: 'prep_clsdef', prepinfo: 'PrepInfo',
+                            graph: 'DependencyGraph'):
     """Add dependency relations that due to the inheritance"""
     clstemp = clsdef.clstemp
     graph.add_clsdef(clsdef)
@@ -92,7 +76,7 @@ def _resolve_cls_placeholder(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     clstemp.placeholders = visitor.get_typevar_list()
 
 
-def _resolve_cls_inh(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
+def resolve_cls_inheritence(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
     clstemp = clsdef.clstemp
     for base_node in clsdef.defnode.bases:
@@ -109,6 +93,9 @@ class _FirstClassTempVisitor(NoGenVisitor):
 
     Used to build dependency graph. For example class C inherits A.B,
     this should return A's template so you can add edge from C to A.
+
+    If the inherited class has already defined in symtable, then it won't
+    return the TypeTemp of that class.
     """
     def __init__(self, prepinfo: 'PrepInfo') -> None:
         self.prepinfo = prepinfo
@@ -121,6 +108,8 @@ class _FirstClassTempVisitor(NoGenVisitor):
 
     def visit_Name(self, node: ast.Name):
         prep_def = self.prepinfo.get_prep_def(node.id)
+        if isinstance(prep_def, prep_impt):
+            prep_def = prep_def.value
         if not isinstance(prep_def, prep_clsdef):
             return None
         return prep_def
@@ -226,13 +215,14 @@ def resolve_cls_method(target: 'BlockTarget', env: 'PrepEnvironment',
         for clsdef in cur_prepinfo.cls_def.values():
             method_targets = _resolve_cls_method(clsdef, mbox)
             for blk_target in method_targets:
-                manager.preprocess_block(blk_target)
+                manager.add_check_target(blk_target)
 
             for subclsdef in clsdef.prepinfo.cls_def.values():
                 queue.append(subclsdef.prepinfo)
 
 
-def _resolve_cls_method(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
+def _resolve_cls_method(clsdef: 'prep_clsdef',
+                        mbox: 'MessageBox') -> List[MethodTarget]:
     targets = []
     prepinfo = clsdef.prepinfo
     clstemp = clsdef.clstemp

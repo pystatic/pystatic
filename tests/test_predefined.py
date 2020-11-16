@@ -30,3 +30,5 @@ def test_predefined_type():
 
     assert int_temp.getattribute('__add__', None)
     assert int_temp.getattribute('__sub__', None)
+
+    assert typevar_type is typing_temp.getattribute('TypeVar', None)

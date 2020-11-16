@@ -178,9 +178,10 @@ class Manager:
     def add_check_symid(self, symid: 'SymId') -> Option[bool]:
         return self.__add_check_symid(symid)
 
-    def add_check_target(self, target: 'Target'):
-        assert target not in self.targets
-        self.__add_target(target)
+    def add_check_target(self, target: 'BlockTarget'):
+        if isinstance(target, Target):
+            assert target not in self.targets
+            self.__add_target(target)
         self.update_stage(target, target.stage, True)
 
     def change_target_stage(self, target: 'Target', stage: Stage):
