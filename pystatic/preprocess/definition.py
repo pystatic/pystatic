@@ -62,8 +62,6 @@ class TypeDefVisitor(BaseVisitor):
     def _try_attr(self, node: ast.AST, target: ast.AST):
         attr = self._is_self_def(target)
         if attr:
-            # Unfortunately this is a hack to put temporary information
-            # on class template's var_attr
             prepinfo = self.prepinfo
             assert isinstance(prepinfo, MethodPrepInfo)
             if attr in prepinfo.var_attr:

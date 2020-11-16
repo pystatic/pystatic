@@ -97,6 +97,7 @@ class PrepInfo:
     def dump(self):
         for name, clsdef in self.cls_def.items():
             # classes must have been added before
+            # TODO: remove this
             assert not self.symtable.getattribute(name,
                                                   clsdef.defnode).haserr()
 
