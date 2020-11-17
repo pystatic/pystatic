@@ -10,7 +10,7 @@ from pystatic.preprocess.cls import (resolve_cls_placeholder, dump_to_symtable,
                                      resolve_cls_method)
 from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
 from pystatic.preprocess.prepinfo import PrepEnvironment
-from pystatic.preprocess.spt import resolve_typevar
+from pystatic.preprocess.spt import resolve_spt
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -75,7 +75,7 @@ class Preprocessor:
                 resolve_cls_method(target, self.env, target.mbox)
 
             for target in to_check:
-                resolve_typevar(target, self.env)
+                resolve_spt(target, self.env)
 
             for target in to_check:
                 dump_to_symtable(target, self.env)

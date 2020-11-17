@@ -52,12 +52,12 @@ def test_alias():
         assert alias.temp is temp
 
     assert OA.temp is optional_temp
-    # assert OA.bindlist
-    # assert len(OA.bindlist) == 1
-    # assert OA.bindlist[0].temp is A_temp
+    assert OA.bindlist
+    assert len(OA.bindlist) == 1
+    assert OA.bindlist[0].temp is A_temp
 
     assert UAB.temp is union_temp
-    # assert UAB.bindlist
-    # assert len(UAB.bindlist) == 2
-    # assert UAB.bindlist[0].temp is A_temp
-    # assert UAB.bindlist[1].temp is B_temp
+    assert UAB.bindlist
+    assert len(UAB.bindlist) == 2
+    assert UAB.bindlist[0].temp is A_temp
+    assert UAB.bindlist[1].temp is B_temp

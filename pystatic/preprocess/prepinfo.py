@@ -59,11 +59,11 @@ class PrepInfo:
         local_def = prep_local(name, defnode)
         self.local[name] = local_def
 
-    def add_type_alias(self, alias: str, typetype: TypeType, defnode: ast.AST):
-        type_alias = prep_type_alias(alias, typetype, defnode)
-        self.type_alias[alias] = type_alias
-        self.symtable.add_entry(alias,
-                                Entry(TypeAlias(alias, typetype), defnode))
+    def add_type_alias(self, alias: str, typealias: TypeAlias,
+                       defnode: AssignNode):
+        prep = prep_type_alias(typealias, defnode)
+        self.type_alias[alias] = prep
+        self.symtable.add_entry(alias, Entry(typealias, defnode))
 
     def add_func_def(self, node: ast.FunctionDef):
         name = node.name
@@ -204,13 +204,11 @@ class prep_typevar:
 
 
 class prep_type_alias:
-    __slots__ = ['typetype', 'defnode', 'value']
+    __slots__ = ['defnode', 'value']
 
-    def __init__(self, alias: str, typetype: 'TypeType',
-                 defnode: ast.AST) -> None:
-        self.typetype = typetype
+    def __init__(self, typealias: 'TypeAlias', defnode: AssignNode) -> None:
+        self.value = typealias
         self.defnode = defnode
-        self.value = TypeAlias(alias, typetype)
 
     def getins(self) -> TypeAlias:
         return self.value

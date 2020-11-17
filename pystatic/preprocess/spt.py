@@ -1,15 +1,15 @@
 import ast
 from collections import deque
 from typing import Deque
-from pystatic.exprparse import ExprParser
-from pystatic.typesys import TypeIns
+from pystatic.exprparse import ExprParser, eval_expr
+from pystatic.typesys import TypeIns, TypeType
 from pystatic.visitor import NoGenVisitor
-from pystatic.predefined import TypeVarIns, TypeAlias, typevar_type, typevar_temp
+from pystatic.predefined import TypeVarIns, typevar_type, typevar_temp
 from pystatic.target import BlockTarget
 from pystatic.preprocess.prepinfo import PrepEnvironment, PrepInfo
 
 
-def resolve_typevar(target: 'BlockTarget', env: PrepEnvironment):
+def resolve_spt(target: 'BlockTarget', env: PrepEnvironment):
     init_prepinfo = env.get_target_prepinfo(target)
     assert init_prepinfo
 
@@ -23,13 +23,18 @@ def resolve_typevar(target: 'BlockTarget', env: PrepEnvironment):
             assert value, "TypeVar definition shouldn't be empty"
             fill_typevar(value, typevar_def.typevar, cur_prepinfo)
 
+        for typealias_def in cur_prepinfo.type_alias.values():
+            value = typealias_def.defnode.value
+            typealias = typealias_def.value
+            # TODO: change assert to
+            assert value, "TypeAlias definition shouldn't be empty"
+            # TODO: add warning
+            typetype = eval_expr(value, cur_prepinfo).value
+            assert isinstance(typetype, TypeType)
+            typealias.bindlist = typetype.bindlist
+
         for clsdef in cur_prepinfo.cls_def.values():
             queue.append(clsdef.prepinfo)
-
-
-def resolve_typealias(target: 'BlockTarget', env: PrepEnvironment):
-    init_prepinfo = env.get_target_prepinfo(target)
-    assert init_prepinfo
 
 
 def fill_typevar(node: ast.AST, typevar: 'TypeVarIns', prepinfo: 'PrepInfo'):
@@ -45,10 +50,6 @@ def copy_typevar(src: 'TypeVarIns', dst: 'TypeVarIns'):
     dst.constrains = src.constrains
 
 
-def fill_typealias(node: ast.AST, typealias: 'TypeAlias'):
-    pass
-
-
 class TypeVarFiller(ExprParser):
     class TypeVarFillerComplete(Exception):
         pass
@@ -61,6 +62,7 @@ class TypeVarFiller(ExprParser):
     def accept(self, node: ast.AST):
         try:
             self.visit(node)
+            # TODO: change this to recoverable error
             raise ValueError("node is not a TypeVar")
         except self.TypeVarFillerComplete:
             return self.typevar

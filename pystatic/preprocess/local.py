@@ -36,7 +36,7 @@ def judge_typevar(prepinfo: 'PrepInfo', node: AssignNode):
             return typevar
     return None
 
-def judge_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeType]:
+def judge_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeAlias]:
     if isinstance(node, ast.AnnAssign):
         # assignment with type annotation is not a type alias.
         return None
@@ -53,8 +53,9 @@ def judge_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeType
                     target = node.targets[0]
             
                 if isinstance(target, ast.Name):
-                    prepinfo.add_type_alias(target.id, typetype, node)
-                    return typetype
+                    typealias = TypeAlias(target.id, typetype)
+                    prepinfo.add_type_alias(target.id, typealias, node)
+                    return typealias
                 else:
                     raise NotImplementedError()
     return None
@@ -67,8 +68,8 @@ def resolve_local_typeins(target: 'BlockTarget', env: 'PrepEnvironment',
         if (typevar := judge_typevar(prepinfo, entry.defnode)):
             entry.value = typevar
             return True
-        elif (typetype := judge_typealias(prepinfo, entry.defnode)):
-            entry.value = TypeAlias(entry.name, typetype)
+        elif (typealias := judge_typealias(prepinfo, entry.defnode)):
+            entry.value = typealias
             return True
         return False
 
