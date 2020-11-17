@@ -3,7 +3,7 @@ from typing import Optional, TYPE_CHECKING, List
 from pystatic.exprparse import SupportGetAttribute
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.predefined import (TypeModuleTemp, TypePackageTemp,
-                                 TypePackageIns, TypeClassTemp)
+                                 TypePackageIns, TypeClassTemp, TypeVarIns)
 from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
 from pystatic.option import Option
 from pystatic.symtable import ImportNode, SymTable

@@ -1,5 +1,6 @@
 import ast
 from typing import TYPE_CHECKING, List
+from pystatic.target import BlockTarget, MethodTarget, Stage, Target
 from pystatic.preprocess.definition import (get_definition,
                                             get_definition_in_method)
 from pystatic.preprocess.impt import resolve_import
@@ -9,7 +10,7 @@ from pystatic.preprocess.cls import (resolve_cls_placeholder, dump_to_symtable,
                                      resolve_cls_method)
 from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
 from pystatic.preprocess.prepinfo import PrepEnvironment
-from pystatic.target import BlockTarget, MethodTarget, Stage, Target
+from pystatic.preprocess.spt import resolve_typevar
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -72,6 +73,9 @@ class Preprocessor:
 
             for target in to_check:
                 resolve_cls_method(target, self.env, target.mbox)
+
+            for target in to_check:
+                resolve_typevar(target, self.env)
 
             for target in to_check:
                 dump_to_symtable(target, self.env)

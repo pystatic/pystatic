@@ -69,6 +69,20 @@ class ExprParser(NoGenVisitor):
                         return any_ins
         return typeins or any_ins
 
+    def generate_applyargs(self, node: ast.Call) -> ApplyArgs:
+        applyargs = ApplyArgs()
+        # generate applyargs
+        for argnode in node.args:
+            argins = self.visit(argnode)
+            assert isinstance(argins, TypeIns)
+            applyargs.add_arg(argins, argnode)
+        for kwargnode in node.keywords:
+            argins = self.visit(kwargnode.value)
+            assert isinstance(argins, TypeIns)
+            assert kwargnode.arg, "**kwargs is not supported now"
+            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
+        return applyargs
+
     def accept(self, node: ast.AST) -> Option[TypeIns]:
         self.errors = []
         tpins = self.visit(node)
@@ -108,17 +122,7 @@ class ExprParser(NoGenVisitor):
         left_ins = self.visit(node.func)
         assert isinstance(left_ins, TypeIns)
 
-        applyargs = ApplyArgs()
-        # generate applyargs
-        for argnode in node.args:
-            argins = self.visit(argnode)
-            assert isinstance(argins, TypeIns)
-            applyargs.add_arg(argins, argnode)
-        for kwargnode in node.keywords:
-            argins = self.visit(kwargnode.value)
-            assert isinstance(argins, TypeIns)
-            assert kwargnode.arg, "**kwargs is not supported now"
-            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
+        applyargs = self.generate_applyargs(node)
         call_option = left_ins.call(applyargs)
 
         self.add_err(call_option.errors)

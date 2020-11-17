@@ -36,7 +36,7 @@ def resolve_cls_dependency(targets: List['BlockTarget'],
     return graph.toposort()
 
 
-def build_dependency_graph(clsdef: 'prep_clsdef', graph: 'DependencyGraph',
+def build_dependency_graph(clsdef: 'prep_cls', graph: 'DependencyGraph',
                            prepinfo: 'PrepInfo'):
     """Add dependency relations about a class"""
     build_inheritance_graph(clsdef, prepinfo, graph)
@@ -48,7 +48,7 @@ def build_dependency_graph(clsdef: 'prep_clsdef', graph: 'DependencyGraph',
         graph.add_dependency(clsdef, subclsdef)
 
 
-def build_inheritance_graph(clsdef: 'prep_clsdef', prepinfo: 'PrepInfo',
+def build_inheritance_graph(clsdef: 'prep_cls', prepinfo: 'PrepInfo',
                             graph: 'DependencyGraph'):
     """Add dependency relations that due to the inheritance"""
     clstemp = clsdef.clstemp
@@ -61,11 +61,11 @@ def build_inheritance_graph(clsdef: 'prep_clsdef', prepinfo: 'PrepInfo',
     for basenode in defnode.bases:
         inh_clsdef = visitor.accept(basenode)
         if inh_clsdef:
-            assert isinstance(inh_clsdef, prep_clsdef)
+            assert isinstance(inh_clsdef, prep_cls)
             graph.add_dependency(clsdef, inh_clsdef)
 
 
-def resolve_cls_placeholder(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
+def resolve_cls_placeholder(clsdef: 'prep_cls', mbox: 'MessageBox'):
     """Resolve placeholders of a class"""
     clstemp = clsdef.clstemp
     visitor = _TypeVarVisitor(clsdef.prepinfo, mbox)
@@ -75,7 +75,7 @@ def resolve_cls_placeholder(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
     clstemp.placeholders = visitor.get_typevar_list()
 
 
-def resolve_cls_inheritence(clsdef: 'prep_clsdef', mbox: 'MessageBox'):
+def resolve_cls_inheritence(clsdef: 'prep_cls', mbox: 'MessageBox'):
     """Resolve baseclasses of a class"""
     clstemp = clsdef.clstemp
     for base_node in clsdef.defnode.bases:
@@ -109,7 +109,7 @@ class _FirstClassTempVisitor(NoGenVisitor):
         prep_def = self.prepinfo.get_prep_def(node.id)
         if isinstance(prep_def, prep_impt):
             prep_def = prep_def.value
-        if not isinstance(prep_def, prep_clsdef):
+        if not isinstance(prep_def, prep_cls):
             return None
         return prep_def
 
@@ -219,7 +219,7 @@ def resolve_cls_method(target: 'BlockTarget', env: 'PrepEnvironment',
                 queue.append(subclsdef.prepinfo)
 
 
-def _resolve_cls_method(clsdef: 'prep_clsdef',
+def _resolve_cls_method(clsdef: 'prep_cls',
                         mbox: 'MessageBox') -> List[MethodTarget]:
     targets = []
     prepinfo = clsdef.prepinfo

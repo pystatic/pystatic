@@ -29,10 +29,10 @@ class PrepInfo:
     def __init__(self, symtable: 'SymTable', enclosing: Optional['PrepInfo']):
         self.enclosing = enclosing
 
-        self.cls_def: Dict[str, 'prep_clsdef'] = {}
-        self.typevar_def: Dict[str, 'prep_typevar_def'] = {}
+        self.cls_def: Dict[str, 'prep_cls'] = {}
+        self.typevar_def: Dict[str, 'prep_typevar'] = {}
         self.type_alias: Dict[str, 'prep_type_alias'] = {}
-        self.local: Dict[str, 'prep_local_def'] = {}
+        self.local: Dict[str, 'prep_local'] = {}
         self.func: Dict[str, 'prep_func'] = {}
         self.impt: Dict[str, 'prep_impt'] = {}
 
@@ -45,18 +45,18 @@ class PrepInfo:
     def add_cls_def(self, temp: TypeClassTemp, prepinfo: 'PrepInfo',
                     def_prepinfo: 'PrepInfo', node: ast.ClassDef):
         name = node.name
-        cls_def = prep_clsdef(temp, prepinfo, def_prepinfo, node)
+        cls_def = prep_cls(temp, prepinfo, def_prepinfo, node)
         self.cls_def[name] = cls_def
         self.symtable.add_type_def(name, temp)
         self.symtable.add_entry(name, Entry(temp.get_default_typetype(), node))
 
     def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
                         defnode: AssignNode):
-        self.typevar_def[name] = prep_typevar_def(name, typevar, defnode)
+        self.typevar_def[name] = prep_typevar(name, typevar, defnode)
         self.symtable.add_entry(name, Entry(typevar, defnode))
 
     def add_local_def(self, name: str, defnode: AssignNode):
-        local_def = prep_local_def(name, defnode)
+        local_def = prep_local(name, defnode)
         self.local[name] = local_def
 
     def add_type_alias(self, alias: str, typetype: TypeType, defnode: ast.AST):
@@ -128,10 +128,10 @@ class MethodPrepInfo(PrepInfo):
                  enclosing: Optional['PrepInfo']):
         super().__init__(clstemp.get_inner_symtable(), enclosing)
         self.clstemp = clstemp
-        self.var_attr: Dict[str, 'prep_local_def'] = {}
+        self.var_attr: Dict[str, 'prep_local'] = {}
 
     def add_attr_def(self, name: str, defnode: AssignNode):
-        attr_def = prep_local_def(name, defnode)
+        attr_def = prep_local(name, defnode)
         self.var_attr[name] = attr_def
 
     def dump(self):
@@ -190,7 +190,7 @@ class PrepEnvironment:
             return module_temp.get_inner_symtable().lookup(name)
 
 
-class prep_typevar_def:
+class prep_typevar:
     __slots__ = ['name', 'typevar', 'defnode']
 
     def __init__(self, name: str, typevar: 'TypeVarIns',
@@ -216,7 +216,7 @@ class prep_type_alias:
         return self.value
 
 
-class prep_clsdef:
+class prep_cls:
     def __init__(self, clstemp: 'TypeClassTemp', prepinfo: 'PrepInfo',
                  def_prepinfo: 'PrepInfo', defnode: ast.ClassDef) -> None:
         assert isinstance(defnode, ast.ClassDef)
@@ -224,14 +224,14 @@ class prep_clsdef:
         self.prepinfo = prepinfo
         self.def_prepinfo = def_prepinfo
         self.defnode = defnode
-        self.var_attr: Dict[str, prep_local_def] = {}
+        self.var_attr: Dict[str, prep_local] = {}
 
     @property
     def name(self):
         return self.defnode.name
 
     def add_attr(self, name: str, defnode: AssignNode):
-        local_def = prep_local_def(name, defnode)
+        local_def = prep_local(name, defnode)
         self.var_attr[name] = local_def
 
     def getins(self) -> TypeType:
@@ -257,7 +257,7 @@ class prep_func:
         return self.value or any_ins
 
 
-class prep_local_def:
+class prep_local:
     __slots__ = ['name', 'defnode', 'value']
 
     def __init__(self, name: str, defnode: AssignNode) -> None:
