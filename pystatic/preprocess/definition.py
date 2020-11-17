@@ -2,13 +2,11 @@ import ast
 from contextlib import contextmanager
 from typing import List, Optional, Union
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import TypeClassTemp, TypeType
-from pystatic.predefined import TypeVarTemp, TypeVarIns
+from pystatic.typesys import TypeClassTemp
 from pystatic.message import MessageBox
 from pystatic.symtable import TableScope, ImportNode
-from pystatic.exprparse import eval_expr
 from pystatic.target import BlockTarget, MethodTarget
-from pystatic.preprocess.util import omit_inst_typetype, analyse_import_stmt
+from pystatic.preprocess.util import analyse_import_stmt
 from pystatic.preprocess.prepinfo import *
 
 
@@ -168,12 +166,12 @@ class TypeDefVisitor(BaseVisitor):
                     cur_prefix += f'.{subid}'
                 else:
                     cur_prefix = subid
-                manager.add_check_symid(cur_prefix)
+                manager.add_check_symid(cur_prefix, False)
 
             if not infoitem.is_import_module():
                 origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
                 if manager.is_module(origin_symid):
-                    manager.add_check_symid(origin_symid)
+                    manager.add_check_symid(origin_symid, False)
 
             # TODO: error check name collision here
             self.prepinfo.impt[infoitem.asname] = infoitem

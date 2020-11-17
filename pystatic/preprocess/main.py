@@ -9,7 +9,7 @@ from pystatic.preprocess.cls import (resolve_cls_placeholder, dump_to_symtable,
                                      resolve_cls_method)
 from pystatic.preprocess.local import resolve_local_typeins, resolve_local_func
 from pystatic.preprocess.prepinfo import PrepEnvironment
-from pystatic.target import BlockTarget, MethodTarget, Stage
+from pystatic.target import BlockTarget, MethodTarget, Stage, Target
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -28,15 +28,15 @@ def path2ast(path: str) -> ast.AST:
 
 class Preprocessor:
     def __init__(self, manager: 'Manager') -> None:
-        self.manager = manager
         self.env = PrepEnvironment(manager)
 
     def process(self):
-        while len(self.manager.q_preprocess) > 0:
+        manager = self.env.manager
+        while len(manager.q_preprocess) > 0:
             to_check: List[BlockTarget] = []
-            while len(self.manager.q_preprocess) > 0:
-                current = self.manager.q_preprocess[0]
-                self.manager.q_preprocess.popleft()
+            while len(manager.q_preprocess) > 0:
+                current = manager.q_preprocess[0]
+                manager.q_preprocess.popleft()
                 assert current.stage == Stage.Preprocess
                 assert current.ast
                 to_check.append(current)
@@ -53,7 +53,7 @@ class Preprocessor:
 
             cls_resolve_order = resolve_cls_dependency(to_check, self.env)
             for clsdef in cls_resolve_order:
-                temp_mbox = self.env.manager.get_mbox_by_symid(
+                temp_mbox = manager.get_mbox_by_symid(
                     clsdef.clstemp.module_symid)
                 assert temp_mbox, "This should always true because pystatic must have added the mbox before"
                 resolve_cls_inheritence(clsdef, temp_mbox)
@@ -65,19 +65,18 @@ class Preprocessor:
                 resolve_local_typeins(target, self.env, target.mbox)
 
             for clsdef in cls_resolve_order:
-                temp_mbox = self.env.manager.get_mbox_by_symid(
+                temp_mbox = manager.get_mbox_by_symid(
                     clsdef.clstemp.module_symid)
                 assert temp_mbox, "This should always true because pystatic must have added the mbox before"
                 resolve_cls_placeholder(clsdef, temp_mbox)
-            # for target in to_check:
-            #     resolve_import_ins(target.symtable, self.manager)
 
             for target in to_check:
                 resolve_cls_method(target, self.env, target.mbox)
 
-                # if isinstance(target, Target):
-                #     self.manager.update_stage(target, Stage.Infer)
-
             for target in to_check:
                 dump_to_symtable(target, self.env)
-            pass
+
+            for target in to_check:
+                if isinstance(target, Target) and manager.is_on_check(
+                        target.symid):
+                    manager.update_stage(target, Stage.Infer)

@@ -1,17 +1,7 @@
-import ast
-import copy
 from collections import deque
-from typing import TYPE_CHECKING, Tuple, List, Dict, Optional, Deque
-from pystatic.typesys import TypeClassTemp, TypeType
-from pystatic.predefined import TypeVarIns, TypeModuleTemp
-from pystatic.symid import symid2list
-from pystatic.symtable import ImportEntry, SymTable
-from pystatic.typesys import any_ins, TypeIns
+from typing import List, Deque
 from pystatic.preprocess.util import update_symtable_import_cache
 from pystatic.preprocess.prepinfo import *
-
-if TYPE_CHECKING:
-    from pystatic.manager import Manager
 
 
 def resolve_import(target: 'BlockTarget', env: 'PrepEnvironment'):
