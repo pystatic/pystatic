@@ -128,8 +128,6 @@ class InferVisitor(BaseVisitor):
         if not self.recorder.is_defined(name):  # var appear first time
             self.recorder.set_type(name, comment)
 
-        print(self.symid, name)
-        print(comment)
         if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
@@ -290,6 +288,8 @@ class InferStarter:
 
     def start_infer(self):
         for symid, target in self.sources.items():
+            if symid == "typing" or symid=="builtins":
+                continue
             logger.info(f'Type infer in module \'{symid}\'')
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox, symid, self.config)

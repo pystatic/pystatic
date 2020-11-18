@@ -29,8 +29,8 @@ def parse_file(file_path):
 file_list = [
     'check_assign',
     'check_attribute',
-    'check_reach',
-    'check_tuple'
+    'check_reach'
+    # 'check_tuple'
 ]
 
 
