@@ -48,9 +48,9 @@ def test_typevar():
     assert isinstance(H, TypeVarIns)
     assert isinstance(I, TypeVarIns)
 
-    assert len(F.constrains) == 2
-    assert F.constrains[0] is int_ins
-    assert F.constrains[1] is str_ins
+    assert len(F.constraints) == 2
+    assert F.constraints[0] is int_ins
+    assert F.constraints[1] is str_ins
     assert G.bound is int_ins
     assert H.bound is str_ins
     assert H.kind == TpVarKind.COVARIANT
