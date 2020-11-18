@@ -167,6 +167,30 @@ class TypeVarIns(TypeIns):
         self.constrains: List['TypeIns'] = list(*args)
 
 
+class TypeTypeAnnTemp(TypeTemp):
+    def __init__(self):
+        super().__init__('Type')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
+
+    def arity(self) -> int:
+        return 1
+
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        if not bindlist or len(bindlist) != 1:
+            raise NotImplementedError()  # TODO: warning here
+
+        if not isinstance(bindlist[0], TypeIns):
+            raise NotImplementedError()
+
+        if isinstance(bindlist[0], TypeType):
+            return Option(bindlist[0])
+        else:
+            return Option(TypeType(bindlist[0].temp, None))
+
+
 class TypeUnionTemp(TypeTemp):
     def __init__(self):
         super().__init__('Union')
@@ -174,6 +198,9 @@ class TypeUnionTemp(TypeTemp):
     @property
     def module_symid(self) -> str:
         return 'typing'
+
+    def arity(self) -> int:
+        return INFINITE_ARITY
 
 
 class TypeOptionalTemp(TypeTemp):
@@ -543,6 +570,8 @@ union_temp, union_type, _ = _add_spt_to_symtable(TypeUnionTemp,
                                                  typing_symtable)
 callable_temp, callable_type, _ = _add_spt_to_symtable(TypeCallableTemp,
                                                        typing_symtable)
+type_temp, type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp,
+                                               typing_symtable)
 
 none_temp, none_type, none_ins = _add_spt_to_symtable(TypeNoneTemp,
                                                       builtin_symtable)

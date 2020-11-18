@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Type
 
 a: int = 1
 b: int = 2
@@ -19,3 +19,4 @@ d: B = B()
 e: Tuple[int] = (3, )
 f: Tuple[str, int] = ('hello', 3)
 g = a < b
+TA: Type[A] = A
