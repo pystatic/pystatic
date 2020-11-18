@@ -1,7 +1,7 @@
 import os
 import logging
 from collections import deque
-from typing import Optional, Dict, TYPE_CHECKING, Deque
+from typing import Optional, Dict, TYPE_CHECKING, Deque, Set
 from pystatic.config import Config
 from pystatic.exprparse import eval_expr
 from pystatic.errorcode import *
@@ -13,7 +13,7 @@ from pystatic.preprocess import Preprocessor
 from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
                                  get_init_module_symtable)
 from pystatic.symid import SymId, relpath2symid, symid2list
-from pystatic.typesys import TypeIns, any_ins
+from pystatic.typesys import TypeIns
 from pystatic.predefined import TypeModuleTemp, TypePackageTemp
 from pystatic.target import BlockTarget, Target, Stage, PackageTarget
 
@@ -30,6 +30,7 @@ class Manager:
         self.fsys = Filesys(config)
 
         self.pre_proc = Preprocessor(self)
+        self.to_check: Set[SymId] = set()  # modules that need to be checked
         self.targets: Dict[SymId, Target] = {}
 
         self.q_preprocess: Deque[BlockTarget] = deque()
@@ -39,14 +40,16 @@ class Manager:
             self.__init_typeshed()
 
     def __init_typeshed(self):
-        self.__add_check_symid('builtins', get_builtin_symtable())
-        self.__add_check_symid('typing', get_typing_symtable())
+        self.__add_check_symid('builtins', get_builtin_symtable(), False, None,
+                               True)
+        self.__add_check_symid('typing', get_typing_symtable(), False, None,
+                               True)
         self.preprocess()
 
-    def __add_check_symid(self,
-                          symid: 'SymId',
-                          default_symtable: Optional['SymTable'] = None,
-                          oldpath: Optional[FilePath] = None) -> Option[bool]:
+    def __add_check_symid(self, symid: 'SymId',
+                          default_symtable: Optional['SymTable'],
+                          to_check: bool, oldpath: Optional[FilePath],
+                          is_special: bool) -> Option[bool]:
         """
         default_symtable:
             if not None, then the symtable of the new target is set to it.
@@ -85,11 +88,15 @@ class Manager:
 
             if find_res.res_type == ModuleFindRes.Module:
                 file_path = self.fsys.realpath(find_res.paths[0])
-                new_target = Target(symid, symtable, mbox, file_path)
+                new_target = Target(symid,
+                                    symtable,
+                                    mbox,
+                                    file_path,
+                                    is_special=is_special)
 
                 self.__parse(new_target)
                 self.update_stage(new_target, Stage.Preprocess)
-                self.__add_target(new_target)
+                self.__add_target(new_target, to_check)
 
             elif find_res.res_type == ModuleFindRes.Package:
                 assert find_res.analyse_path
@@ -106,18 +113,20 @@ class Manager:
 
                 self.__parse(new_target)
                 self.update_stage(new_target, Stage.Preprocess)
-                self.__add_target(new_target)
+                self.__add_target(new_target, to_check)
 
             elif find_res.res_type == ModuleFindRes.Namespace:
                 assert False, "Namespace package not supported yet"
 
         return add_option
 
-    def __add_target(self, target: Target):
+    def __add_target(self, target: Target, to_check: bool):
         """Add target"""
         self.targets[target.symid] = target
         if target.path:
             self.fsys.add_path_symid_map(target.path, target.symid)
+        if to_check:
+            self.to_check.add(target.symid)
 
     def __parse(self, target: Target):
         assert target.stage == Stage.Parse
@@ -131,6 +140,9 @@ class Manager:
             return False
         else:
             return True
+
+    def is_on_check(self, symid: 'SymId') -> bool:
+        return symid in self.to_check
 
     def update_stage(self,
                      target: BlockTarget,
@@ -162,7 +174,9 @@ class Manager:
             return self.targets[symid].module_temp
         return None
 
-    def add_check_file(self, path: FilePath) -> Option[bool]:
+    def add_check_file(self,
+                       path: FilePath,
+                       to_check: bool = True) -> Option[bool]:
         path = self.fsys.realpath(path)
 
         if not os.path.exists(path):
@@ -173,14 +187,17 @@ class Manager:
             rt_path = crawl_path(os.path.dirname(path))
             self.fsys.add_userpath(rt_path)
             symid = relpath2symid(rt_path, path)
-            return self.__add_check_symid(symid, None, path)
+            return self.__add_check_symid(symid, None, to_check, path, False)
 
-    def add_check_symid(self, symid: 'SymId') -> Option[bool]:
-        return self.__add_check_symid(symid)
+    def add_check_symid(self,
+                        symid: 'SymId',
+                        to_check: bool = True) -> Option[bool]:
+        return self.__add_check_symid(symid, None, to_check, None, False)
 
-    def add_check_target(self, target: 'Target'):
-        assert target not in self.targets
-        self.__add_target(target)
+    def add_check_target(self, target: 'BlockTarget', to_check: bool = True):
+        if isinstance(target, Target):
+            assert target not in self.targets
+            self.__add_target(target, to_check)
         self.update_stage(target, target.stage, True)
 
     def change_target_stage(self, target: 'Target', stage: Stage):

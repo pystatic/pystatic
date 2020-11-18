@@ -43,6 +43,13 @@ class ExprParser(NoGenVisitor):
         self.container = old_container
         self.in_subs = old_in_subs
 
+    @contextlib.contextmanager
+    def block_container(self):
+        old_in_subs = self.in_subs
+        self.in_subs = False
+        yield
+        self.in_subs = old_in_subs
+
     def add_err(self, errlist: Optional[List[ErrorCode]]):
         if errlist:
             self.errors.extend(errlist)
@@ -68,6 +75,20 @@ class ExprParser(NoGenVisitor):
                     if not typeins.equiv(new_typeins):
                         return any_ins
         return typeins or any_ins
+
+    def generate_applyargs(self, node: ast.Call) -> ApplyArgs:
+        applyargs = ApplyArgs()
+        # generate applyargs
+        for argnode in node.args:
+            argins = self.visit(argnode)
+            assert isinstance(argins, TypeIns)
+            applyargs.add_arg(argins, argnode)
+        for kwargnode in node.keywords:
+            argins = self.visit(kwargnode.value)
+            assert isinstance(argins, TypeIns)
+            assert kwargnode.arg, "**kwargs is not supported now"
+            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
+        return applyargs
 
     def accept(self, node: ast.AST) -> Option[TypeIns]:
         self.errors = []
@@ -108,17 +129,7 @@ class ExprParser(NoGenVisitor):
         left_ins = self.visit(node.func)
         assert isinstance(left_ins, TypeIns)
 
-        applyargs = ApplyArgs()
-        # generate applyargs
-        for argnode in node.args:
-            argins = self.visit(argnode)
-            assert isinstance(argins, TypeIns)
-            applyargs.add_arg(argins, argnode)
-        for kwargnode in node.keywords:
-            argins = self.visit(kwargnode.value)
-            assert isinstance(argins, TypeIns)
-            assert kwargnode.arg, "**kwargs is not supported now"
-            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
+        applyargs = self.generate_applyargs(node)
         call_option = left_ins.call(applyargs)
 
         self.add_err(call_option.errors)
@@ -155,8 +166,9 @@ class ExprParser(NoGenVisitor):
         return res_option.value
 
     def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
-        left_ins = self.visit(node.value)
-        assert isinstance(left_ins, TypeIns)
+        with self.block_container():
+            left_ins = self.visit(node.value)
+            assert isinstance(left_ins, TypeIns)
 
         container = []
         with self.register_container(container):
@@ -216,7 +228,7 @@ class ExprParser(NoGenVisitor):
         return res
 
     def visit_Slice(self, node: ast.Slice):
-        assert False, "TODO"
+        raise NotImplementedError()
 
     def visit_Index(self, node: ast.Index):
         return self.visit(node.value)

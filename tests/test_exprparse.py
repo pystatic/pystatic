@@ -19,7 +19,7 @@ def parse_expr(expr: str):
 def parse_eval_check(expr: str,
                      module_ins,
                      expect: TypeIns,
-                     equiv,
+                     equiv: bool,
                      explicit=False):
     astnode = parse_expr(expr)
     eval_option = eval_expr(astnode, module_ins, explicit)
@@ -30,27 +30,58 @@ def parse_eval_check(expr: str,
         assert eval_res is expect
 
 
+def parse_eval_ann_check(expr: str, module_ins, expect: TypeIns):
+    astnode = parse_expr(expr)
+    eval_option = eval_expr(astnode, module_ins)
+    eval_res = eval_option.value
+    assert isinstance(eval_res, TypeType)
+    eval_res = eval_res.get_default_ins()
+    assert eval_res.equiv(expect)
+
+
 def test_exprparse_basic():
     cwd = os.path.dirname(__file__)
     manager = Manager(Config({'cwd': cwd}))
-    module_temp = manager.get_module_temp('builtins')
-    module_ins = module_temp.get_default_ins().value
 
-    parse_eval_check('1', module_ins, TypeLiteralIns(1), True)
-    parse_eval_check("'hello'", module_ins, TypeLiteralIns('hello'), True)
-    # parse_eval_check('1 < 2', module_ins, bool_ins, False)
-    parse_eval_check('[1, 2]', module_ins, TypeIns(list_temp, [int_ins]), True)
-    parse_eval_check("[1, 'hello']", module_ins, TypeIns(list_temp, [any_ins]),
+    parse_eval_check('1', typing_symtable, TypeLiteralIns(1), True)
+    parse_eval_check("'hello'", typing_symtable, TypeLiteralIns('hello'), True)
+    parse_eval_check('1 < 2', typing_symtable, bool_ins, False)
+    parse_eval_check('[1, 2]', typing_symtable, TypeIns(list_temp, [int_ins]),
                      True)
-    parse_eval_check('(1, 2)', module_ins,
+    parse_eval_check("[1, 'hello']", typing_symtable,
+                     TypeIns(list_temp, [any_ins]), True)
+    parse_eval_check('(1, 2)', typing_symtable,
                      TypeIns(tuple_temp, [int_ins, int_ins]), True)
     parse_eval_check(
-        '(1, 2)', module_ins,
+        '(1, 2)', typing_symtable,
         TypeIns(tuple_temp,
                 [TypeLiteralIns(1), TypeLiteralIns(2)]), True, True)
-    parse_eval_check('{1, 2}', module_ins, TypeIns(set_temp, [int_ins]), True)
-    parse_eval_check('{1: "good", 2: "good"}', module_ins,
+    parse_eval_check('{1, 2}', typing_symtable, TypeIns(set_temp, [int_ins]),
+                     True)
+    parse_eval_check('{1: "good", 2: "good"}', typing_symtable,
                      TypeIns(dict_temp, [int_ins, str_ins]), True)
+
+    parse_eval_ann_check('Type[int]', typing_symtable,
+                         TypeType(int_temp, None))
+
+
+def test_exprparse_type_expr():
+    src = 'exprparse_type_expr'
+    cwd = os.path.dirname(__file__)
+    config = Config({'cwd': cwd})
+    manager = Manager(config)
+    file_path = os.path.join(cwd, 'src', f'{src}.py')
+    res_option = manager.add_check_file(file_path)
+    assert res_option.value
+    manager.preprocess()
+
+    a = manager.get_sym_type(src, 'a')
+    assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
+    cur_union = union_temp.get_default_ins().value
+    cur_union.bindlist = [int, str]
+    cur_optional = optional_temp.get_default_ins().value
+    cur_optional.bindlist = [cur_union]
+    assert a.equiv(cur_optional)
 
 
 def test_exprparse():
@@ -83,11 +114,16 @@ def test_exprparse():
     d = manager.get_sym_type(src, 'd')
     A = manager.get_sym_type(src, 'A')
     B = manager.get_sym_type(src, 'B')
+    TA = manager.get_sym_type(src, 'TA')
 
     assert isinstance(c, TypeIns) and not isinstance(c, TypeType)
     assert isinstance(d, TypeIns) and not isinstance(d, TypeType)
     assert isinstance(A, TypeType)
     assert isinstance(B, TypeType)
+    assert isinstance(TA, TypeType)
+
+    assert TA.equiv(A)
+
     assert c.temp == A.temp
     assert d.temp == B.temp
 

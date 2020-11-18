@@ -97,17 +97,28 @@ class TypeIns:
         else:
             temp_arity = self.temp.arity()
             # default bind is Any
-            if self.bindlist:
-                diff1 = temp_arity - len(self.bindlist)
-                ext_list1 = self.bindlist + [any_ins] * diff1
-            else:
-                ext_list1 = [any_ins] * temp_arity
+            if temp_arity == INFINITE_ARITY:
+                ext_list1 = copy.copy(self.bindlist) if self.bindlist else []
+                ext_list2 = copy.copy(other.bindlist) if other.bindlist else []
+                len1 = len(ext_list1)
+                len2 = len(ext_list2)
+                if len1 < len2:
+                    ext_list1.extend([any_ins] * (len2 - len1))
+                elif len2 < len1:
+                    ext_list2.extend([any_ins] * (len1 - len2))
 
-            if other.bindlist:
-                diff2 = temp_arity - len(other.bindlist)
-                ext_list2 = other.bindlist + [any_ins] * diff2
             else:
-                ext_list2 = [any_ins] * temp_arity
+                if self.bindlist:
+                    diff1 = temp_arity - len(self.bindlist)
+                    ext_list1 = self.bindlist + [any_ins] * diff1
+                else:
+                    ext_list1 = [any_ins] * temp_arity
+
+                if other.bindlist:
+                    diff2 = temp_arity - len(other.bindlist)
+                    ext_list2 = other.bindlist + [any_ins] * diff2
+                else:
+                    ext_list2 = [any_ins] * temp_arity
 
             for i in range(temp_arity):
                 if not ext_list1[i].equiv(ext_list2[i]):
@@ -171,6 +182,15 @@ class TypeType(TypeIns):
     def __str__(self):
         s = self.temp.str_expr(None)
         return "Type[" + s + ']'
+
+
+class TypeAlias(TypeType):
+    def __init__(self, alias: str, typetype: TypeType):
+        super().__init__(typetype.temp, typetype.bindlist)
+        self.alias = alias
+
+    def __str__(self):
+        return self.alias
 
 
 class TypeTemp(ABC):
@@ -373,30 +393,26 @@ class ModuleNamedTypeTemp(TypeTemp):
 
 
 class TypeClassTemp(TypeTemp):
-    def __init__(self,
-                 clsname: str,
-                 def_symtable: 'SymTable',
-                 inner_symtable: 'SymTable',
-                 defnode: Optional[ast.ClassDef] = None):
+    def __init__(self, clsname: str, def_symtable: 'SymTable',
+                 inner_symtable: 'SymTable'):
         super().__init__(clsname)
 
-        self.baseclass: 'List[TypeType]'
+        self.baseclass: 'List[TypeIns]'
         self.baseclass = []
 
         self.var_attr: Dict[str, 'TypeIns'] = {}
 
         self._inner_symtable = inner_symtable  # symtable belongs to this cls
         self._def_symtable = def_symtable  # symtable where this cls is defined
-        self._defnode = defnode
 
     @property
     def module_symid(self) -> str:
         return self._def_symtable.glob_symid
 
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
-        cls_defs = self._inner_symtable._tp_defs
-        if name in cls_defs:
-            return cls_defs[name]
+        cls_def = self._inner_symtable._tp_def
+        if name in cls_def:
+            return cls_def[name]
         else:
             return None
 

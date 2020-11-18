@@ -22,7 +22,7 @@ builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
 builtin_symtable.glob = builtin_symtable
 builtin_symtable.builtins = builtin_symtable
 
-typing_symtable = SymTable('typings', None, None, builtin_symtable,
+typing_symtable = SymTable('typing', None, None, builtin_symtable,
                            TableScope.GLOB)
 typing_symtable.glob = typing_symtable
 
@@ -84,7 +84,7 @@ class TypeVarTemp(TypeClassTemp):
 
     def init_ins(self, applyargs: 'ApplyArgs',
                  bindlist: BindList) -> Option[TypeIns]:
-        def extract_value(ins_ast: Optional[InsWithAst], expect_type):
+        def extract_value(ins_ast: Optional['InsWithAst'], expect_type):
             if not ins_ast:
                 return None
 
@@ -121,32 +121,28 @@ class TypeVarTemp(TypeClassTemp):
                 default_ins.constrains.append(rangeins)
 
         cova = applyargs.kwargs.get('covariant')
+        contra = applyargs.kwargs.get('contravariant')
         if not cova:
             covariant = False
         else:
             covariant = extract_value(cova, bool)
-            if not covariant:
-                assert False, "TODO"
-
-        contra = applyargs.kwargs.get('contravariant')
         if not contra:
             contravariant = False
         else:
             contravariant = extract_value(contra, bool)
-            if not contravariant:
-                assert False, "TODO"
 
         bound_ins_ast = applyargs.kwargs.get('bound')
         if bound_ins_ast:
             if default_ins.constrains:
-                assert False, "TODO"
+                raise NotImplementedError()
             bound = bound_ins_ast.ins
             assert isinstance(bound, TypeType), "TODO"
-            default_ins.bound = bound
+            default_ins.bound = bound.get_default_ins()
 
         if covariant and contravariant:
-            assert False, "TODO"
+            raise NotImplementedError()
 
+        # TODO: warning if both covariant and contravariant is True
         if covariant:
             default_ins.kind = TpVarKind.COVARIANT
         elif contravariant:
@@ -171,6 +167,30 @@ class TypeVarIns(TypeIns):
         self.constrains: List['TypeIns'] = list(*args)
 
 
+class TypeTypeAnnTemp(TypeTemp):
+    def __init__(self):
+        super().__init__('Type')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
+
+    def arity(self) -> int:
+        return 1
+
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        if not bindlist or len(bindlist) != 1:
+            raise NotImplementedError()  # TODO: warning here
+
+        if not isinstance(bindlist[0], TypeIns):
+            raise NotImplementedError()
+
+        if isinstance(bindlist[0], TypeType):
+            return Option(bindlist[0])
+        else:
+            return Option(TypeType(bindlist[0].temp, None))
+
+
 class TypeUnionTemp(TypeTemp):
     def __init__(self):
         super().__init__('Union')
@@ -178,6 +198,9 @@ class TypeUnionTemp(TypeTemp):
     @property
     def module_symid(self) -> str:
         return 'typing'
+
+    def arity(self) -> int:
+        return INFINITE_ARITY
 
 
 class TypeOptionalTemp(TypeTemp):
@@ -518,8 +541,8 @@ class TypeFuncIns(TypeIns):
         return Option(self.overloads[0].ret_type)
 
 
-typevar_temp = TypeVarTemp()
-typevar_type = TypeType(typevar_temp, None)
+typevar_temp, typevar_type, _ = _add_spt_to_symtable(TypeVarTemp,
+                                                     typing_symtable)
 func_temp = TypeFuncTemp()
 
 _invariant_tpvar = TypeVarIns('_invariant_tpvar',
@@ -547,6 +570,8 @@ union_temp, union_type, _ = _add_spt_to_symtable(TypeUnionTemp,
                                                  typing_symtable)
 callable_temp, callable_type, _ = _add_spt_to_symtable(TypeCallableTemp,
                                                        typing_symtable)
+type_temp, type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp,
+                                               typing_symtable)
 
 none_temp, none_type, none_ins = _add_spt_to_symtable(TypeNoneTemp,
                                                       builtin_symtable)

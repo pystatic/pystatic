@@ -6,7 +6,7 @@ from pystatic.option import Option
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
-    from pystatic.typesys import TypeIns, TypeTemp, TypeClassTemp
+    from pystatic.typesys import TypeIns, TypeTemp
     from pystatic.predefined import TypeFuncIns
 
 
@@ -25,29 +25,33 @@ TypeDefNode = Union[str, ast.AST]
 
 
 class Entry:
-    def __init__(self, tp: 'TypeIns', defnode: Optional[ast.AST] = None):
-        self._tp = tp
-        self._defnode = defnode
+    __slots__ = ['tp', 'defnode']
 
-    def get_type(self, symtb: 'SymTable') -> 'TypeIns':
-        return self._tp
+    def __init__(self, tp: 'TypeIns', defnode: Optional[ast.AST] = None):
+        self.tp = tp
+        self.defnode = defnode
+
+    def get_type(self, symtable: 'SymTable') -> 'TypeIns':
+        return self.tp
 
     def get_defnode(self) -> Optional[ast.AST]:
-        return self._defnode
+        return self.defnode
 
 
 class ImportEntry(Entry):
+    __slots__ = ['module_symid', 'origin_name', 'defnode']
+
     def __init__(self,
                  module_symid: 'SymId',
                  origin_name: 'SymId',
                  defnode: Optional[ast.AST] = None) -> None:
-        self._module_symid = module_symid
-        self._origin_name = origin_name
-        self._defnode = defnode
+        self.module_symid = module_symid
+        self.origin_name = origin_name
+        self.defnode = defnode
 
-    def get_type(self, symtb: 'SymTable'):
-        return symtb.import_cache.lookup_cache(self._module_symid,
-                                               self._origin_name)
+    def get_type(self, symtable: 'SymTable'):
+        return symtable.import_cache.lookup_cache(self.module_symid,
+                                                  self.origin_name)
 
 
 class ImportCache:
@@ -118,8 +122,8 @@ class SymTable:
 
         # inner data structure to store important information about this
         # symtable, used heavily in the preprocess stage.
-        self._tp_defs: Dict[str, 'TypeTemp'] = {}
-        self._func_defs: Dict[str, 'TypeFuncIns'] = {}
+        self._tp_def: Dict[str, 'TypeTemp'] = {}
+        self._func_def: Dict[str, 'TypeFuncIns'] = {}
 
     @property
     def glob_symid(self):
@@ -144,13 +148,13 @@ class SymTable:
         return find(self.builtins, name)
 
     def add_type_def(self, name: str, temp: 'TypeTemp'):
-        self._tp_defs[name] = temp
+        self._tp_def[name] = temp
 
     def get_type_def(self, name: str) -> Optional['TypeTemp']:
         findlist = name.split('.')
         assert findlist
-        if name in self._tp_defs:
-            cur_temp = self._tp_defs[name]
+        if name in self._tp_def:
+            cur_temp = self._tp_def[name]
         else:
             return None
 
