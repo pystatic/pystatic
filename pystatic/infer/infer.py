@@ -104,6 +104,9 @@ class InferVisitor(BaseVisitor):
                 self.check_composed_node_of_assign(lvalue, tp, node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
+        if node.value is None:
+            self.record_no_value_node(node.target)
+            return
         rtype: TypeIns = self.get_type(node.value)
         self.err_maker.add_type(node.target, rtype)  # TODO:plugin
         self.err_maker.add_type(node.value, rtype)
@@ -112,6 +115,12 @@ class InferVisitor(BaseVisitor):
             self.check_name_node_of_annassign(target, rtype, node.value)
         else:
             self.check_composed_node_of_annassign(target, rtype, node.value)
+
+    def record_no_value_node(self, target: ast.Name):
+        assert isinstance(target, ast.Name)
+        name = target.id
+        comment = self.recorder.get_comment_type(name)
+        self.recorder.set_type(name, comment)
 
     def check_name_node_of_annassign(self, target: ast.Name, rtype, rnode):
         name = target.id
@@ -279,6 +288,8 @@ class InferStarter:
 
     def start_infer(self):
         for symid, target in self.sources.items():
+            if symid == "typing" or symid=="builtins":
+                continue
             logger.info(f'Type infer in module \'{symid}\'')
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox, symid, self.config)
