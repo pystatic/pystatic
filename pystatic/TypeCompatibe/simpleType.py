@@ -25,7 +25,7 @@ class TypeCompatible:
         
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        print(a,b)
+        # print(a,b)
        
         
      
