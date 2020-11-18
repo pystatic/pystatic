@@ -1,4 +1,4 @@
-# Any = object()
+Any = object()
 
 
 # class TypeVar:

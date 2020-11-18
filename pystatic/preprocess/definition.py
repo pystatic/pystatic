@@ -16,11 +16,16 @@ def get_definition(target: 'BlockTarget', env: 'PrepEnvironment',
     cur_ast = target.ast
     symtable = target.symtable
     symid = target.symid
+    
+    if isinstance(target, Target):
+        is_special = target.is_special
+    else:
+        is_special = False
 
     assert cur_ast
     assert not env.get_prepinfo(symid), "call get_definition with the same symid is invalid"
 
-    prepinfo = env.try_add_target_prepinfo(target, PrepInfo(symtable, None))
+    prepinfo = env.try_add_target_prepinfo(target, PrepInfo(symtable, None, is_special))
 
     TypeDefVisitor(env, prepinfo, mbox).accept(cur_ast)
 
@@ -124,6 +129,7 @@ class TypeDefVisitor(BaseVisitor):
             raise NotImplementedError("name collision with class not handled yet")
 
         if (clstemp := self.prepinfo.symtable.get_type_def(clsname)):
+            # clstemp already in symtable
             assert isinstance(clstemp, TypeClassTemp)
             new_symtable = clstemp.get_inner_symtable()
 
@@ -133,9 +139,8 @@ class TypeDefVisitor(BaseVisitor):
 
         assert isinstance(clstemp, TypeClassTemp)
 
-        new_prepinfo = PrepInfo(new_symtable, self.prepinfo)
+        new_prepinfo = PrepInfo(new_symtable, self.prepinfo, False)
         self.prepinfo.add_cls_def(clstemp, new_prepinfo, self.prepinfo, node)
-        self.prepinfo.symtable.add_entry(clsname, Entry(clstemp.get_default_typetype(), node))
 
         # enter class scope
         with self.enter_class(new_prepinfo):

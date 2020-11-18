@@ -40,14 +40,16 @@ class Manager:
             self.__init_typeshed()
 
     def __init_typeshed(self):
-        self.__add_check_symid('builtins', get_builtin_symtable(), False, None)
-        self.__add_check_symid('typing', get_typing_symtable(), False, None)
+        self.__add_check_symid('builtins', get_builtin_symtable(), False, None,
+                               True)
+        self.__add_check_symid('typing', get_typing_symtable(), False, None,
+                               True)
         self.preprocess()
 
     def __add_check_symid(self, symid: 'SymId',
                           default_symtable: Optional['SymTable'],
-                          to_check: bool,
-                          oldpath: Optional[FilePath]) -> Option[bool]:
+                          to_check: bool, oldpath: Optional[FilePath],
+                          is_special: bool) -> Option[bool]:
         """
         default_symtable:
             if not None, then the symtable of the new target is set to it.
@@ -86,7 +88,11 @@ class Manager:
 
             if find_res.res_type == ModuleFindRes.Module:
                 file_path = self.fsys.realpath(find_res.paths[0])
-                new_target = Target(symid, symtable, mbox, file_path)
+                new_target = Target(symid,
+                                    symtable,
+                                    mbox,
+                                    file_path,
+                                    is_special=is_special)
 
                 self.__parse(new_target)
                 self.update_stage(new_target, Stage.Preprocess)
@@ -181,12 +187,12 @@ class Manager:
             rt_path = crawl_path(os.path.dirname(path))
             self.fsys.add_userpath(rt_path)
             symid = relpath2symid(rt_path, path)
-            return self.__add_check_symid(symid, None, to_check, path)
+            return self.__add_check_symid(symid, None, to_check, path, False)
 
     def add_check_symid(self,
                         symid: 'SymId',
                         to_check: bool = True) -> Option[bool]:
-        return self.__add_check_symid(symid, None, to_check, None)
+        return self.__add_check_symid(symid, None, to_check, None, False)
 
     def add_check_target(self, target: 'BlockTarget', to_check: bool = True):
         if isinstance(target, Target):

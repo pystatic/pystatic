@@ -26,8 +26,10 @@ class PrepInfoItem(Protocol):
 
 
 class PrepInfo:
-    def __init__(self, symtable: 'SymTable', enclosing: Optional['PrepInfo']):
+    def __init__(self, symtable: 'SymTable', enclosing: Optional['PrepInfo'],
+                 is_special: bool):
         self.enclosing = enclosing
+        self.is_special = is_special
 
         self.cls_def: Dict[str, 'prep_cls'] = {}
         self.typevar_def: Dict[str, 'prep_typevar'] = {}
@@ -56,6 +58,10 @@ class PrepInfo:
         self.symtable.add_entry(name, Entry(typevar, defnode))
 
     def add_local_def(self, name: str, defnode: AssignNode):
+        if self.is_special:
+            origin_local = self.symtable.lookup_local(name)
+            if origin_local:
+                return
         local_def = prep_local(name, defnode)
         self.local[name] = local_def
 
@@ -126,7 +132,7 @@ class PrepInfo:
 class MethodPrepInfo(PrepInfo):
     def __init__(self, clstemp: TypeClassTemp,
                  enclosing: Optional['PrepInfo']):
-        super().__init__(clstemp.get_inner_symtable(), enclosing)
+        super().__init__(clstemp.get_inner_symtable(), enclosing, False)
         self.clstemp = clstemp
         self.var_attr: Dict[str, 'prep_local'] = {}
 

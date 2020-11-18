@@ -52,11 +52,17 @@ class Target(BlockTarget):
                  symtable: 'SymTable',
                  mbox: 'MessageBox',
                  path: str,
+                 is_special: bool = False,
                  stage: Stage = Stage.Parse):
+        """
+        :param is_special: If target is builtins or typing, is_special is True,
+        otherwise False.
+        """
         super().__init__(symid, symtable, mbox, stage)
         # NOTE: TpStage.OVER may be wrong.
         self.module_temp = TypeModuleTemp(symid, self.symtable)
         self.path: str = path
+        self.is_special = is_special
 
     @property
     def analyse_path(self):
