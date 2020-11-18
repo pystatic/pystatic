@@ -364,6 +364,11 @@ class TypeEllipsisTemp(TypeTemp):
     def get_default_ins(self) -> Option['TypeIns']:
         return Option(self._cached_ins)
 
+    def str_expr(self,
+                 bindlist: BindList,
+                 context: Optional['TypeContext'] = None) -> str:
+        return '...'
+
 
 class TypeCallableTemp(TypeTemp):
     def __init__(self):

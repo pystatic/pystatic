@@ -4,11 +4,10 @@ from typing import List, Optional, Protocol, Sequence
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
 from pystatic.typesys import TypeIns, any_ins
-from pystatic.predefined import (TypeLiteralIns, none_ins, bool_ins, list_temp,
-                                 tuple_temp, dict_temp, set_temp)
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map
+from pystatic.predefined import *
 
 
 class SupportGetAttribute(Protocol):
@@ -109,11 +108,19 @@ class ExprParser(NoGenVisitor):
         return name_option.value
 
     def visit_Constant(self, node: ast.Constant) -> TypeIns:
-        if node.value is None:
-            return none_ins
-        tpins = TypeLiteralIns(node.value)
-        self.add_to_container(tpins, node)
-        return tpins
+        res = None
+        if node.value == None:
+            res = none_ins
+        elif node.value == ...:
+            res = ellipsis_ins
+
+        if res:
+            self.add_to_container(res, node)
+            return res
+        else:
+            tpins = TypeLiteralIns(node.value)
+            self.add_to_container(tpins, node)
+            return tpins
 
     def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
         res = self.visit(node.value)

@@ -79,6 +79,7 @@ def test_exprparse_type_expr():
     b = manager.get_sym_type(src, 'b')
     c = manager.get_sym_type(src, 'c')
     d = manager.get_sym_type(src, 'd')
+    e = manager.get_sym_type(src, 'e')
     A = manager.get_sym_type(src, 'A')
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
     cur_union = union_temp.get_default_ins().value
@@ -96,11 +97,15 @@ def test_exprparse_type_expr():
     assert isinstance(c.bindlist[0], TypeType)
     assert c.bindlist[0].temp is A.temp
 
-    assert len(d.bindlist) == 3
+    assert len(d.bindlist) == 2
     assert d.bindlist[0] is int_ins
-    assert d.bindlist[1] is str_ins
-    assert isinstance(d.bindlist[2], TypeLiteralIns)
-    assert d.bindlist[2].value == ...
+    assert d.bindlist[1] is ellipsis_ins
+
+    assert str(a) == 'Optional[Union[int, str]]'
+    assert str(b) == 'Optional[A]'
+    assert str(c) == 'Optional[Type[A]]'
+    assert str(d) == 'Tuple[int, ...]'
+    assert str(e) == 'Tuple[int, str]'
 
 
 def test_exprparse():

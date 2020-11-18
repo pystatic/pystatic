@@ -8,4 +8,5 @@ class A:
 a: Optional[Union[int, str]] = None
 b: Optional[A] = None
 c: Optional[Type[A]] = None
-d: Tuple[int, str, ...] = (1, 2)
+d: Tuple[int, ...] = (1, 2)
+e: Tuple[int, str] = (1, "s")

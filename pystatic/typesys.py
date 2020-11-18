@@ -353,10 +353,9 @@ class TypeTemp(ABC):
         slot_cnt = self.arity()
 
         if slot_cnt == INFINITE_ARITY:
-            return self.name
             for bind in bindlist:
                 str_bindlist.append(f'{bind}')
-            return self.name + '[' + ','.join(str_bindlist) + ']'
+            return self.name + '[' + ', '.join(str_bindlist) + ']'
 
         elif slot_cnt == 0:
             return self.name
