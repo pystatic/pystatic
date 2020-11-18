@@ -19,7 +19,7 @@ def parse_expr(expr: str):
 def parse_eval_check(expr: str,
                      module_ins,
                      expect: TypeIns,
-                     equiv,
+                     equiv: bool,
                      explicit=False):
     astnode = parse_expr(expr)
     eval_option = eval_expr(astnode, module_ins, explicit)
@@ -51,6 +51,25 @@ def test_exprparse_basic():
     parse_eval_check('{1, 2}', module_ins, TypeIns(set_temp, [int_ins]), True)
     parse_eval_check('{1: "good", 2: "good"}', module_ins,
                      TypeIns(dict_temp, [int_ins, str_ins]), True)
+
+
+def test_exprparse_type_expr():
+    src = 'exprparse_type_expr'
+    cwd = os.path.dirname(__file__)
+    config = Config({'cwd': cwd})
+    manager = Manager(config)
+    file_path = os.path.join(cwd, 'src', f'{src}.py')
+    res_option = manager.add_check_file(file_path)
+    assert res_option.value
+    manager.preprocess()
+
+    a = manager.get_sym_type(src, 'a')
+    assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
+    cur_union = union_temp.get_default_ins().value
+    cur_union.bindlist = [int, str]
+    cur_optional = optional_temp.get_default_ins().value
+    cur_optional.bindlist = [cur_union]
+    assert a.equiv(cur_optional)
 
 
 def test_exprparse():

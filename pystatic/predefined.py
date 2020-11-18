@@ -22,7 +22,7 @@ builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
 builtin_symtable.glob = builtin_symtable
 builtin_symtable.builtins = builtin_symtable
 
-typing_symtable = SymTable('typings', None, None, builtin_symtable,
+typing_symtable = SymTable('typing', None, None, builtin_symtable,
                            TableScope.GLOB)
 typing_symtable.glob = typing_symtable
 

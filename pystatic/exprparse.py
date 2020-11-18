@@ -43,6 +43,13 @@ class ExprParser(NoGenVisitor):
         self.container = old_container
         self.in_subs = old_in_subs
 
+    @contextlib.contextmanager
+    def block_container(self):
+        old_in_subs = self.in_subs
+        self.in_subs = False
+        yield
+        self.in_subs = old_in_subs
+
     def add_err(self, errlist: Optional[List[ErrorCode]]):
         if errlist:
             self.errors.extend(errlist)
@@ -159,8 +166,9 @@ class ExprParser(NoGenVisitor):
         return res_option.value
 
     def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
-        left_ins = self.visit(node.value)
-        assert isinstance(left_ins, TypeIns)
+        with self.block_container():
+            left_ins = self.visit(node.value)
+            assert isinstance(left_ins, TypeIns)
 
         container = []
         with self.register_container(container):

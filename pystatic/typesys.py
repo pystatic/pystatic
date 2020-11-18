@@ -97,17 +97,28 @@ class TypeIns:
         else:
             temp_arity = self.temp.arity()
             # default bind is Any
-            if self.bindlist:
-                diff1 = temp_arity - len(self.bindlist)
-                ext_list1 = self.bindlist + [any_ins] * diff1
-            else:
-                ext_list1 = [any_ins] * temp_arity
+            if temp_arity == INFINITE_ARITY:
+                ext_list1 = copy.copy(self.bindlist) if self.bindlist else []
+                ext_list2 = copy.copy(other.bindlist) if other.bindlist else []
+                len1 = len(ext_list1)
+                len2 = len(ext_list2)
+                if len1 < len2:
+                    ext_list1.extend([any_ins] * (len2 - len1))
+                elif len2 < len1:
+                    ext_list2.extend([any_ins] * (len1 - len2))
 
-            if other.bindlist:
-                diff2 = temp_arity - len(other.bindlist)
-                ext_list2 = other.bindlist + [any_ins] * diff2
             else:
-                ext_list2 = [any_ins] * temp_arity
+                if self.bindlist:
+                    diff1 = temp_arity - len(self.bindlist)
+                    ext_list1 = self.bindlist + [any_ins] * diff1
+                else:
+                    ext_list1 = [any_ins] * temp_arity
+
+                if other.bindlist:
+                    diff2 = temp_arity - len(other.bindlist)
+                    ext_list2 = other.bindlist + [any_ins] * diff2
+                else:
+                    ext_list2 = [any_ins] * temp_arity
 
             for i in range(temp_arity):
                 if not ext_list1[i].equiv(ext_list2[i]):
