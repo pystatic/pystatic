@@ -118,7 +118,7 @@ class TypeVarTemp(TypeClassTemp):
             for rangenode in applyargs.args[args_rear:]:
                 assert isinstance(rangenode.ins, TypeType), "expect typetype"
                 rangeins = rangenode.ins.getins(ins_option)
-                default_ins.constrains.append(rangeins)
+                default_ins.constraints.append(rangeins)
 
         cova = applyargs.kwargs.get('covariant')
         contra = applyargs.kwargs.get('contravariant')
@@ -133,7 +133,7 @@ class TypeVarTemp(TypeClassTemp):
 
         bound_ins_ast = applyargs.kwargs.get('bound')
         if bound_ins_ast:
-            if default_ins.constrains:
+            if default_ins.constraints:
                 raise NotImplementedError()
             bound = bound_ins_ast.ins
             assert isinstance(bound, TypeType), "TODO"
@@ -164,7 +164,7 @@ class TypeVarIns(TypeIns):
         self.bound = bound
         assert kind == TpVarKind.INVARIANT or kind == TpVarKind.COVARIANT or kind == TpVarKind.CONTRAVARIANT
         self.kind = kind
-        self.constrains: List['TypeIns'] = list(*args)
+        self.constraints: List['TypeIns'] = list(*args)
 
 
 class TypeTypeAnnTemp(TypeTemp):
@@ -363,6 +363,11 @@ class TypeEllipsisTemp(TypeTemp):
 
     def get_default_ins(self) -> Option['TypeIns']:
         return Option(self._cached_ins)
+
+    def str_expr(self,
+                 bindlist: BindList,
+                 context: Optional['TypeContext'] = None) -> str:
+        return '...'
 
 
 class TypeCallableTemp(TypeTemp):

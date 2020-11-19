@@ -12,9 +12,9 @@ c, d = 1, 2  # E Incompatible type in assignment(expression has type 'int', vari
 d, c = 1, 2  # E Incompatible type in assignment(expression has type 'int', variable has type 'str')
 
 t1: Tuple[int, str] = (1, "s")
-t1 = ("s", 1)# E Incompatible type in assignment(expression has type 'Tuple[str,int]', variable has type 'Tuple[int,str]')
-t1 = 1  # E Incompatible type in assignment(expression has type 'Literal[1]', variable has type 'Tuple[int,str]')
-t1 = "s"  # E Incompatible type in assignment(expression has type 'Literal['s']', variable has type 'Tuple[int,str]')
+t1 = ("s", 1)# E Incompatible type in assignment(expression has type 'Tuple[str, int]', variable has type 'Tuple[int, str]')
+t1 = 1  # E Incompatible type in assignment(expression has type 'Literal[1]', variable has type 'Tuple[int, str]')
+t1 = "s"  # E Incompatible type in assignment(expression has type 'Literal['s']', variable has type 'Tuple[int, str]')
 
 
 class A:
@@ -25,7 +25,7 @@ class B:
     ...
 
 
-t2: Tuple[A, B] = A, B # E Incompatible type in assignment(expression has type 'Tuple[Type[A],Type[B]]', variable has type 'Tuple[A,B]')
+t2: Tuple[A, B] = A, B # E Incompatible type in assignment(expression has type 'Tuple[Type[A], Type[B]]', variable has type 'Tuple[A, B]')
 t2 = A(), B()
-t2 = A(), B  # E Incompatible type in assignment(expression has type 'Tuple[A,Type[B]]', variable has type 'Tuple[A,B]')
-t2 = B(), A()  # E Incompatible type in assignment(expression has type 'Tuple[B,A]', variable has type 'Tuple[A,B]')
+t2 = A(), B  # E Incompatible type in assignment(expression has type 'Tuple[A, Type[B]]', variable has type 'Tuple[A, B]')
+t2 = B(), A()  # E Incompatible type in assignment(expression has type 'Tuple[B, A]', variable has type 'Tuple[A, B]')

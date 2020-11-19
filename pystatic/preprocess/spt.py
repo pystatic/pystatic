@@ -47,7 +47,7 @@ def copy_typevar(src: 'TypeVarIns', dst: 'TypeVarIns'):
     dst.bindlist = src.bindlist
     dst.kind = src.kind
     dst.bound = src.bound
-    dst.constrains = src.constrains
+    dst.constraints = src.constraints
 
 
 class TypeVarFiller(ExprParser):
