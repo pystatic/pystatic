@@ -60,4 +60,9 @@ def test_alias():
     assert UAB.bindlist
     assert len(UAB.bindlist) == 2
     assert UAB.bindlist[0].temp is A_temp
+    assert isinstance(UAB.bindlist[0],
+                      TypeIns) and not isinstance(UAB.bindlist[0], TypeType)
     assert UAB.bindlist[1].temp is B_temp
+
+    UD = manager.get_sym_type(symid, 'UD')
+    assert not isinstance(UD, TypeAlias)

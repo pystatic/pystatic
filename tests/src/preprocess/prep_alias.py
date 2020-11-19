@@ -19,7 +19,8 @@ class D(B):
 Aalias = A
 Balias = B
 Calias = D.C
-UAB = Union[A, B]
+UAB = Union['A', B]
 OA = Optional[A]
 a = A()
 b = B()
+UD = 'D'

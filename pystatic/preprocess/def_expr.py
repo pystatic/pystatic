@@ -19,7 +19,7 @@ def eval_typedef_expr(node: TypeDefNode, prepinfo: PrepInfo,
     elif isinstance(node, ast.FunctionDef):
         raise NotImplementedError()
     else:
-        res_option = eval_expr(node, prepinfo)
+        res_option = eval_expr(node, prepinfo, annotation=True)
     if annotation:
         res_type = res_option.value
         if isinstance(res_type, TypeType):

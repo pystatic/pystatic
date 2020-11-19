@@ -412,6 +412,15 @@ class TypeGenericTemp(TypeTemp):
         return option_res
 
 
+class TypeProtocolTemp(TypeTemp):
+    def __init__(self) -> None:
+        super().__init__('Protocol')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
+
+
 class TypeLiteralTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__('Literal')
@@ -571,6 +580,8 @@ literal_temp, literal_type, _ = _add_spt_to_symtable(TypeLiteralTemp,
                                                      typing_symtable)
 generic_temp, generic_type, _ = _add_spt_to_symtable(TypeGenericTemp,
                                                      typing_symtable)
+protocol_temp, protocol_type, _ = _add_spt_to_symtable(TypeProtocolTemp,
+                                                       typing_symtable)
 union_temp, union_type, _ = _add_spt_to_symtable(TypeUnionTemp,
                                                  typing_symtable)
 callable_temp, callable_type, _ = _add_spt_to_symtable(TypeCallableTemp,

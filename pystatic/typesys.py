@@ -7,9 +7,8 @@ from pystatic.evalutil import ApplyArgs, GetItemArg
 from pystatic.errorcode import NoAttribute
 
 if TYPE_CHECKING:
-    from pystatic.predefined import TypeContext, TypeFuncIns, TypeVarIns
+    from pystatic.predefined import TypeContext, TypeVarIns
     from pystatic.symtable import SymTable
-    from pystatic.symid import SymId
 
 BindList = Optional[List[Any]]
 

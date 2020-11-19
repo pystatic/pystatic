@@ -17,15 +17,24 @@ class SupportGetAttribute(Protocol):
 
 def eval_expr(node: ast.AST,
               attr_consultant: SupportGetAttribute,
-              explicit=False):
-    return ExprParser(attr_consultant, explicit).accept(node)
+              explicit=False,
+              annotation=False):
+    """
+    :param explicit: If True, tuples like (1, 2) will return 
+    Tuple[Literal[1], Literal[2]], else return Tuple[int]
+
+    :param annotation: If True, strings inside this node is treated
+    as forward-reference other than Literal string.
+    """
+    return ExprParser(attr_consultant, explicit, annotation).accept(node)
 
 
 class ExprParser(NoGenVisitor):
-    def __init__(self, consultant: SupportGetAttribute,
-                 explicit: bool) -> None:
+    def __init__(self, consultant: SupportGetAttribute, explicit: bool,
+                 annotation: bool) -> None:
         self.consultant = consultant
         self.explicit = explicit
+        self.annotation = annotation
         self.errors = []
 
         self.in_subs = False  # under a subscription node?
@@ -113,6 +122,16 @@ class ExprParser(NoGenVisitor):
             res = none_ins
         elif node.value == ...:
             res = ellipsis_ins
+        elif self.annotation and isinstance(node.value, str):
+            try:
+                astnode = ast.parse(node.value, mode='eval')
+                res_option = eval_expr(astnode.body, self.consultant,
+                                       self.explicit, True)
+                # TODO: add warning here
+                res = res_option.value
+            except SyntaxError:
+                # TODO: add warning here
+                res = TypeLiteralIns(node.value)
 
         if res:
             self.add_to_container(res, node)

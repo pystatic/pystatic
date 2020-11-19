@@ -2,7 +2,7 @@ from typing import TypeVar, Generic
 from extend_typevar import I
 
 T = TypeVar('T')
-F = TypeVar('F', int, str)
+F = TypeVar('F', 'int', str)
 G = TypeVar('G', bound=int)
 H = TypeVar('H', bound=str, covariant=True)
 
