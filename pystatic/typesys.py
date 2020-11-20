@@ -170,7 +170,7 @@ class TypeType(TypeIns):
         return option_res
 
     def getitem(self, item: GetItemArg) -> Option['TypeIns']:
-        return self.temp.get_typetype(self.bindlist, item)
+        return self.temp.getitem_typetype(self.bindlist, item)
 
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         return self.temp.init_ins(applyargs, self.bindlist)
@@ -278,7 +278,7 @@ class TypeTemp(ABC):
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
 
-    def get_typetype(
+    def getitem_typetype(
             self,
             bindlist: Optional[BindList] = None,
             itemarg: Optional[GetItemArg] = None) -> Option['TypeType']:
@@ -331,7 +331,7 @@ class TypeTemp(ABC):
             name: str,
             bindlist: BindList,
             context: Optional['TypeContext'] = None) -> Optional['TypeIns']:
-        """Get attribute that belong to the Type itself, mainly used for typetype"""
+        """Get attribute that belong to the Type itself, mainly used for TypeType"""
         return self.getattribute(name, bindlist, context)
 
     def init_ins(self, applyargs: 'ApplyArgs',
@@ -395,12 +395,17 @@ class ModuleNamedTypeTemp(TypeTemp):
 
 
 class TypeClassTemp(TypeTemp):
-    def __init__(self, clsname: str, def_symtable: 'SymTable',
-                 inner_symtable: 'SymTable'):
+    def __init__(self,
+                 clsname: str,
+                 def_symtable: 'SymTable',
+                 inner_symtable: 'SymTable',
+                 metaclass: Optional[TypeIns] = None):
         super().__init__(clsname)
 
         self.baseclass: 'List[TypeIns]'
         self.baseclass = []
+
+        self.metaclass = metaclass
 
         self.var_attr: Dict[str, 'TypeIns'] = {}
 
@@ -493,8 +498,8 @@ class TypeAnyTemp(TypeTemp):
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
         return Option(self._cached_ins)
 
-    def get_typetype(self, bindlist: Optional[BindList],
-                     item: Optional[GetItemArg]) -> Option['TypeType']:
+    def getitem_typetype(self, bindlist: Optional[BindList],
+                         item: Optional[GetItemArg]) -> Option['TypeType']:
         # TODO: warning: if bindlist is non-empty, then report an error
         return Option(self._cached_typetype)
 

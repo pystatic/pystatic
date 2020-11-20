@@ -252,8 +252,8 @@ class TypeNoneTemp(TypeTemp):
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
         return Option(self._cached_ins)
 
-    def get_typetype(self, bindlist: Optional[BindList],
-                     item: Optional[GetItemArg]) -> Option['TypeType']:
+    def getitem_typetype(self, bindlist: Optional[BindList],
+                         item: Optional[GetItemArg]) -> Option['TypeType']:
         return Option(self._cached_typetype)
 
     def get_default_ins(self) -> Option['TypeIns']:
@@ -586,10 +586,17 @@ union_temp, union_type, _ = _add_spt_to_symtable(TypeUnionTemp,
                                                  typing_symtable)
 callable_temp, callable_type, _ = _add_spt_to_symtable(TypeCallableTemp,
                                                        typing_symtable)
-type_temp, type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp,
+Type_temp, Type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp,
                                                typing_symtable)
 
 none_temp, none_type, none_ins = _add_spt_to_symtable(TypeNoneTemp,
                                                       builtin_symtable)
 ellipsis_temp, ellipsis_type, ellipsis_ins = _add_spt_to_symtable(
     TypeEllipsisTemp, builtin_symtable)
+
+type_meta_temp = TypeClassTemp(
+    'type', builtin_symtable,
+    builtin_symtable.new_symtable('type', TableScope.CLASS), None)
+type_meta_ins = type_meta_temp.get_default_ins().value
+builtin_symtable.add_type_def('type', type_meta_temp)
+builtin_symtable.add_entry('type', Entry(type_meta_ins))
