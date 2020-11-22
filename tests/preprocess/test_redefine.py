@@ -4,8 +4,8 @@ sys.path.extend(['.', '..'])
 from ..util import get_manager_path, parse_file_error
 
 
-def test_class_redefine():
-    symid = 'preprocess.class_redefine'
+def test_redefine():
+    symid = 'preprocess.redefine'
     manager, path = get_manager_path({}, symid)
     manager.preprocess()
 

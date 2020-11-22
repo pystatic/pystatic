@@ -60,7 +60,7 @@ class PrepInfo:
         else:
             new_symtable = self.symtable.new_symtable(clsname, TableScope.CLASS)
             clstemp = TypeClassTemp(clsname, self.symtable, new_symtable)
-        
+
         new_prepinfo = PrepInfo(new_symtable, self, False)
         cls_def = prep_cls(clstemp, new_prepinfo, self, node)
         self.cls_def[clsname] = cls_def
@@ -74,6 +74,12 @@ class PrepInfo:
         self.symtable.add_entry(name, Entry(typevar, defnode))
 
     def add_local_def(self, node: AssignNode, is_method: bool, mbox: 'MessageBox'):
+        def is_strong_def(node: AssignNode):
+            """If a assignment has annotation or type_comment, then it's a strong
+            definition.
+            """
+            return getattr(node, 'type_comment', None) or getattr(node, 'annotation', None)
+
         def is_self_def(node: AssignNode, target: ast.AST):
             """Whether test_node represents a form of "self.xxx = yyy"""
             if isinstance(target, ast.Attribute):
@@ -88,17 +94,32 @@ class PrepInfo:
         def deal_single_expr(target: ast.AST, defnode: AssignNode):
             if isinstance(target, ast.Name):
                 name = target.id
-                if not self.name_collide(name):
-                    if self.is_special:
-                        origin_local = self.symtable.lookup_local(name)
-                        if origin_local:
+                if self.is_special:
+                    origin_local = self.symtable.lookup_local(name)
+                    if origin_local:
+                        return
+
+                # NOTE: local_def finally added here
+                if (old_cls_def := self.cls_def.get(name)):
+                    mbox.add_err(VarTypeCollide(old_cls_def.defnode, name, defnode))
+                    return
+                elif (old_local_def := self.local.get(name)):
+                    if is_strong_def(defnode):
+                        old_astnode = old_local_def.defnode
+                        if is_strong_def(old_astnode):
+                            # variable defined earlier with type annotation
+                            mbox.add_err(SymbolRedefine(defnode, name, old_astnode))
                             return
-                    # NOTE: local_def finally added here
-                    local_def = prep_local(name, defnode)
-                    self.local[name] = local_def
+                    else:
+                        return
+
+                local_def = prep_local(name, defnode)
+                self.local[name] = local_def
+
             elif isinstance(target, ast.Tuple):
                 for elt in target.elts:
                     deal_single_expr(elt, defnode)
+
             elif is_method:
                 is_self_def(defnode, target)
 

@@ -32,7 +32,7 @@ def eval_str_type(s: str, prepinfo: PrepInfo) -> Option[TypeIns]:
     try:
         treenode = ast.parse(s, mode='eval')
         if hasattr(treenode, 'body'):
-            return eval_expr(treenode.body, symtable)  # type: ignore
+            return eval_expr(treenode.body, prepinfo)  # type: ignore
         else:
             res_option = Option(any_ins)
             # TODO: add error here

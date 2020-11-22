@@ -29,6 +29,9 @@ def test_synthesis_1():
     A = manager.get_sym_type(symid, 'A')
     assert isinstance(A, TypeType)
 
+    AB = manager.get_sym_type(symid, 'A.B')
+    assert isinstance(AB, TypeType)
+
     a = manager.get_sym_type(symid, 'a')
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
     assert a.temp == A.temp
@@ -47,3 +50,11 @@ def test_synthesis_1():
     a_dot_a = manager.get_sym_type(symid, 'a.a')
     assert isinstance(a_dot_a, TypeIns) and not isinstance(a_dot_a, TypeType)
     assert a_dot_a.temp == int_typetype.temp
+
+    e = manager.get_sym_type(symid, 'e')
+    assert type(e) == TypeIns
+    assert e.temp == A.temp
+
+    g = manager.get_sym_type(symid, 'g')
+    assert type(g) == TypeIns
+    assert g.temp == AB.temp
