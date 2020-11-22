@@ -77,10 +77,10 @@ class TypeDefVisitor(BaseVisitor):
 
     def visit_Assign(self, node: ast.Assign):
         # TODO: here pystatic haven't add redefine warning and check consistence
-        self.prepinfo.add_local_def(node, self.is_method)
+        self.prepinfo.add_local_def(node, self.is_method, self.mbox)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        self.prepinfo.add_local_def(node, self.is_method)
+        self.prepinfo.add_local_def(node, self.is_method, self.mbox)
 
     def visit_ClassDef(self, node: ast.ClassDef):
         new_prepinfo = self.prepinfo.add_cls_def(node, self.mbox)

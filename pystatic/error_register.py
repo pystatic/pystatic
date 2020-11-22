@@ -2,6 +2,7 @@
 INCOMPATIBLE_TYPE_IN_ASSIGN = "Incompatible type in assignment"
 SYMBOL_UNDEFINED = "Cannot determine type of '{}'"
 SYMBOL_REDEFINE = "'{}' has already defined"
+VAR_TYPE_COLLIDE = "'{}' is a class"
 NO_ATTRIBUTE = "Type '{}' has no attribute '{}'"
 UNSUPPORTED_OPERAND = "Unsupported operand types for '{}'"
 CODE_UNREACHABLE = "This code is unreachable"

@@ -75,6 +75,27 @@ class SymbolRedefine(ErrorCode):
             return self.node, review
 
 
+class VarTypeCollide(ErrorCode):
+    """Name has been defined as a class but used on the left of an assignment
+    statement.
+    """
+    def __init__(self, clsnode: Optional[ast.ClassDef], name: str,
+                 varnode: Optional[ast.AST]) -> None:
+        super().__init__()
+        self.clsnode = clsnode
+        self.node = varnode
+        self.name = name
+        self.level = Level.WARN
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        review = VAR_TYPE_COLLIDE.format(self.name)
+        if self.clsnode:
+            detail = f'{self.name} defined as a class at line {self.clsnode.lineno}'
+            return self.node, self.concat_msg(review, detail)
+        else:
+            return self.node, review
+
+
 class IncompatibleReturnType(ErrorCode):
     def __init__(self, node: Optional[ast.AST], expect_type: 'TypeIns',
                  ret_type: 'TypeIns'):
@@ -129,7 +150,8 @@ class TooMoreArgument(ErrorCode):
 
 
 class TooMoreValuesToUnpack(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
+    def __init__(self, node: Optional[ast.AST], expected_num: int,
+                 got_num: int):
         super().__init__()
         self.node = node
         self.expected_num = expected_num
@@ -143,7 +165,8 @@ class TooMoreValuesToUnpack(ErrorCode):
 
 
 class NeedMoreValuesToUnpack(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
+    def __init__(self, node: Optional[ast.AST], expected_num: int,
+                 got_num: int):
         super().__init__()
         self.node = node
         self.expected_num = expected_num
