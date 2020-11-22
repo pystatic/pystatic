@@ -1,5 +1,5 @@
 from typing import Union, Optional
-from extend_alias import A_ext
+from .extend_alias import A_ext
 
 
 class A:

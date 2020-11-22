@@ -1,4 +1,5 @@
 import ast
+from pystatic.errorcode import ErrorCode, SymbolRedefine
 from pystatic.target import Target
 from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union)
 from pystatic.symid import SymId
@@ -41,13 +42,17 @@ class PrepInfo:
         return (name in self.typevar_def or name in self.func
                 or name in self.local or name in self.cls_def)
 
-    def add_cls_def(self, node: ast.ClassDef):
+    def add_cls_def(self, node: ast.ClassDef, mbox: 'MessageBox'):
         # TODO: check name collision
         clsname = node.name
+        if (old_cls_def := self.cls_def.get(clsname)):
+            mbox.add_err(SymbolRedefine(node, clsname, old_cls_def.defnode))
+            return
+
         if (clstemp := self.symtable.get_type_def(clsname)):
             assert isinstance(clstemp, TypeClassTemp)
             new_symtable = clstemp.get_inner_symtable()
-        
+
         else:
             new_symtable = self.symtable.new_symtable(clsname, TableScope.CLASS)
             clstemp = TypeClassTemp(clsname, self.symtable, new_symtable)
@@ -64,8 +69,7 @@ class PrepInfo:
         self.typevar_def[name] = prep_typevar(name, typevar, defnode)
         self.symtable.add_entry(name, Entry(typevar, defnode))
 
-
-    def add_local_def(self, node: AssignNode, is_method):
+    def add_local_def(self, node: AssignNode, is_method: bool):
         def is_self_def(node: AssignNode, target: ast.AST):
             """Whether test_node represents a form of "self.xxx = yyy"""
             if isinstance(target, ast.Attribute):

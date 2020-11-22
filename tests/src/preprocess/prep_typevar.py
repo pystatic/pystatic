@@ -1,5 +1,5 @@
 from typing import TypeVar, Generic
-from extend_typevar import I
+from .extend_typevar import I
 
 T = TypeVar('T')
 F = TypeVar('F', 'int', str)

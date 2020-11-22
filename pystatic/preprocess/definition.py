@@ -83,7 +83,7 @@ class TypeDefVisitor(BaseVisitor):
         self.prepinfo.add_local_def(node, self.is_method)
 
     def visit_ClassDef(self, node: ast.ClassDef):
-        new_prepinfo = self.prepinfo.add_cls_def(node)
+        new_prepinfo = self.prepinfo.add_cls_def(node, self.mbox)
         # enter class scope
         with self.enter_class(new_prepinfo):
             for body in node.body:

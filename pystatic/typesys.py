@@ -235,7 +235,6 @@ class TypeTemp(ABC):
              bindlist: BindList) -> Option['TypeIns']:
         call_option = Option(any_ins)
         # TODO: add error for not callable
-        # call_option.add_err(...)
         return call_option
 
     def getitem(self, item: GetItemArg,
