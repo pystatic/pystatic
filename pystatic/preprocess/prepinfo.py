@@ -1,17 +1,12 @@
 import ast
-from itertools import chain
-from pystatic import preprocess
 from pystatic.target import Target
-from typing import (Optional, Protocol, TYPE_CHECKING, Dict, List, TypeVar,
-                    Union, Any)
-from pystatic.symid import (absolute_symidlist, SymId, symid2list,
-                            rel2abssymid, symid_parent)
+from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union)
+from pystatic.symid import SymId
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
-from pystatic.predefined import (TypeModuleTemp, TypePackageIns,
-                                 TypePackageTemp, TypeVarIns, TypeFuncIns)
-
+from pystatic.predefined import TypeVarIns, TypeFuncIns
 from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry
 from pystatic.option import Option
+from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -39,6 +34,8 @@ class PrepInfo:
         self.impt: Dict[str, 'prep_impt'] = {}
 
         self.symtable = symtable
+
+        self.tick = 1
 
     def name_collide(self, name: str):
         return (name in self.typevar_def or name in self.func

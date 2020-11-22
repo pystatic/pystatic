@@ -187,7 +187,7 @@ class SymTable:
         res_option = Option(any_ins)
         res = self.lookup(name)
         if not res:
-            res_option.add_err(SymbolUndefined(node, name))
+            res_option.add_error(SymbolUndefined(node, name))
         else:
             res_option.set_value(res)
         return res_option

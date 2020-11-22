@@ -16,10 +16,6 @@ if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 
-class ReadNsAst(Exception):
-    pass
-
-
 def path2ast(path: str) -> ast.AST:
     """May throw FileNotFoundError or SyntaxError"""
     with open(path, 'r') as f:

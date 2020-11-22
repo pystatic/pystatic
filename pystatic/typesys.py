@@ -59,7 +59,7 @@ class TypeIns:
                                          context)
 
         if not ins_res:
-            option_res.add_err(NoAttribute(node, self, name))
+            option_res.add_error(NoAttribute(node, self, name))
         else:
             option_res.set_value(ins_res)
         return option_res
@@ -164,7 +164,7 @@ class TypeType(TypeIns):
 
         if not ins_res:
             err = NoAttribute(node, self, name)
-            option_res.add_err(err)
+            option_res.add_error(err)
         else:
             option_res.set_value(ins_res)
         return option_res

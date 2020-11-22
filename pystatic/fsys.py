@@ -1,5 +1,4 @@
 import os
-from os.path import abspath
 from pystatic.config import PY_VERSION
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pystatic.symid import symid2list, absolute_symidlist, list2symid

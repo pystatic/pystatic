@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 from pystatic.visitor import BaseVisitor
 from pystatic.typesys import TypeClassTemp
 from pystatic.message import MessageBox
+from pystatic.symid import symid2list
 from pystatic.symtable import TableScope, ImportNode
 from pystatic.target import BlockTarget, MethodTarget
 from pystatic.preprocess.util import analyse_import_stmt
