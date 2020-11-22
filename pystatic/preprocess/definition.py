@@ -98,7 +98,7 @@ class TypeDefVisitor(BaseVisitor):
         self._add_import_info(node, info_list)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.prepinfo.add_func_def(node)
+        self.prepinfo.add_func_def(node, self.mbox)
 
     def _add_import_info(self, node: 'ImportNode', info_list: List[prep_impt]):
         """Add import information to the symtable"""

@@ -5,7 +5,7 @@ from ..util import get_manager_path, parse_file_error
 
 
 def test_redefine():
-    symid = 'preprocess.redefine'
+    symid = 'preprocess.prep_redefine'
     manager, path = get_manager_path({}, symid)
     manager.preprocess()
 

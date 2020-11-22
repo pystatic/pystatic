@@ -1,7 +1,7 @@
 import ast
 from pystatic.option import Option
 from enum import Enum
-from typing import Tuple, Optional, TYPE_CHECKING
+from typing import Tuple, Optional, TYPE_CHECKING, Union
 from pystatic.error_register import *
 
 if TYPE_CHECKING:
@@ -76,21 +76,26 @@ class SymbolRedefine(ErrorCode):
 
 
 class VarTypeCollide(ErrorCode):
-    """Name has been defined as a class but used on the left of an assignment
-    statement.
+    """Name has been defined as a class or function but used on the left of an
+    assignment statement.
     """
-    def __init__(self, clsnode: Optional[ast.ClassDef], name: str,
-                 varnode: Optional[ast.AST]) -> None:
+    def __init__(self, previlege_node: Optional[Union[ast.ClassDef,
+                                                      ast.FunctionDef]],
+                 name: str, varnode: Optional[ast.AST]) -> None:
         super().__init__()
-        self.clsnode = clsnode
+        self.previledge_node = previlege_node
         self.node = varnode
         self.name = name
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = VAR_TYPE_COLLIDE.format(self.name)
-        if self.clsnode:
-            detail = f'{self.name} defined as a class at line {self.clsnode.lineno}'
+        if self.previledge_node:
+            if isinstance(self.previledge_node, ast.ClassDef):
+                detail = f'{self.name} defined as a class at line {self.previledge_node.lineno}'
+            else:
+                assert isinstance(self.previledge_node, ast.FunctionDef)
+                detail = f'{self.name} defined as a function at line {self.previledge_node.lineno}'
             return self.node, self.concat_msg(review, detail)
         else:
             return self.node, review

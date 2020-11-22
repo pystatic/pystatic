@@ -28,11 +28,11 @@ class PrepInfo:
         self.is_special = is_special
 
         self.cls_def: Dict[str, 'prep_cls'] = {}
-        self.typevar_def: Dict[str, 'prep_typevar'] = {}
-        self.type_alias: Dict[str, 'prep_type_alias'] = {}
         self.local: Dict[str, 'prep_local'] = {}
         self.func: Dict[str, 'prep_func'] = {}
         self.impt: Dict[str, 'prep_impt'] = {}
+        self.typevar_def: Dict[str, 'prep_typevar'] = {}
+        self.type_alias: Dict[str, 'prep_type_alias'] = {}
 
         self.symtable = symtable
 
@@ -45,13 +45,16 @@ class PrepInfo:
     def add_cls_def(self, node: ast.ClassDef, mbox: 'MessageBox'):
         # TODO: check name collision
         clsname = node.name
-        if (old_cls_def := self.cls_def.get(clsname)):
-            mbox.add_err(SymbolRedefine(node, clsname, old_cls_def.defnode))
+        if (old_def := self.cls_def.get(clsname)):
+            mbox.add_err(SymbolRedefine(node, clsname, old_def.defnode))
             return
 
-        if (old_local_def := self.local.get(clsname)):
-            mbox.add_err(VarTypeCollide(node, clsname, old_local_def.defnode))
+        if (old_def := self.local.get(clsname)):
+            mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
             self.local.pop(clsname)
+        elif (old_def := self.func.get(clsname)):
+            mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
+            self.func.pop(clsname)
 
         if (clstemp := self.symtable.get_type_def(clsname)):
             assert isinstance(clstemp, TypeClassTemp)
@@ -68,10 +71,20 @@ class PrepInfo:
         self.symtable.add_entry(clsname, Entry(clstemp.get_default_typetype(), node))
         return new_prepinfo
 
-    def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
-                        defnode: AssignNode):
-        self.typevar_def[name] = prep_typevar(name, typevar, defnode)
-        self.symtable.add_entry(name, Entry(typevar, defnode))
+    def add_func_def(self, node: ast.FunctionDef, mbox: 'MessageBox'):
+        name = node.name
+        if name in self.func:
+            # name collision of different function is checked later
+            self.func[name].defnodes.append(node)
+        else:
+            if (old_def := self.cls_def.get(name)):
+                mbox.add_err(VarTypeCollide(old_def.defnode, name, node))
+                return
+            elif (old_def := self.local.get(name)):
+                mbox.add_err(VarTypeCollide(node, name, old_def.defnode))
+                self.local.pop(name)
+
+            self.func[name] = prep_func(node)
 
     def add_local_def(self, node: AssignNode, is_method: bool, mbox: 'MessageBox'):
         def is_strong_def(node: AssignNode):
@@ -100,12 +113,15 @@ class PrepInfo:
                         return
 
                 # NOTE: local_def finally added here
-                if (old_cls_def := self.cls_def.get(name)):
-                    mbox.add_err(VarTypeCollide(old_cls_def.defnode, name, defnode))
+                if (old_def := self.cls_def.get(name)):
+                    mbox.add_err(VarTypeCollide(old_def.defnode, name, defnode))
                     return
-                elif (old_local_def := self.local.get(name)):
+                elif (old_def := self.func.get(name)):
+                    mbox.add_err(SymbolRedefine(defnode, name, old_def.defnode))
+                    return
+                elif (old_def := self.local.get(name)):
                     if is_strong_def(defnode):
-                        old_astnode = old_local_def.defnode
+                        old_astnode = old_def.defnode
                         if is_strong_def(old_astnode):
                             # variable defined earlier with type annotation
                             mbox.add_err(SymbolRedefine(defnode, name, old_astnode))
@@ -137,18 +153,16 @@ class PrepInfo:
             else:
                 raise TypeError()
 
+    def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
+                        defnode: AssignNode):
+        self.typevar_def[name] = prep_typevar(name, typevar, defnode)
+        self.symtable.add_entry(name, Entry(typevar, defnode))
+
     def add_type_alias(self, alias: str, typealias: TypeAlias,
                        defnode: AssignNode):
         prep = prep_type_alias(typealias, defnode)
         self.type_alias[alias] = prep
         self.symtable.add_entry(alias, Entry(typealias, defnode))
-
-    def add_func_def(self, node: ast.FunctionDef):
-        name = node.name
-        if name in self.func:
-            self.func[name].defnodes.append(node)
-        else:
-            self.func[name] = prep_func(node)
 
     def get_prep_def(self, name: str) -> Optional[PrepInfoItem]:
         if name in self.cls_def:
