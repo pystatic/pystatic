@@ -4,7 +4,7 @@ from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union)
 from pystatic.symid import SymId
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
 from pystatic.predefined import TypeVarIns, TypeFuncIns
-from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry
+from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry, TableScope
 from pystatic.option import Option
 from pystatic.message import MessageBox
 
@@ -41,26 +41,72 @@ class PrepInfo:
         return (name in self.typevar_def or name in self.func
                 or name in self.local or name in self.cls_def)
 
-    def add_cls_def(self, temp: TypeClassTemp, prepinfo: 'PrepInfo',
-                    def_prepinfo: 'PrepInfo', node: ast.ClassDef):
-        name = node.name
-        cls_def = prep_cls(temp, prepinfo, def_prepinfo, node)
-        self.cls_def[name] = cls_def
-        self.symtable.add_type_def(name, temp)
-        self.symtable.add_entry(name, Entry(temp.get_default_typetype(), node))
+    def add_cls_def(self, node: ast.ClassDef):
+        # TODO: check name collision
+        clsname = node.name
+        if (clstemp := self.symtable.get_type_def(clsname)):
+            assert isinstance(clstemp, TypeClassTemp)
+            new_symtable = clstemp.get_inner_symtable()
+        
+        else:
+            new_symtable = self.symtable.new_symtable(clsname, TableScope.CLASS)
+            clstemp = TypeClassTemp(clsname, self.symtable, new_symtable)
+        
+        new_prepinfo = PrepInfo(new_symtable, self, False)
+        cls_def = prep_cls(clstemp, new_prepinfo, self, node)
+        self.cls_def[clsname] = cls_def
+        self.symtable.add_type_def(clsname, clstemp)
+        self.symtable.add_entry(clsname, Entry(clstemp.get_default_typetype(), node))
+        return new_prepinfo
 
     def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
                         defnode: AssignNode):
         self.typevar_def[name] = prep_typevar(name, typevar, defnode)
         self.symtable.add_entry(name, Entry(typevar, defnode))
 
-    def add_local_def(self, name: str, defnode: AssignNode):
-        if self.is_special:
-            origin_local = self.symtable.lookup_local(name)
-            if origin_local:
-                return
-        local_def = prep_local(name, defnode)
-        self.local[name] = local_def
+
+    def add_local_def(self, node: AssignNode, is_method):
+        def is_self_def(node: AssignNode, target: ast.AST):
+            """Whether test_node represents a form of "self.xxx = yyy"""
+            if isinstance(target, ast.Attribute):
+                if isinstance(target.value, ast.Name) and target.value.id == 'self':
+                    attr = target.attr
+                    assert isinstance(self, MethodPrepInfo)
+                    if attr in self.var_attr:
+                        # TODO: warning here because of redefinition
+                        return
+                    self.add_attr_def(attr, node)
+
+        def deal_single_expr(target: ast.AST, defnode: AssignNode):
+            if isinstance(target, ast.Name):
+                name = target.id
+                if not self.name_collide(name):
+                    if self.is_special:
+                        origin_local = self.symtable.lookup_local(name)
+                        if origin_local:
+                            return
+                    # NOTE: local_def finally added here
+                    local_def = prep_local(name, defnode)
+                    self.local[name] = local_def
+            elif isinstance(target, ast.Tuple):
+                for elt in target.elts:
+                    deal_single_expr(elt, defnode)
+            elif is_method:
+                is_self_def(defnode, target)
+
+        if not node.value:
+            assert isinstance(node, ast.AnnAssign)
+            deal_single_expr(node.target, node)
+        else:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    deal_single_expr(target, node)
+
+            elif isinstance(node, ast.AnnAssign):
+                deal_single_expr(node.target, node)
+
+            else:
+                raise TypeError()
 
     def add_type_alias(self, alias: str, typealias: TypeAlias,
                        defnode: AssignNode):

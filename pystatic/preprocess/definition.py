@@ -17,16 +17,18 @@ def get_definition(target: 'BlockTarget', env: 'PrepEnvironment',
     cur_ast = target.ast
     symtable = target.symtable
     symid = target.symid
-    
+
     if isinstance(target, Target):
         is_special = target.is_special
     else:
         is_special = False
 
     assert cur_ast
-    assert not env.get_prepinfo(symid), "call get_definition with the same symid is invalid"
+    assert not env.get_prepinfo(
+        symid), "call get_definition with the same symid is invalid"
 
-    prepinfo = env.try_add_target_prepinfo(target, PrepInfo(symtable, None, is_special))
+    prepinfo = env.try_add_target_prepinfo(
+        target, PrepInfo(symtable, None, is_special))
 
     TypeDefVisitor(env, prepinfo, mbox).accept(cur_ast)
 
@@ -36,7 +38,8 @@ def get_definition_in_method(target: 'MethodTarget', env: 'PrepEnvironment',
     cur_ast = target.ast
     assert isinstance(cur_ast, ast.FunctionDef)
     clstemp = target.clstemp
-    prepinfo = env.try_add_target_prepinfo(target, MethodPrepInfo(clstemp, None))
+    prepinfo = env.try_add_target_prepinfo(target,
+                                           MethodPrepInfo(clstemp, None))
     assert isinstance(prepinfo, MethodPrepInfo)
 
     return TypeDefVisitor(env, prepinfo, mbox, True).accept_func(cur_ast)
@@ -55,23 +58,6 @@ class TypeDefVisitor(BaseVisitor):
         self.glob_symid = prepinfo.symtable.glob.symid  # the module's symid
         self.is_method = is_method
 
-    def _is_self_def(self, node: ast.AST) -> Optional[str]:
-        if isinstance(node, ast.Attribute):
-            if isinstance(node.value, ast.Name):
-                if node.value.id == 'self':
-                    return node.attr
-        return None
-
-    def _try_attr(self, node: AssignNode, target: ast.AST):
-        attr = self._is_self_def(target)
-        if attr:
-            prepinfo = self.prepinfo
-            assert isinstance(prepinfo, MethodPrepInfo)
-            if attr in prepinfo.var_attr:
-                # TODO: warning here because of redefinition
-                return
-            prepinfo.add_attr_def(attr, node)
-
     def accept_func(self, node: ast.FunctionDef):
         for stmt in node.body:
             self.visit(stmt)
@@ -89,60 +75,15 @@ class TypeDefVisitor(BaseVisitor):
         self.is_method = old_is_method
         self.prepinfo = old_prepinfo
 
-    def collect_definition(self, node: Union[ast.Assign, ast.AnnAssign]):
-        def check_single_expr(target: ast.AST, defnode: AssignNode):
-            if isinstance(target, ast.Name):
-                name = target.id
-                if not self.prepinfo.name_collide(name):
-                    self.prepinfo.add_local_def(name, defnode)
-            elif isinstance(target, ast.Tuple):
-                for elt in target.elts:
-                    check_single_expr(elt, defnode)
-            elif self.is_method:
-                self._try_attr(defnode, target)
-
-        if not node.value:
-            assert isinstance(node, ast.AnnAssign)
-            check_single_expr(node.target, node)
-        else:
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    check_single_expr(target, node)
-
-            elif isinstance(node, ast.AnnAssign):
-                check_single_expr(node.target, node)
-
-            else:
-                raise TypeError()
-
     def visit_Assign(self, node: ast.Assign):
         # TODO: here pystatic haven't add redefine warning and check consistence
-        self.collect_definition(node)
+        self.prepinfo.add_local_def(node, self.is_method)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        self.collect_definition(node)
+        self.prepinfo.add_local_def(node, self.is_method)
 
     def visit_ClassDef(self, node: ast.ClassDef):
-        clsname = node.name
-
-        # TODO: error: redefinition
-        if self.prepinfo.name_collide(clsname):
-            raise NotImplementedError("name collision with class not handled yet")
-
-        if (clstemp := self.prepinfo.symtable.get_type_def(clsname)):
-            # clstemp already in symtable
-            assert isinstance(clstemp, TypeClassTemp)
-            new_symtable = clstemp.get_inner_symtable()
-
-        else:
-            new_symtable = self.prepinfo.symtable.new_symtable(clsname, TableScope.CLASS)
-            clstemp = TypeClassTemp(clsname, self.prepinfo.symtable, new_symtable)
-
-        assert isinstance(clstemp, TypeClassTemp)
-
-        new_prepinfo = PrepInfo(new_symtable, self.prepinfo, False)
-        self.prepinfo.add_cls_def(clstemp, new_prepinfo, self.prepinfo, node)
-
+        new_prepinfo = self.prepinfo.add_cls_def(node)
         # enter class scope
         with self.enter_class(new_prepinfo):
             for body in node.body:
@@ -159,8 +100,7 @@ class TypeDefVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.prepinfo.add_func_def(node)
 
-    def _add_import_info(self, node: 'ImportNode',
-                         info_list: List[prep_impt]):
+    def _add_import_info(self, node: 'ImportNode', info_list: List[prep_impt]):
         """Add import information to the symtable"""
         manager = self.env.manager
         for infoitem in info_list:

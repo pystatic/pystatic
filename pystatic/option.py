@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TypeVar, Any, TYPE_CHECKING, List
+from typing import Generic, TypeVar, Any, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from pystatic.errorcode import ErrorCode
