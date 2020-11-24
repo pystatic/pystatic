@@ -293,5 +293,3 @@ class InferStarter:
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox, symid, self.config)
             infer_visitor.infer()
-            from pystatic.plugin import find_node_type
-            print(find_node_type(target.ast, 3, 1))
