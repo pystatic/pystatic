@@ -11,7 +11,7 @@ from pystatic.config import Config
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.reachability import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH, is_true
-from pystatic.TypeCompatibe.simpleType import type_consistent
+from pystatic.TypeCompatible.simpleType import type_consistent
 
 
 class ConditionStmtType(Enum):

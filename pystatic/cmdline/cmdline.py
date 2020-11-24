@@ -60,11 +60,11 @@ def cmdline_main():
 
         # for err in cmdline_mbox.error:
         for err in cmdline_mbox.to_message():
-            print(f'{err}\n')
+            print(f'{err}')
 
         for mod in cmd_res.module:
             mbox = manager.get_mbox(mod)
 
             # for err in mbox.error:
             for err in mbox.to_message():
-                print(f'{err}\n')
+                print(f'{err}')
