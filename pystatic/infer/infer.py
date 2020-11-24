@@ -49,10 +49,8 @@ class InferVisitor(BaseVisitor):
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
-        # self.err_maker.add_type(node.value, rtype)
         setattr(node, 'type', rtype)
         for target in node.targets:
-            # self.err_maker.add_type(target, rtype)  # plugin
             setattr(node, 'type', rtype)
             if isinstance(target, ast.Name):
                 self.infer_name_node_of_assign(target, rtype, node.value)
@@ -110,10 +108,7 @@ class InferVisitor(BaseVisitor):
             self.record_no_value_node(node.target)
             return
         rtype: TypeIns = self.get_type(node.value)
-        # self.err_maker.add_type(node.target, rtype)
-        # self.err_maker.add_type(node.value, rtype)
         setattr(node.value, 'type', rtype)
-        setattr(node.target, 'type', rtype)
         target = node.target
         if isinstance(target, ast.Name):
             self.check_name_node_of_annassign(target, rtype, node.value)
@@ -129,6 +124,7 @@ class InferVisitor(BaseVisitor):
     def check_name_node_of_annassign(self, target: ast.Name, rtype, rnode):
         name = target.id
         comment = self.recorder.get_comment_type(name)
+        setattr(target, 'type', comment)
         if not self.recorder.is_defined(name):  # var appear first time
             self.recorder.set_type(name, comment)
 

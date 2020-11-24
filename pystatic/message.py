@@ -37,26 +37,10 @@ class Message(object):
         return f'line {self.lineno} col {self.col_offset}: ' + self.msg
 
 
-class NodeType:
-    def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
-                 end_col_offset: Optional[int], node_type: 'TypeIns'):
-        self.lineno = lineno
-        self.end_lineno: int = end_lineno if end_lineno else lineno
-        self.col_offset = col_offset
-        self.end_col_offset: int = end_col_offset if end_col_offset else col_offset
-        self.node_type = node_type
-
-    @classmethod
-    def from_node(cls, node: ast.AST, node_type: 'TypeIns'):
-        return cls(node.lineno, node.end_lineno, node.col_offset,
-                   node.end_col_offset, node_type)
-
-
 class MessageBox(object):
     def __init__(self, module_symid: str):
         self.module_symid = module_symid
         self.error: List[ErrorCode] = []
-        self.node_types: List[NodeType] = []
 
     def add_err(self, err: ErrorCode):
         self.error.append(err)
@@ -66,10 +50,6 @@ class MessageBox(object):
 
     def clear(self):
         self.error = []
-
-    def report(self):
-        for err in self.error:
-            print(Message.from_node(err.make()))
 
 
 class ErrorMaker:
@@ -82,9 +62,6 @@ class ErrorMaker:
 
     def add_err(self, err: ErrorCode):
         self.mbox.add_err(err)
-
-    def add_type(self, node: ast.AST, node_type: 'TypeIns'):
-        self.mbox.node_types.append(NodeType.from_node(node, node_type))
 
     def exsit_error(self, option: Option) -> bool:
         return option.haserr()
