@@ -2,6 +2,7 @@ import sys
 import os
 
 sys.path.extend(['.', '..'])
+from ..util import get_manager_path
 
 from pystatic.typesys import *
 from pystatic.predefined import *
@@ -10,18 +11,13 @@ from pystatic.manager import Manager
 
 
 def test_typevar():
-    src = 'prep_typevar'
-    cwd = os.path.dirname(os.path.dirname(__file__))
-    config = Config({'cwd': cwd})
-    manager = Manager(config)
-    filepath = os.path.join(cwd, 'src', 'preprocess', f'{src}.py')
-    res_option = manager.add_check_file(filepath)
-    assert res_option.value
+    symid = 'preprocess.prep_typevar'
+    manager, filepath = get_manager_path({}, symid)
     manager.preprocess()
 
-    module_temp = manager.get_module_temp(src)
+    module_temp = manager.get_module_temp(symid)
     assert isinstance(module_temp, TypeModuleTemp)
-    assert module_temp.module_symid == src
+    assert module_temp.module_symid == symid
 
     int_typetype = manager.get_sym_type('builtins', 'int')
     int_ins = int_typetype.temp.get_default_ins().value
@@ -33,13 +29,13 @@ def test_typevar():
     assert isinstance(str_typetype, TypeType)
     assert isinstance(str_ins, TypeIns)
 
-    T = manager.get_sym_type(src, 'T')
-    F = manager.get_sym_type(src, 'F')
-    G = manager.get_sym_type(src, 'G')
-    H = manager.get_sym_type(src, 'H')
-    A = manager.get_sym_type(src, 'A')
-    B = manager.get_sym_type(src, 'B')
-    I = manager.get_sym_type(src, 'I')
+    T = manager.get_sym_type(symid, 'T')
+    F = manager.get_sym_type(symid, 'F')
+    G = manager.get_sym_type(symid, 'G')
+    H = manager.get_sym_type(symid, 'H')
+    A = manager.get_sym_type(symid, 'A')
+    B = manager.get_sym_type(symid, 'B')
+    I = manager.get_sym_type(symid, 'I')
     assert isinstance(A, TypeType)
     assert isinstance(B, TypeType)
     assert isinstance(T, TypeVarIns)
@@ -48,9 +44,9 @@ def test_typevar():
     assert isinstance(H, TypeVarIns)
     assert isinstance(I, TypeVarIns)
 
-    assert len(F.constrains) == 2
-    assert F.constrains[0] is int_ins
-    assert F.constrains[1] is str_ins
+    assert len(F.constraints) == 2
+    assert F.constraints[0] is int_ins
+    assert F.constraints[1] is str_ins
     assert G.bound is int_ins
     assert H.bound is str_ins
     assert H.kind == TpVarKind.COVARIANT

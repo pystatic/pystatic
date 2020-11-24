@@ -3,21 +3,17 @@ import sys
 
 sys.path.extend(['.', '..'])
 
+from ..util import get_manager_path
+
 from pystatic.typesys import TypeAnyTemp, TypeIns, TypeType
 from pystatic.predefined import TypeFuncTemp, TypeModuleTemp, TypeFuncIns
 from pystatic.config import Config
 from pystatic.manager import Manager
-from pystatic.exprparse import eval_expr
 
 
 def test_class():
-    symid = 'prep_cls'
-    cwd = os.path.dirname(os.path.dirname(__file__))
-    config = Config({'cwd': cwd})
-    manager = Manager(config)
-    file_path = os.path.join(cwd, 'src', 'preprocess', f'{symid}.py')
-    res_option = manager.add_check_file(file_path)
-    assert res_option.value
+    symid = 'preprocess.prep_cls'
+    manager, file_path = get_manager_path({}, symid)
     manager.preprocess()
 
     module_temp = manager.get_module_temp(symid)

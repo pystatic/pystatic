@@ -3,6 +3,7 @@ import sys
 
 sys.path.extend(['.', '..'])
 
+from ..util import get_manager_path
 from pystatic.typesys import *
 from pystatic.predefined import *
 from pystatic.config import *
@@ -10,13 +11,8 @@ from pystatic.manager import *
 
 
 def test_alias():
-    symid = 'prep_alias'
-    cwd = os.path.dirname(os.path.dirname(__file__))
-    config = Config({'cwd': cwd})
-    manager = Manager(config)
-    file_path = os.path.join(cwd, 'src', 'preprocess', f'{symid}.py')
-    res_option = manager.add_check_file(file_path)
-    assert res_option.value
+    symid = 'preprocess.prep_alias'
+    manager, filepath = get_manager_path({}, symid)
     manager.preprocess()
 
     module_temp = manager.get_module_temp(symid)
@@ -60,4 +56,9 @@ def test_alias():
     assert UAB.bindlist
     assert len(UAB.bindlist) == 2
     assert UAB.bindlist[0].temp is A_temp
+    assert isinstance(UAB.bindlist[0],
+                      TypeIns) and not isinstance(UAB.bindlist[0], TypeType)
     assert UAB.bindlist[1].temp is B_temp
+
+    UD = manager.get_sym_type(symid, 'UD')
+    assert not isinstance(UD, TypeAlias)

@@ -1,17 +1,13 @@
 import ast
-from itertools import chain
-from pystatic import preprocess
+from pystatic.errorcode import *
 from pystatic.target import Target
-from typing import (Optional, Protocol, TYPE_CHECKING, Dict, List, TypeVar,
-                    Union, Any)
-from pystatic.symid import (absolute_symidlist, SymId, symid2list,
-                            rel2abssymid, symid_parent)
+from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union)
+from pystatic.symid import SymId
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
-from pystatic.predefined import (TypeModuleTemp, TypePackageIns,
-                                 TypePackageTemp, TypeVarIns, TypeFuncIns)
-
-from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry
+from pystatic.predefined import TypeVarIns, TypeFuncIns
+from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry, TableScope
 from pystatic.option import Option
+from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -32,51 +28,141 @@ class PrepInfo:
         self.is_special = is_special
 
         self.cls_def: Dict[str, 'prep_cls'] = {}
-        self.typevar_def: Dict[str, 'prep_typevar'] = {}
-        self.type_alias: Dict[str, 'prep_type_alias'] = {}
         self.local: Dict[str, 'prep_local'] = {}
         self.func: Dict[str, 'prep_func'] = {}
         self.impt: Dict[str, 'prep_impt'] = {}
+        self.typevar_def: Dict[str, 'prep_typevar'] = {}
+        self.type_alias: Dict[str, 'prep_type_alias'] = {}
 
         self.symtable = symtable
+
+        self.tick = 1
 
     def name_collide(self, name: str):
         return (name in self.typevar_def or name in self.func
                 or name in self.local or name in self.cls_def)
 
-    def add_cls_def(self, temp: TypeClassTemp, prepinfo: 'PrepInfo',
-                    def_prepinfo: 'PrepInfo', node: ast.ClassDef):
+    def add_cls_def(self, node: ast.ClassDef, mbox: 'MessageBox'):
+        # TODO: check name collision
+        clsname = node.name
+        if (old_def := self.cls_def.get(clsname)):
+            mbox.add_err(SymbolRedefine(node, clsname, old_def.defnode))
+            return
+
+        if (old_def := self.local.get(clsname)):
+            mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
+            self.local.pop(clsname)
+        elif (old_def := self.func.get(clsname)):
+            mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
+            self.func.pop(clsname)
+
+        if (clstemp := self.symtable.get_type_def(clsname)):
+            assert isinstance(clstemp, TypeClassTemp)
+            new_symtable = clstemp.get_inner_symtable()
+
+        else:
+            new_symtable = self.symtable.new_symtable(clsname, TableScope.CLASS)
+            clstemp = TypeClassTemp(clsname, self.symtable, new_symtable)
+
+        new_prepinfo = PrepInfo(new_symtable, self, False)
+        cls_def = prep_cls(clstemp, new_prepinfo, self, node)
+        self.cls_def[clsname] = cls_def
+        self.symtable.add_type_def(clsname, clstemp)
+        self.symtable.add_entry(clsname, Entry(clstemp.get_default_typetype(), node))
+        return new_prepinfo
+
+    def add_func_def(self, node: ast.FunctionDef, mbox: 'MessageBox'):
         name = node.name
-        cls_def = prep_cls(temp, prepinfo, def_prepinfo, node)
-        self.cls_def[name] = cls_def
-        self.symtable.add_type_def(name, temp)
-        self.symtable.add_entry(name, Entry(temp.get_default_typetype(), node))
+        if name in self.func:
+            # name collision of different function is checked later
+            self.func[name].defnodes.append(node)
+        else:
+            if (old_def := self.cls_def.get(name)):
+                mbox.add_err(VarTypeCollide(old_def.defnode, name, node))
+                return
+            elif (old_def := self.local.get(name)):
+                mbox.add_err(VarTypeCollide(node, name, old_def.defnode))
+                self.local.pop(name)
+
+            self.func[name] = prep_func(node)
+
+    def add_local_def(self, node: AssignNode, is_method: bool, mbox: 'MessageBox'):
+        def is_strong_def(node: AssignNode):
+            """If a assignment has annotation or type_comment, then it's a strong
+            definition.
+            """
+            return getattr(node, 'type_comment', None) or getattr(node, 'annotation', None)
+
+        def is_self_def(node: AssignNode, target: ast.AST):
+            """Whether test_node represents a form of "self.xxx = yyy"""
+            if isinstance(target, ast.Attribute):
+                if isinstance(target.value, ast.Name) and target.value.id == 'self':
+                    attr = target.attr
+                    assert isinstance(self, MethodPrepInfo)
+                    if attr in self.var_attr:
+                        # TODO: warning here because of redefinition
+                        return
+                    self.add_attr_def(attr, node)
+
+        def deal_single_expr(target: ast.AST, defnode: AssignNode):
+            if isinstance(target, ast.Name):
+                name = target.id
+                if self.is_special:
+                    origin_local = self.symtable.lookup_local(name)
+                    if origin_local:
+                        return
+
+                # NOTE: local_def finally added here
+                if (old_def := self.cls_def.get(name)):
+                    mbox.add_err(VarTypeCollide(old_def.defnode, name, defnode))
+                    return
+                elif (old_def := self.func.get(name)):
+                    mbox.add_err(SymbolRedefine(defnode, name, old_def.defnode))
+                    return
+                elif (old_def := self.local.get(name)):
+                    if is_strong_def(defnode):
+                        old_astnode = old_def.defnode
+                        if is_strong_def(old_astnode):
+                            # variable defined earlier with type annotation
+                            mbox.add_err(SymbolRedefine(defnode, name, old_astnode))
+                            return
+                    else:
+                        return
+
+                local_def = prep_local(name, defnode)
+                self.local[name] = local_def
+
+            elif isinstance(target, ast.Tuple):
+                for elt in target.elts:
+                    deal_single_expr(elt, defnode)
+
+            elif is_method:
+                is_self_def(defnode, target)
+
+        if not node.value:
+            assert isinstance(node, ast.AnnAssign)
+            deal_single_expr(node.target, node)
+        else:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    deal_single_expr(target, node)
+
+            elif isinstance(node, ast.AnnAssign):
+                deal_single_expr(node.target, node)
+
+            else:
+                raise TypeError()
 
     def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
                         defnode: AssignNode):
         self.typevar_def[name] = prep_typevar(name, typevar, defnode)
         self.symtable.add_entry(name, Entry(typevar, defnode))
 
-    def add_local_def(self, name: str, defnode: AssignNode):
-        if self.is_special:
-            origin_local = self.symtable.lookup_local(name)
-            if origin_local:
-                return
-        local_def = prep_local(name, defnode)
-        self.local[name] = local_def
-
     def add_type_alias(self, alias: str, typealias: TypeAlias,
                        defnode: AssignNode):
         prep = prep_type_alias(typealias, defnode)
         self.type_alias[alias] = prep
         self.symtable.add_entry(alias, Entry(typealias, defnode))
-
-    def add_func_def(self, node: ast.FunctionDef):
-        name = node.name
-        if name in self.func:
-            self.func[name].defnodes.append(node)
-        else:
-            self.func[name] = prep_func(node)
 
     def get_prep_def(self, name: str) -> Optional[PrepInfoItem]:
         if name in self.cls_def:

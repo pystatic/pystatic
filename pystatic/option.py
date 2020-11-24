@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TypeVar, Any, TYPE_CHECKING, List
+from typing import Generic, TypeVar, Any, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from pystatic.errorcode import ErrorCode
@@ -14,12 +14,12 @@ class Option(Generic[T]):
         self.value: T = default
         self.errors = None
 
-    def add_err(self, error: 'ErrorCode'):
+    def add_error(self, error: 'ErrorCode'):
         if not self.errors:
             self.errors = []
         self.errors.append(error)
 
-    def add_errlist(self, errors: List['ErrorCode']):
+    def add_error_list(self, errors: List['ErrorCode']):
         if not self.errors:
             self.errors = []
         self.errors.extend(errors)
@@ -29,7 +29,7 @@ class Option(Generic[T]):
 
     def combine_error(self, other: 'Option'):
         if other.errors:
-            self.add_errlist(other.errors)
+            self.add_error_list(other.errors)
 
     def dump_to_box(self, mbox: 'MessageBox'):
         if self.errors:

@@ -64,7 +64,7 @@ class Manager:
         add_option = Option(True)
         if not find_res:
             add_option.value = False
-            add_option.add_err(ModuleNotFound(symid))
+            add_option.add_error(ModuleNotFound(symid))
 
         else:
             if default_symtable:
@@ -181,7 +181,7 @@ class Manager:
 
         if not os.path.exists(path):
             add_option = Option(False)
-            add_option.add_err(FileNotFound(path))
+            add_option.add_error(FileNotFound(path))
             return add_option
         else:
             rt_path = crawl_path(os.path.dirname(path))

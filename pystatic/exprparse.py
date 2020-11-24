@@ -4,11 +4,10 @@ from typing import List, Optional, Protocol, Sequence
 from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
 from pystatic.typesys import TypeIns, any_ins
-from pystatic.predefined import (TypeLiteralIns, none_ins, bool_ins, list_temp,
-                                 tuple_temp, dict_temp, set_temp)
 from pystatic.evalutil import ApplyArgs, WithAst
 from pystatic.option import Option
 from pystatic.opmap import binop_map, unaryop_map
+from pystatic.predefined import *
 
 
 class SupportGetAttribute(Protocol):
@@ -18,15 +17,24 @@ class SupportGetAttribute(Protocol):
 
 def eval_expr(node: ast.AST,
               attr_consultant: SupportGetAttribute,
-              explicit=False):
-    return ExprParser(attr_consultant, explicit).accept(node)
+              explicit=False,
+              annotation=False):
+    """
+    :param explicit: If True, tuples like (1, 2) will return 
+    Tuple[Literal[1], Literal[2]], else return Tuple[int]
+
+    :param annotation: If True, strings inside this node is treated
+    as forward-reference other than Literal string.
+    """
+    return ExprParser(attr_consultant, explicit, annotation).accept(node)
 
 
 class ExprParser(NoGenVisitor):
-    def __init__(self, consultant: SupportGetAttribute,
-                 explicit: bool) -> None:
+    def __init__(self, consultant: SupportGetAttribute, explicit: bool,
+                 annotation: bool) -> None:
         self.consultant = consultant
         self.explicit = explicit
+        self.annotation = annotation
         self.errors = []
 
         self.in_subs = False  # under a subscription node?
@@ -50,7 +58,7 @@ class ExprParser(NoGenVisitor):
         yield
         self.in_subs = old_in_subs
 
-    def add_err(self, errlist: Optional[List[ErrorCode]]):
+    def add_error(self, errlist: Optional[List[ErrorCode]]):
         if errlist:
             self.errors.extend(errlist)
 
@@ -95,7 +103,7 @@ class ExprParser(NoGenVisitor):
         tpins = self.visit(node)
         assert isinstance(tpins, TypeIns)
         res_option = Option(tpins)
-        res_option.add_errlist(self.errors)
+        res_option.add_error_list(self.errors)
         return res_option
 
     def visit_Name(self, node: ast.Name) -> TypeIns:
@@ -103,24 +111,42 @@ class ExprParser(NoGenVisitor):
         assert isinstance(name_option, Option)
         assert isinstance(name_option.value, TypeIns)
 
-        self.add_err(name_option.errors)
+        self.add_error(name_option.errors)
 
         self.add_to_container(name_option.value, node)
         return name_option.value
 
     def visit_Constant(self, node: ast.Constant) -> TypeIns:
-        if node.value is None:
-            return none_ins
-        tpins = TypeLiteralIns(node.value)
-        self.add_to_container(tpins, node)
-        return tpins
+        res = None
+        if node.value == None:
+            res = none_ins
+        elif node.value == ...:
+            res = ellipsis_ins
+        elif self.annotation and isinstance(node.value, str):
+            try:
+                astnode = ast.parse(node.value, mode='eval')
+                res_option = eval_expr(astnode.body, self.consultant,
+                                       self.explicit, True)
+                # TODO: add warning here
+                res = res_option.value
+            except SyntaxError:
+                # TODO: add warning here
+                res = TypeLiteralIns(node.value)
+
+        if res:
+            self.add_to_container(res, node)
+            return res
+        else:
+            tpins = TypeLiteralIns(node.value)
+            self.add_to_container(tpins, node)
+            return tpins
 
     def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
         res = self.visit(node.value)
         assert isinstance(res, TypeIns)
         attr_option = res.getattribute(node.attr, node)
 
-        self.add_err(attr_option.errors)
+        self.add_error(attr_option.errors)
 
         self.add_to_container(attr_option.value, node)
         return attr_option.value
@@ -132,7 +158,7 @@ class ExprParser(NoGenVisitor):
         applyargs = self.generate_applyargs(node)
         call_option = left_ins.call(applyargs)
 
-        self.add_err(call_option.errors)
+        self.add_error(call_option.errors)
 
         self.add_to_container(call_option.value, node)
         return call_option.value
@@ -145,7 +171,7 @@ class ExprParser(NoGenVisitor):
         assert op, f"{node.op} is not supported now"
         res_option = operand_ins.unaryop_mgf(op, node)
 
-        self.add_err(res_option.errors)
+        self.add_error(res_option.errors)
 
         self.add_to_container(res_option.value, node)
         return res_option.value
@@ -160,7 +186,7 @@ class ExprParser(NoGenVisitor):
         assert op, f"{node.op} is not supported now"
         res_option = left_ins.binop_mgf(right_ins, op, node)
 
-        self.add_err(res_option.errors)
+        self.add_error(res_option.errors)
 
         self.add_to_container(res_option.value, node)
         return res_option.value

@@ -12,7 +12,7 @@ from pystatic.staticinfer import cmp_by_op
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.visitor import BaseVisitor
 from pystatic.reach import Reach, cal_neg, is_true
-from pystatic.TypeCompatibe.simpleType import type_consistent
+from pystatic.TypeCompatible.simpleType import type_consistent
 
 
 class ConditionStmtType(Enum):
@@ -67,11 +67,10 @@ class ConditionInfer(BaseVisitor):
 
     def rejected(self):
         reach = self.cur_condition.reach
-        return reach in REJECT_REACH
+        return reach in (Reach.ALWAYS_FALSE, Reach.TYPE_FALSE)
 
     def pop(self):
         if self.cur_condition.reach == Reach.UNKNOWN:
-            # print(self.cur_condition.dirty_map)
             self.recorder.clean_dirty(self.cur_condition.dirty_map)
         self.reach_stack.pop()
         assert len(self.reach_stack) != 0
@@ -225,6 +224,8 @@ class ConditionInfer(BaseVisitor):
         return Reach.ALWAYS_FALSE
 
     def infer_value_of_name_node(self, test: ast.Name) -> Reach:
+        if test.id == "TYPE_CHECKING":
+            return Reach.TYPE_TRUE
         option: Option = eval_expr(test, self.recorder)
         tp = self.err_maker.dump_option(option)
         if self.err_maker.exsit_error(option):

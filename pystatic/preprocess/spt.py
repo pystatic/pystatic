@@ -4,6 +4,7 @@ from typing import Deque
 from pystatic.exprparse import ExprParser, eval_expr
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.visitor import NoGenVisitor
+from pystatic.evalutil import ApplyArgs
 from pystatic.predefined import TypeVarIns, typevar_type, typevar_temp
 from pystatic.target import BlockTarget
 from pystatic.preprocess.prepinfo import PrepEnvironment, PrepInfo
@@ -28,8 +29,10 @@ def resolve_spt(target: 'BlockTarget', env: PrepEnvironment):
             typealias = typealias_def.value
             # TODO: change assert to
             assert value, "TypeAlias definition shouldn't be empty"
+            # expression in the right assignment mustn't a string literal
+            assert not isinstance(typealias_def.defnode.value, ast.Constant)
             # TODO: add warning
-            typetype = eval_expr(value, cur_prepinfo).value
+            typetype = eval_expr(value, cur_prepinfo, annotation=True).value
             assert isinstance(typetype, TypeType)
             typealias.bindlist = typetype.bindlist
 
@@ -47,7 +50,7 @@ def copy_typevar(src: 'TypeVarIns', dst: 'TypeVarIns'):
     dst.bindlist = src.bindlist
     dst.kind = src.kind
     dst.bound = src.bound
-    dst.constrains = src.constrains
+    dst.constraints = src.constraints
 
 
 class TypeVarFiller(ExprParser):
@@ -55,7 +58,7 @@ class TypeVarFiller(ExprParser):
         pass
 
     def __init__(self, typevar: 'TypeVarIns', prepinfo: 'PrepInfo') -> None:
-        super().__init__(prepinfo, False)
+        super().__init__(prepinfo, False, False)
         self.typevar = typevar
         self.outermost = True
 
@@ -66,6 +69,30 @@ class TypeVarFiller(ExprParser):
             raise ValueError("node is not a TypeVar")
         except self.TypeVarFillerComplete:
             return self.typevar
+
+    def generate_applyargs(self, node: ast.Call) -> ApplyArgs:
+        # TODO: warning here for failing.
+        applyargs = ApplyArgs()
+        name_node = node.args[0]
+        name_ins = self.visit(name_node)
+        assert name_ins
+        applyargs.add_arg(name_ins, name_node)
+
+        # When eval TypeVar's argument can be type represented by
+        # a string
+        self.annotation = True
+        for constrain_node in node.args[1:]:
+            argins = self.visit(constrain_node)
+            assert isinstance(argins, TypeIns)
+            applyargs.add_arg(argins, constrain_node)
+
+        for kwargnode in node.keywords:
+            argins = self.visit(kwargnode.value)
+            assert isinstance(argins, TypeIns)
+            assert kwargnode.arg, "**kwargs is not supported yet"
+            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
+        self.annotation = False
+        return applyargs
 
     def visit_Call(self, node: ast.Call) -> TypeIns:
         if self.outermost:

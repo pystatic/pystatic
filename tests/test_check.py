@@ -26,12 +26,7 @@ def parse_file(file_path):
     return msg_list
 
 
-file_list = [
-    'check_assign',
-    'check_attribute',
-    'check_reach'
-    # 'check_tuple'
-]
+file_list = ['check_assign', 'check_attribute', 'check_reach', 'check_tuple']
 
 
 def test_check():

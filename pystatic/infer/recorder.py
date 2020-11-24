@@ -5,7 +5,7 @@ from pystatic.typesys import TypeIns, TypeType, any_type
 from pystatic.predefined import TypeFuncIns
 from pystatic.option import Option
 from pystatic.symtable import SymTable
-from pystatic.TypeCompatibe.simpleType import type_consistent
+from pystatic.TypeCompatible.simpleType import type_consistent
 
 
 class Scope:
@@ -38,7 +38,6 @@ class ModuleScope(Scope):
 
 class SymbolRecorder:
     """record the appeared symbol"""
-
     def __init__(self, module):
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))
@@ -123,14 +122,12 @@ class SymbolRecorder:
             return Option(tp)
         else:
             option: Option = Option(any_type)
-            option.add_err(SymbolUndefined(node, name))
+            option.add_error(SymbolUndefined(node, name))
             return option
 
     def clean_dirty(self, dirty_map: Dict[str, TypeIns]):
         for name, pre_type in dirty_map.items():
             cur_type = self.get_run_time_type(name)
-            print("pre", pre_type)
-            print("cur", cur_type)
             if type_consistent(pre_type, cur_type):
                 self.set_type(name, pre_type)
             else:
