@@ -7,23 +7,41 @@ if TYPE_CHECKING:
     from pystatic.config import Config
 
 
-def infer_reachability_if(test: ast.expr, config: 'Config') -> Reach:
+def is_accessible(test: ast.expr, config: 'Config'):
+    res = static_infer(test, config)
+    if res != Reach.UNKNOWN:
+        setattr(test, 'reach', res)
+    return is_true(res)
+
+
+def static_infer(test: ast.expr, config: 'Config') -> Reach:
     if isinstance(test, ast.UnaryOp):
-        res = infer_reachability_if(test.operand, config)
-        return cal_neg(res)
-    elif isinstance(test, ast.BinOp):
-        left_res = infer_reachability_if(test.left, config)
+        res = static_infer(test.operand, config)
+        op = test.op
+        if isinstance(op, ast.Not):
+            return cal_neg(res)
+        elif isinstance(op, ast.UAdd):
+            return res
+        elif isinstance(op, ast.USub):
+            if isinstance(test.operand, ast.Constant):  # -1 1 0 -0
+                return res
+            else:  # -False -True
+                return cal_neg(res)
+    elif isinstance(test, ast.BoolOp):
         if isinstance(test.op, ast.And):
-            if left_res == Reach.ALWAYS_TRUE:
-                return infer_reachability_if(test.right, config)
-            else:
-                return left_res
+            for value in test.values:
+                value_reach = static_infer(value, config)
+                if value_reach == Reach.ALWAYS_FALSE:
+                    return Reach.ALWAYS_FALSE
+                elif value_reach == Reach.UNKNOWN:
+                    return Reach.UNKNOWN
         elif isinstance(test.op, ast.Or):
-            if left_res == Reach.ALWAYS_TRUE:
-                return Reach.ALWAYS_TRUE
-            else:
-                return infer_reachability_if(test.right, config)
-        return Reach.UNKNOWN
+            for value in test.values:
+                value_reach = static_infer(value, config)
+                if value_reach == Reach.ALWAYS_TRUE:
+                    return Reach.ALWAYS_TRUE
+                elif value_reach == Reach.UNKNOWN:
+                    return Reach.UNKNOWN
     elif isinstance(test, ast.Compare):
         left = test.left
         for cmpa, op in zip(test.comparators, test.ops):
@@ -38,10 +56,16 @@ def infer_reachability_if(test: ast.expr, config: 'Config') -> Reach:
             if not is_true(res, False):
                 return res
             left = cmpa
-
         return Reach.ALWAYS_TRUE
-    else:
-        return Reach.UNKNOWN
+    elif isinstance(test, ast.Name):
+        if test.id == "TYPE_CHECKING":
+            return Reach.TYPE_TRUE
+    elif isinstance(test, ast.Constant):
+        if test.value:
+            return Reach.ALWAYS_TRUE
+        else:
+            return Reach.ALWAYS_FALSE
+    return Reach.UNKNOWN
 
 
 def is_cmp_python_version(node: ast.expr):
@@ -50,6 +74,25 @@ def is_cmp_python_version(node: ast.expr):
         return True
     else:
         return False
+
+
+def cmp_by_op(left, right, op: ast.cmpop) -> Reach:
+    cond_map = {False: Reach.ALWAYS_FALSE, True: Reach.ALWAYS_TRUE}
+    try:
+        if isinstance(op, ast.Eq):
+            return cond_map[left == right]
+        elif isinstance(op, ast.Gt):
+            return cond_map[left > right]
+        elif isinstance(op, ast.GtE):
+            return cond_map[left >= right]
+        elif isinstance(op, ast.Lt):
+            return cond_map[left < right]
+        elif isinstance(op, ast.LtE):
+            return cond_map[left <= right]
+        else:
+            return Reach.UNKNOWN
+    except TypeError:
+        return Reach.UNKNOWN
 
 
 def compare_python_version(sys_node: ast.expr,
@@ -68,20 +111,4 @@ def compare_python_version(sys_node: ast.expr,
     left = py_version
     if atright:
         left, right = right, left
-    if isinstance(op, ast.Eq):
-        if not left == right:
-            return Reach.ALWAYS_FALSE
-    elif isinstance(op, ast.Gt):
-        if not left > right:
-            return Reach.ALWAYS_FALSE
-    elif isinstance(op, ast.GtE):
-        if not left >= right:
-            return Reach.ALWAYS_FALSE
-    elif isinstance(op, ast.Lt):
-        if not left < right:
-            return Reach.ALWAYS_FALSE
-    elif isinstance(op, ast.LtE):
-        if not left <= right:
-            return Reach.ALWAYS_FALSE
-
-    return Reach.ALWAYS_TRUE
+    return cmp_by_op(left, right, op)

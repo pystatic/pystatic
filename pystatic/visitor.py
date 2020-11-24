@@ -19,7 +19,7 @@ class VisitException(Exception):
 class BaseVisitor(object):
     def whether_visit(self, node):
         if getattr(node, 'reach',
-                   Reach.UNKNOWN) not in (Reach.NEVER, Reach.CLS_REDEF):
+                   Reach.UNKNOWN) not in (Reach.FUNC_REDEF, Reach.CLS_REDEF):
             return True
         return False
 

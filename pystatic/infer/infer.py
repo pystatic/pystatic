@@ -1,7 +1,7 @@
 import ast
 import logging
 from contextlib import contextmanager
-from typing import Optional, Set
+from typing import Optional, Set, Deque
 from pystatic.typesys import *
 from pystatic.predefined import *
 from pystatic.target import BlockTarget, Target
@@ -12,7 +12,7 @@ from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.opmap import *
 from pystatic.config import Config
-from pystatic.infer.visitor import BaseVisitor
+from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
 from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any, type_consistent
@@ -272,24 +272,23 @@ class InferVisitor(BaseVisitor):
         container = self.get_type(node.iter)
         print(container.bindlist)
         print(container.temp.placeholders)
-        get_element_type_in_container(container)
+        self.get_element_type_in_container(container)
 
-
-def get_element_type_in_container(container):
-    # print(container)
-    # print(container.bindlist)
-    pass
+    def get_element_type_in_container(container):
+        # print(container)
+        # print(container.bindlist)
+        pass
 
 
 class InferStarter:
-    def __init__(self, sources: Dict[SymId, Target], config: Config):
-        self.sources = sources
+    def __init__(self, q_infer: Deque[BlockTarget], config: Config):
+        self.q_infer = q_infer
         self.config = config
 
     def start_infer(self):
-        for symid, target in self.sources.items():
-            if symid == "typing" or symid=="builtins":
-                continue
+        for target in self.q_infer:
+            print(type(target))
+            symid = target.symid
             logger.info(f'Type infer in module \'{symid}\'')
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox, symid, self.config)

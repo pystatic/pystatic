@@ -1,4 +1,3 @@
-from typing import TYPE_CHECKING
 import enum
 
 
@@ -6,14 +5,15 @@ import enum
 class Reach(enum.Enum):
     TYPE_TRUE = 1  # true on type checking(see TYPE_CHECKING)
     TYPE_FALSE = 2  # false on type checking
-    RUNTIME_TRUE = 3  # true on runtime
-    RUNTIME_FALSE = 4  # false on runtime
-    ALWAYS_TRUE = 5  # always true
-    ALWAYS_FALSE = 6  # always wrong
-    CLS_REDEF = 7  # class redefined(usually omit this)
-    NEVER = 8  # node that will never be visited
-    UNKNOWN = 9  # uncertain about its reachability
+    ALWAYS_TRUE = 3  # true on runtime
+    ALWAYS_FALSE = 4  # false on runtime
+    UNKNOWN = 5  # uncertain about its reachability
+    CLS_REDEF = 6
+    FUNC_REDEF = 7
 
+
+ACCEPT_REACH = (Reach.ALWAYS_TRUE, Reach.TYPE_TRUE, Reach.UNKNOWN)
+REJECT_REACH = (Reach.ALWAYS_FALSE, Reach.TYPE_FALSE)
 
 
 def cal_neg(res: Reach) -> Reach:
@@ -21,20 +21,16 @@ def cal_neg(res: Reach) -> Reach:
         return Reach.TYPE_FALSE
     elif res == Reach.TYPE_FALSE:
         return Reach.TYPE_TRUE
-    elif res == Reach.RUNTIME_TRUE:
-        return Reach.RUNTIME_FALSE
-    elif res == Reach.RUNTIME_FALSE:
-        return Reach.RUNTIME_TRUE
-    elif res == Reach.ALWAYS_FALSE:
-        return Reach.ALWAYS_TRUE
     elif res == Reach.ALWAYS_TRUE:
         return Reach.ALWAYS_FALSE
+    elif res == Reach.ALWAYS_FALSE:
+        return Reach.ALWAYS_TRUE
     else:
         return Reach.UNKNOWN
 
 
 def is_true(res: Reach, runtime=False) -> bool:
     if runtime:
-        return res in (Reach.ALWAYS_TRUE, Reach.RUNTIME_TRUE)
+        return res in (Reach.ALWAYS_TRUE, Reach.TYPE_FALSE)
     else:
         return res in (Reach.ALWAYS_TRUE, Reach.TYPE_TRUE)
