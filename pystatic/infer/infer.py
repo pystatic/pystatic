@@ -15,7 +15,7 @@ from pystatic.config import Config
 from pystatic.infer.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
-from pystatic.TypeCompatibe.simpleType import TypeCompatible, is_any, type_consistent
+from pystatic.TypeCompatible.simpleType import TypeCompatible, is_any, type_consistent
 
 logger = logging.getLogger(__name__)
 

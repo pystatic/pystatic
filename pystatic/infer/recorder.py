@@ -5,7 +5,7 @@ from pystatic.typesys import TypeIns, TypeType, any_type
 from pystatic.predefined import TypeFuncIns
 from pystatic.option import Option
 from pystatic.symtable import SymTable
-from pystatic.TypeCompatibe.simpleType import type_consistent
+from pystatic.TypeCompatible.simpleType import type_consistent
 
 
 class Scope:
