@@ -128,8 +128,6 @@ class SymbolRecorder:
     def clean_dirty(self, dirty_map: Dict[str, TypeIns]):
         for name, pre_type in dirty_map.items():
             cur_type = self.get_run_time_type(name)
-            print("pre", pre_type)
-            print("cur", cur_type)
             if type_consistent(pre_type, cur_type):
                 self.set_type(name, pre_type)
             else:

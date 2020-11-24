@@ -43,7 +43,7 @@ class TypeCompatible:
                 return False
 
         elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
-            print('TypeclassTemp')
+            # print('TypeclassTemp')
             return self.SpecificClassTypeCom(
                 a, b, compatibleState.CONTRAVARIANT)  # 此处语法有待丰富
 

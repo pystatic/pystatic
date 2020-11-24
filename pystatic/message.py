@@ -23,7 +23,6 @@ class Message(object):
 
     @classmethod
     def from_node(cls, node: ast.AST, msg: str):
-        print(msg)
         return cls(node.lineno, node.end_lineno, node.col_offset,
                    node.end_col_offset, msg)
 

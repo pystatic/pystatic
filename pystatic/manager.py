@@ -228,7 +228,7 @@ class Manager:
         pass
 
     def infer(self):
-        InferStarter(self.targets, self.config).start_infer()
+        InferStarter(self.q_infer, self.config).start_infer()
 
     def get_sym_type(self, module_symid: SymId,
                      var_symid: SymId) -> Optional['TypeIns']:

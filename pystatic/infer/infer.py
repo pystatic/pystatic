@@ -1,7 +1,7 @@
 import ast
 import logging
 from contextlib import contextmanager
-from typing import Optional, Set
+from typing import Optional, Set, Deque
 from pystatic.typesys import *
 from pystatic.predefined import *
 from pystatic.target import BlockTarget, Target
@@ -12,7 +12,7 @@ from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.opmap import *
 from pystatic.config import Config
-from pystatic.infer.visitor import BaseVisitor
+from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
 from pystatic.TypeCompatible.simpleType import TypeCompatible, is_any, type_consistent
@@ -49,9 +49,11 @@ class InferVisitor(BaseVisitor):
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
-        self.err_maker.add_type(node.value, rtype)  # TODO:plugin
+        # self.err_maker.add_type(node.value, rtype)
+        setattr(node, 'type', rtype)
         for target in node.targets:
-            self.err_maker.add_type(target, rtype)  # plugin
+            # self.err_maker.add_type(target, rtype)  # plugin
+            setattr(node, 'type', rtype)
             if isinstance(target, ast.Name):
                 self.infer_name_node_of_assign(target, rtype, node.value)
             elif isinstance(target, (ast.List, ast.Tuple)):
@@ -108,8 +110,10 @@ class InferVisitor(BaseVisitor):
             self.record_no_value_node(node.target)
             return
         rtype: TypeIns = self.get_type(node.value)
-        self.err_maker.add_type(node.target, rtype)  # TODO:plugin
-        self.err_maker.add_type(node.value, rtype)
+        # self.err_maker.add_type(node.target, rtype)
+        # self.err_maker.add_type(node.value, rtype)
+        setattr(node.value, 'type', rtype)
+        setattr(node.target, 'type', rtype)
         target = node.target
         if isinstance(target, ast.Name):
             self.check_name_node_of_annassign(target, rtype, node.value)
@@ -165,6 +169,7 @@ class InferVisitor(BaseVisitor):
     def visit_scope(self, node):
         tp = self.recorder.get_comment_type(node.name)
         self.recorder.set_type(node.name, tp)
+        setattr(node, 'type', tp)
         yield tp
         self.recorder.leave_scope()
 
@@ -270,27 +275,27 @@ class InferVisitor(BaseVisitor):
 
     def visit_For(self, node: ast.For):
         container = self.get_type(node.iter)
-        print(container.bindlist)
-        print(container.temp.placeholders)
-        get_element_type_in_container(container)
+        # print(container.bindlist)
+        # print(container.temp.placeholders)
+        self.get_element_type_in_container(container)
 
-
-def get_element_type_in_container(container):
-    # print(container)
-    # print(container.bindlist)
-    pass
+    def get_element_type_in_container(container):
+        # print(container)
+        # print(container.bindlist)
+        pass
 
 
 class InferStarter:
-    def __init__(self, sources: Dict[SymId, Target], config: Config):
-        self.sources = sources
+    def __init__(self, q_infer: Deque[BlockTarget], config: Config):
+        self.q_infer = q_infer
         self.config = config
 
     def start_infer(self):
-        for symid, target in self.sources.items():
-            if symid == "typing" or symid=="builtins":
-                continue
+        for target in self.q_infer:
+            symid = target.symid
             logger.info(f'Type infer in module \'{symid}\'')
             infer_visitor = InferVisitor(target.ast, target.module_temp,
                                          target.mbox, symid, self.config)
             infer_visitor.infer()
+            from pystatic.plugin import find_node_type
+            print(find_node_type(target.ast, 3, 1))
