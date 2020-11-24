@@ -12,10 +12,6 @@ class Reach(enum.Enum):
     FUNC_REDEF = 7
 
 
-ACCEPT_REACH = (Reach.ALWAYS_TRUE, Reach.TYPE_TRUE, Reach.UNKNOWN)
-REJECT_REACH = (Reach.ALWAYS_FALSE, Reach.TYPE_FALSE)
-
-
 def cal_neg(res: Reach) -> Reach:
     if res == Reach.TYPE_TRUE:
         return Reach.TYPE_FALSE

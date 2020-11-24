@@ -11,7 +11,7 @@ from pystatic.config import Config
 from pystatic.staticinfer import cmp_by_op
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.visitor import BaseVisitor
-from pystatic.reach import Reach, cal_neg, ACCEPT_REACH, REJECT_REACH, is_true
+from pystatic.reach import Reach, cal_neg, is_true
 from pystatic.TypeCompatibe.simpleType import type_consistent
 
 
