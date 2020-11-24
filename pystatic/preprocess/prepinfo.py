@@ -1,8 +1,8 @@
 import ast
+from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union, List)
 from pystatic.errorcode import *
 from pystatic.target import Target
-from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union)
-from pystatic.symid import SymId
+from pystatic.symid import SymId, symid2list
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
 from pystatic.predefined import TypeVarIns, TypeFuncIns
 from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry, TableScope
@@ -23,7 +23,7 @@ class PrepInfoItem(Protocol):
 
 class PrepInfo:
     def __init__(self, symtable: 'SymTable', enclosing: Optional['PrepInfo'],
-                 is_special: bool):
+                 env: 'PrepEnvironment', is_special: bool):
         self.enclosing = enclosing
         self.is_special = is_special
 
@@ -35,12 +35,17 @@ class PrepInfo:
         self.type_alias: Dict[str, 'prep_type_alias'] = {}
 
         self.symtable = symtable
+        self.env = env
+        self.star_import: List[SymId] = []
 
         self.tick = 1
 
     def name_collide(self, name: str):
         return (name in self.typevar_def or name in self.func
                 or name in self.local or name in self.cls_def)
+    
+    def new_cls_prepinfo(self, symtable: 'SymTable'):
+        return PrepInfo(symtable, self, self.env, False)
 
     def add_cls_def(self, node: ast.ClassDef, mbox: 'MessageBox'):
         # TODO: check name collision
@@ -64,7 +69,7 @@ class PrepInfo:
             new_symtable = self.symtable.new_symtable(clsname, TableScope.CLASS)
             clstemp = TypeClassTemp(clsname, self.symtable, new_symtable)
 
-        new_prepinfo = PrepInfo(new_symtable, self, False)
+        new_prepinfo = self.new_cls_prepinfo(new_symtable)
         cls_def = prep_cls(clstemp, new_prepinfo, self, node)
         self.cls_def[clsname] = cls_def
         self.symtable.add_type_def(clsname, clstemp)
@@ -153,6 +158,32 @@ class PrepInfo:
             else:
                 raise TypeError()
 
+    def add_import_def(self, node: Union[ast.Import, ast.ImportFrom], infolist: List['prep_impt']):
+        """Add import information to the symtable"""
+        manager = self.env.manager
+        for infoitem in infolist:
+            if infoitem.origin_name == '*':
+                if infoitem.origin_name not in self.star_import:
+                    self.star_import.append(infoitem.origin_name)
+
+            # analyse all the package along the way
+            symidlist = symid2list(infoitem.symid)
+            cur_prefix = ''
+            for subid in symidlist:
+                if cur_prefix:
+                    cur_prefix += f'.{subid}'
+                else:
+                    cur_prefix = subid
+                manager.add_check_symid(cur_prefix, False)
+
+            if not infoitem.is_import_module():
+                origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
+                if manager.is_module(origin_symid):
+                    manager.add_check_symid(origin_symid, False)
+
+            # TODO: error check name collision here
+            self.impt[infoitem.asname] = infoitem
+
     def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
                         defnode: AssignNode):
         self.typevar_def[name] = prep_typevar(name, typevar, defnode)
@@ -181,6 +212,14 @@ class PrepInfo:
             impt = self.impt[name]
             return Option(impt.getins())
         else:
+            for star_impt in self.star_import:
+                res = self.env.lookup(star_impt, name)
+                if res:
+                    if isinstance(res, TypeIns):
+                        return Option(res)
+                    else:
+                        return Option(res.getins())
+
             res = self.symtable.lookup(name)
             if res:
                 return Option(res)
@@ -217,8 +256,8 @@ class PrepInfo:
 
 class MethodPrepInfo(PrepInfo):
     def __init__(self, clstemp: TypeClassTemp,
-                 enclosing: Optional['PrepInfo']):
-        super().__init__(clstemp.get_inner_symtable(), enclosing, False)
+                 enclosing: Optional['PrepInfo'], env: 'PrepEnvironment'):
+        super().__init__(clstemp.get_inner_symtable(), enclosing, env, False)
         self.clstemp = clstemp
         self.var_attr: Dict[str, 'prep_local'] = {}
 

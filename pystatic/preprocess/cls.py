@@ -212,7 +212,8 @@ def resolve_cls_method(target: 'BlockTarget', env: 'PrepEnvironment',
                 # NOTE: here we add the target directly to the queue
                 # that get around manager, which may be problematic
                 env.add_target_prepinfo(
-                    blk_target, MethodPrepInfo(clsdef.clstemp, cur_prepinfo))
+                    blk_target,
+                    MethodPrepInfo(clsdef.clstemp, cur_prepinfo, env))
                 manager.q_preprocess.append(blk_target)
 
             for subclsdef in clsdef.prepinfo.cls_def.values():
