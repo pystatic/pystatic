@@ -239,21 +239,21 @@ class TypeNoneTemp(TypeTemp):
                     node: ast.UnaryOp) -> Option['TypeIns']:
         none_ins = self._cached_ins
         res_option = Option(none_ins)
-        res_option.add_err(NoAttribute(node, none_ins, 'None'))
+        res_option.add_error(NoAttribute(node, none_ins, 'None'))
         return res_option
 
     def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
                   node: ast.BinOp) -> Option['TypeIns']:
         none_ins = self._cached_ins
         res_option = Option(none_ins)
-        res_option.add_err(NoAttribute(node, none_ins, 'None'))
+        res_option.add_error(NoAttribute(node, none_ins, 'None'))
         return res_option
 
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
         return Option(self._cached_ins)
 
-    def get_typetype(self, bindlist: Optional[BindList],
-                     item: Optional[GetItemArg]) -> Option['TypeType']:
+    def getitem_typetype(self, bindlist: Optional[BindList],
+                         item: Optional[GetItemArg]) -> Option['TypeType']:
         return Option(self._cached_typetype)
 
     def get_default_ins(self) -> Option['TypeIns']:
@@ -410,6 +410,15 @@ class TypeGenericTemp(TypeTemp):
                 # option_res.add_err()  # TODO: add error here
                 pass
         return option_res
+
+
+class TypeProtocolTemp(TypeTemp):
+    def __init__(self) -> None:
+        super().__init__('Protocol')
+
+    @property
+    def module_symid(self) -> str:
+        return 'typing'
 
 
 class TypeLiteralTemp(TypeTemp):
@@ -571,14 +580,23 @@ literal_temp, literal_type, _ = _add_spt_to_symtable(TypeLiteralTemp,
                                                      typing_symtable)
 generic_temp, generic_type, _ = _add_spt_to_symtable(TypeGenericTemp,
                                                      typing_symtable)
+protocol_temp, protocol_type, _ = _add_spt_to_symtable(TypeProtocolTemp,
+                                                       typing_symtable)
 union_temp, union_type, _ = _add_spt_to_symtable(TypeUnionTemp,
                                                  typing_symtable)
 callable_temp, callable_type, _ = _add_spt_to_symtable(TypeCallableTemp,
                                                        typing_symtable)
-type_temp, type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp,
+Type_temp, Type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp,
                                                typing_symtable)
 
 none_temp, none_type, none_ins = _add_spt_to_symtable(TypeNoneTemp,
                                                       builtin_symtable)
 ellipsis_temp, ellipsis_type, ellipsis_ins = _add_spt_to_symtable(
     TypeEllipsisTemp, builtin_symtable)
+
+type_meta_temp = TypeClassTemp(
+    'type', builtin_symtable,
+    builtin_symtable.new_symtable('type', TableScope.CLASS), None)
+type_meta_ins = type_meta_temp.get_default_ins().value
+builtin_symtable.add_type_def('type', type_meta_temp)
+builtin_symtable.add_entry('type', Entry(type_meta_ins))

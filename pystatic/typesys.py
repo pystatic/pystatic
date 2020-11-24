@@ -7,9 +7,8 @@ from pystatic.evalutil import ApplyArgs, GetItemArg
 from pystatic.errorcode import NoAttribute
 
 if TYPE_CHECKING:
-    from pystatic.predefined import TypeContext, TypeFuncIns, TypeVarIns
+    from pystatic.predefined import TypeContext, TypeVarIns
     from pystatic.symtable import SymTable
-    from pystatic.symid import SymId
 
 BindList = Optional[List[Any]]
 
@@ -60,7 +59,7 @@ class TypeIns:
                                          context)
 
         if not ins_res:
-            option_res.add_err(NoAttribute(node, self, name))
+            option_res.add_error(NoAttribute(node, self, name))
         else:
             option_res.set_value(ins_res)
         return option_res
@@ -165,13 +164,13 @@ class TypeType(TypeIns):
 
         if not ins_res:
             err = NoAttribute(node, self, name)
-            option_res.add_err(err)
+            option_res.add_error(err)
         else:
             option_res.set_value(ins_res)
         return option_res
 
     def getitem(self, item: GetItemArg) -> Option['TypeIns']:
-        return self.temp.get_typetype(self.bindlist, item)
+        return self.temp.getitem_typetype(self.bindlist, item)
 
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         return self.temp.init_ins(applyargs, self.bindlist)
@@ -236,7 +235,6 @@ class TypeTemp(ABC):
              bindlist: BindList) -> Option['TypeIns']:
         call_option = Option(any_ins)
         # TODO: add error for not callable
-        # call_option.add_err(...)
         return call_option
 
     def getitem(self, item: GetItemArg,
@@ -279,7 +277,7 @@ class TypeTemp(ABC):
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return None
 
-    def get_typetype(
+    def getitem_typetype(
             self,
             bindlist: Optional[BindList] = None,
             itemarg: Optional[GetItemArg] = None) -> Option['TypeType']:
@@ -332,7 +330,7 @@ class TypeTemp(ABC):
             name: str,
             bindlist: BindList,
             context: Optional['TypeContext'] = None) -> Optional['TypeIns']:
-        """Get attribute that belong to the Type itself, mainly used for typetype"""
+        """Get attribute that belong to the Type itself, mainly used for TypeType"""
         return self.getattribute(name, bindlist, context)
 
     def init_ins(self, applyargs: 'ApplyArgs',
@@ -396,12 +394,17 @@ class ModuleNamedTypeTemp(TypeTemp):
 
 
 class TypeClassTemp(TypeTemp):
-    def __init__(self, clsname: str, def_symtable: 'SymTable',
-                 inner_symtable: 'SymTable'):
+    def __init__(self,
+                 clsname: str,
+                 def_symtable: 'SymTable',
+                 inner_symtable: 'SymTable',
+                 metaclass: Optional[TypeIns] = None):
         super().__init__(clsname)
 
         self.baseclass: 'List[TypeIns]'
         self.baseclass = []
+
+        self.metaclass = metaclass
 
         self.var_attr: Dict[str, 'TypeIns'] = {}
 
@@ -494,8 +497,8 @@ class TypeAnyTemp(TypeTemp):
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
         return Option(self._cached_ins)
 
-    def get_typetype(self, bindlist: Optional[BindList],
-                     item: Optional[GetItemArg]) -> Option['TypeType']:
+    def getitem_typetype(self, bindlist: Optional[BindList],
+                         item: Optional[GetItemArg]) -> Option['TypeType']:
         # TODO: warning: if bindlist is non-empty, then report an error
         return Option(self._cached_typetype)
 

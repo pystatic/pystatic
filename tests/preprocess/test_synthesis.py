@@ -4,6 +4,8 @@ import ast
 
 sys.path.extend(['.', '..'])
 
+from ..util import get_manager_path
+
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.predefined import TypeModuleTemp, TypeFuncIns, TypeVarIns
 from pystatic.config import Config
@@ -12,32 +14,29 @@ from pystatic.exprparse import eval_expr
 
 
 def test_synthesis_1():
-    src = 'prep_1'
-    cwd = os.path.dirname(os.path.dirname(__file__))
-    config = Config({'cwd': cwd})
-    manager = Manager(config)
-
-    filepath = os.path.join(cwd, 'src', 'preprocess', f'{src}.py')
-    res_option = manager.add_check_file(filepath)
-    assert res_option.value
+    symid = 'preprocess.prep_1'
+    manager, filepath = get_manager_path({}, symid)
     manager.preprocess()
 
-    module_temp = manager.get_module_temp(src)
+    module_temp = manager.get_module_temp(symid)
     assert isinstance(module_temp, TypeModuleTemp)
-    assert module_temp.module_symid == src
+    assert module_temp.module_symid == symid
 
     int_typetype = manager.get_sym_type('builtins', 'int')
     assert int_typetype
     assert isinstance(int_typetype, TypeType)
 
-    A = manager.get_sym_type(src, 'A')
+    A = manager.get_sym_type(symid, 'A')
     assert isinstance(A, TypeType)
 
-    a = manager.get_sym_type(src, 'a')
+    AB = manager.get_sym_type(symid, 'A.B')
+    assert isinstance(AB, TypeType)
+
+    a = manager.get_sym_type(symid, 'a')
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
     assert a.temp == A.temp
 
-    f = manager.get_sym_type(src, 'f')
+    f = manager.get_sym_type(symid, 'f')
     assert isinstance(f, TypeFuncIns)
 
     assert len(f.overloads) == 1
@@ -45,9 +44,17 @@ def test_synthesis_1():
     assert isinstance(ret_ins, TypeIns) and not isinstance(ret_ins, TypeType)
     assert ret_ins.temp == A.temp
 
-    assert manager.get_sym_type(src, 'c')
-    assert manager.get_sym_type(src, 'd')
+    assert manager.get_sym_type(symid, 'c')
+    assert manager.get_sym_type(symid, 'd')
 
-    a_dot_a = manager.get_sym_type(src, 'a.a')
+    a_dot_a = manager.get_sym_type(symid, 'a.a')
     assert isinstance(a_dot_a, TypeIns) and not isinstance(a_dot_a, TypeType)
     assert a_dot_a.temp == int_typetype.temp
+
+    e = manager.get_sym_type(symid, 'e')
+    assert type(e) == TypeIns
+    assert e.temp == A.temp
+
+    g = manager.get_sym_type(symid, 'g')
+    assert type(g) == TypeIns
+    assert g.temp == AB.temp
