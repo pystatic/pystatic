@@ -6,6 +6,7 @@ from pystatic.option import Option
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
+    from pystatic.manager import Manager
     from pystatic.typesys import TypeIns, TypeTemp
     from pystatic.predefined import TypeFuncIns
 
@@ -108,7 +109,7 @@ class ImportCache:
 class SymTable:
     def __init__(self, symid: 'SymId', glob: 'SymTable',
                  non_local: Optional['SymTable'], builtins: 'SymTable',
-                 scope: 'TableScope') -> None:
+                 manager: 'Manager', scope: 'TableScope') -> None:
         self.symid = symid
 
         self.local: Dict[str, Entry] = {}
@@ -119,6 +120,10 @@ class SymTable:
         self.scope = scope
 
         self.import_cache = ImportCache()
+
+        self.manager = manager
+        # modules star imported
+        self.star_import: List[SymId] = []
 
         # inner data structure to store important information about this
         # symtable, used heavily in the preprocess stage.
@@ -203,7 +208,8 @@ class SymTable:
             non_local = self
         glob = self.glob
         new_symid = self.symid + '.' + name
-        return SymTable(new_symid, glob, non_local, builtins, new_scope)
+        return SymTable(new_symid, glob, non_local, builtins, self.manager,
+                        new_scope)
 
     def legb_lookup(self, name):
         return self._legb_lookup(name, SymTable.lookup_local)
