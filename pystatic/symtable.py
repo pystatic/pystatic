@@ -8,7 +8,6 @@ from pystatic.errorcode import *
 if TYPE_CHECKING:
     from pystatic.manager import Manager
     from pystatic.typesys import TypeIns, TypeTemp
-    from pystatic.predefined import TypeFuncIns
 
 
 class TableScope(enum.Enum):
@@ -128,7 +127,6 @@ class SymTable:
         # inner data structure to store important information about this
         # symtable, used heavily in the preprocess stage.
         self._tp_def: Dict[str, 'TypeTemp'] = {}
-        self._func_def: Dict[str, 'TypeFuncIns'] = {}
 
     @property
     def glob_symid(self):
@@ -155,6 +153,9 @@ class SymTable:
     def add_type_def(self, name: str, temp: 'TypeTemp'):
         self._tp_def[name] = temp
 
+    def add_entry(self, name: str, entry: Entry):
+        self.local[name] = entry
+
     def get_type_def(self, name: str) -> Optional['TypeTemp']:
         findlist = name.split('.')
         assert findlist
@@ -171,17 +172,27 @@ class SymTable:
                 return None
         return cur_temp
 
-    def lookup_local(self, name: str) -> Optional['TypeIns']:
+    def lookup_local(self,
+                     name: str,
+                     search_star_import=True) -> Optional['TypeIns']:
+        """
+        :param search_star_import: whether search in the module fully imported
+        """
         res = self.local.get(name)
-        if not res:
+        if search_star_import and not res:
+            searched = set(self.glob_symid)
+            for module in self.star_import:
+                if module not in searched:
+                    searched.add(module)
+                    module_temp = self.manager.get_module_temp(module)
+                    res = module_temp._inner_symtable.lookup_local(name, False)
+                    if res:
+                        return res
             return None
         return res.get_type(self)
 
-    def lookup(self, name: str) -> Optional['TypeIns']:
+    def legb_lookup(self, name):
         return self._legb_lookup(name, SymTable.lookup_local)
-
-    def getattr(self, name: str) -> Optional['TypeIns']:
-        return self.lookup(name)
 
     def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
         """Getattribute from symtable
@@ -190,15 +201,12 @@ class SymTable:
         """
         from pystatic.typesys import any_ins  # avoid import circle
         res_option = Option(any_ins)
-        res = self.lookup(name)
+        res = self.legb_lookup(name)
         if not res:
             res_option.add_error(SymbolUndefined(node, name))
         else:
             res_option.set_value(res)
         return res_option
-
-    def add_entry(self, name: str, entry: Entry):
-        self.local[name] = entry
 
     def new_symtable(self, name: str, new_scope: 'TableScope') -> 'SymTable':
         builtins = self.builtins
@@ -210,6 +218,3 @@ class SymTable:
         new_symid = self.symid + '.' + name
         return SymTable(new_symid, glob, non_local, builtins, self.manager,
                         new_scope)
-
-    def legb_lookup(self, name):
-        return self._legb_lookup(name, SymTable.lookup_local)

@@ -272,6 +272,13 @@ class TypeModuleTemp(TypeClassTemp):
     def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
         return self._inner_symtable.get_type_def(name)
 
+    def getattribute(
+            self,
+            name: str,
+            bindlist: BindList,
+            context: Optional['TypeContext'] = None) -> Optional['TypeIns']:
+        return self._inner_symtable.lookup_local(name)
+
 
 class TypePackageTemp(TypeModuleTemp):
     def __init__(self, paths: List[str], symtable: 'SymTable', symid: SymId):
@@ -338,9 +345,10 @@ class TypeDictTemp(TypeClassTemp):
         return self._cached_typetype
 
 
-class TypeEllipsisTemp(TypeTemp):
+class TypeEllipsisTemp(TypeClassTemp):
     def __init__(self) -> None:
-        super().__init__('ellipsis')
+        symtable = builtins_symtable.new_symtable('ellipsis', TableScope.CLASS)
+        super().__init__('ellipsis', builtins_symtable, symtable)
 
     @property
     def module_symid(self) -> str:

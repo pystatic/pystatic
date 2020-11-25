@@ -52,7 +52,7 @@ class PrepInfo:
         clsname = node.name
         if (old_def := self.cls_def.get(clsname)):
             mbox.add_err(SymbolRedefine(node, clsname, old_def.defnode))
-            return
+            return old_def.prepinfo
 
         if (old_def := self.local.get(clsname)):
             mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
@@ -162,10 +162,6 @@ class PrepInfo:
         """Add import information to the symtable"""
         manager = self.env.manager
         for infoitem in infolist:
-            if infoitem.origin_name == '*':
-                if infoitem.origin_name not in self.star_import:
-                    self.star_import.append(infoitem.origin_name)
-
             # analyse all the package along the way
             symidlist = symid2list(infoitem.symid)
             cur_prefix = ''
@@ -175,6 +171,10 @@ class PrepInfo:
                 else:
                     cur_prefix = subid
                 manager.add_check_symid(cur_prefix, False)
+
+            if infoitem.origin_name == '*':
+                if infoitem.origin_name not in self.star_import:
+                    self.star_import.append(infoitem.symid)
 
             if not infoitem.is_import_module():
                 origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
@@ -220,13 +220,20 @@ class PrepInfo:
                     else:
                         return Option(res.getins())
 
-            res = self.symtable.lookup(name)
+            res = self.symtable.legb_lookup(name)
             if res:
                 return Option(res)
             elif self.enclosing:
                 assert self.enclosing is not self
                 return self.enclosing.getattribute(name, node)
             else:
+                searched = {self.symtable.glob_symid}
+                for module in self.star_import:
+                    if module not in searched:
+                        searched.add(module)
+                        res = self.env.lookup(module, name)
+                        if res:
+                            return Option(res)
                 return Option(any_ins)
 
     def dump(self):
@@ -252,6 +259,8 @@ class PrepInfo:
                                                  value)
             self.symtable.add_entry(
                 name, ImportEntry(impt.symid, impt.origin_name, impt.defnode))
+
+        self.symtable.star_import.extend(self.star_import)
 
 
 class MethodPrepInfo(PrepInfo):
@@ -318,7 +327,7 @@ class PrepEnvironment:
         if not module_temp:
             return None
         else:
-            return module_temp.get_inner_symtable().lookup(name)
+            return module_temp.get_inner_symtable().legb_lookup(name)
 
 
 class prep_typevar:
