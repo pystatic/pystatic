@@ -259,6 +259,12 @@ class Manager:
         except SyntaxError as e:
             return None
 
+    def recheck(self, module_symid: SymId):
+        module_target = self.targets.get(module_symid)
+        assert isinstance(module_target, Target)
+        module_target.clear()
+        self.update_stage(module_target, Stage.Preprocess, False)
+
 
 def path2ast(path: FilePath) -> ast.AST:
     with open(path, 'r') as f:
