@@ -103,6 +103,11 @@ class ImportCache:
             return None
         else:
             return module_map.get(origin_name)
+    
+    def clear(self):
+        self.import_map = {}
+        self.import_nodes = []
+        self._cache = {}
 
 
 class SymTable:
@@ -218,3 +223,9 @@ class SymTable:
         new_symid = self.symid + '.' + name
         return SymTable(new_symid, glob, non_local, builtins, self.manager,
                         new_scope)
+
+    def clear(self):
+        self.local = {}
+        self.star_import = []
+        self._tp_def = {}
+        self.import_cache.clear()

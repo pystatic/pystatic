@@ -4,7 +4,7 @@ from pystatic.target import Stage, Target
 from pystatic.symtable import SymTable
 from pystatic.manager import Manager
 from pystatic.config import Config
-from pystatic.predefined import get_init_module_symtable
+from pystatic.predefined import *
 
 DEFAULT_INDENT = 4
 
@@ -87,9 +87,11 @@ class Shell:
         self.ps = '>>> '
 
         self.symid = '__shell__'
-        self.symtable = get_init_module_symtable(self.symid)
+        self.symtable = SymTable(self.symid, None, None, builtins_symtable,
+                                 self.manager, TableScope.GLOB)
+        self.symtable.glob = self.symtable
         self.mbox = MessageBox(self.symid)
-        self.target = Target(self.symid, self.symtable, self.mbox, '',
+        self.target = Target(self.symid, self.symtable, self.mbox, '', False,
                              Stage.FINISH)
         self.manager.add_check_target(self.target)
 
