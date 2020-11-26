@@ -313,3 +313,4 @@ class InferStarter:
                                          target.mbox, symid, self.config,
                                          self.manager)
             infer_visitor.infer()
+        self.q_infer.clear()
