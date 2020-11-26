@@ -39,8 +39,8 @@ def get_definition_in_method(target: 'MethodTarget', env: 'PrepEnvironment',
     assert isinstance(cur_ast, ast.FunctionDef)
     clstemp = target.clstemp
     prepinfo = env.try_add_target_prepinfo(target,
-                                           MethodPrepInfo(clstemp, None, env))
-    assert isinstance(prepinfo, MethodPrepInfo)
+                                           PrepMethodInfo(clstemp, None, env))
+    assert isinstance(prepinfo, PrepMethodInfo)
 
     return TypeDefVisitor(env, prepinfo, mbox, True).accept_func(cur_ast)
 
@@ -69,7 +69,7 @@ class TypeDefVisitor(BaseVisitor):
 
         self.prepinfo = new_prepinfo
         self.is_method = False
-        assert not isinstance(new_prepinfo, MethodPrepInfo)
+        assert not isinstance(new_prepinfo, PrepMethodInfo)
         yield new_prepinfo
 
         self.is_method = old_is_method

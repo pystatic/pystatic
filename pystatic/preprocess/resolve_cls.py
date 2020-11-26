@@ -1,68 +1,27 @@
 import ast
 import contextlib
 from collections import deque
-from pystatic.target import MethodTarget
-from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
-                                          eval_typedef_expr,
-                                          template_resolve_fun)
 from typing import Deque, List, TYPE_CHECKING
-from pystatic.typesys import (TypeClassTemp, TypeIns, TypeType)
-from pystatic.predefined import (TypeGenericTemp, TypeModuleTemp, TypeVarIns,
-                                 TypeFuncIns)
+from pystatic.target import MethodTarget
+from pystatic.typesys import TypeIns, TypeType
+from pystatic.predefined import TypeGenericTemp, TypeVarIns, TypeFuncIns
 from pystatic.exprparse import eval_expr
-from pystatic.visitor import BaseVisitor, NoGenVisitor, VisitorMethodNotFound
+from pystatic.visitor import BaseVisitor
 from pystatic.message import MessageBox
 from pystatic.symtable import TableScope
 from pystatic.arg import Argument
-from pystatic.preprocess.dependency import DependencyGraph
 from pystatic.preprocess.util import add_baseclass
+from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
+                                          eval_typedef_expr)
+from pystatic.preprocess.resolve_local import resolve_func_template
 from pystatic.preprocess.prepinfo import *
 
 if TYPE_CHECKING:
     from pystatic.target import BlockTarget
 
 
-def resolve_cls_dependency(targets: List['BlockTarget'],
-                           env: 'PrepEnvironment'):
-    """Resolve dependencies between classes"""
-    graph = DependencyGraph()
-    for target in targets:
-        prepinfo = env.get_target_prepinfo(target)
-        assert prepinfo
-        for clsdef in prepinfo.cls_def.values():
-            assert isinstance(clsdef.clstemp, TypeClassTemp)
-            build_dependency_graph(clsdef, graph, prepinfo)
-
-    return graph.toposort()
-
-
-def build_dependency_graph(clsdef: 'prep_cls', graph: 'DependencyGraph',
-                           prepinfo: 'PrepInfo'):
-    """Add dependency relations about a class"""
-    build_inheritance_graph(clsdef, prepinfo, graph)
-
-    # build dependencies of classes defined inside this class
-    for subclsdef in clsdef.prepinfo.cls_def.values():
-        build_dependency_graph(subclsdef, graph, prepinfo)
-        # add dependency relations due to containment
-        graph.add_dependency(clsdef, subclsdef)
-
-
-def build_inheritance_graph(clsdef: 'prep_cls', prepinfo: 'PrepInfo',
-                            graph: 'DependencyGraph'):
-    """Add dependency relations that due to the inheritance"""
-    clstemp = clsdef.clstemp
-    graph.add_clsdef(clsdef)
-    assert isinstance(
-        clstemp, TypeClassTemp) and not isinstance(clstemp, TypeModuleTemp)
-    defnode = clsdef.defnode
-
-    visitor = _FirstClassTempVisitor(prepinfo)
-    for basenode in defnode.bases:
-        inh_clsdef = visitor.accept(basenode)
-        if inh_clsdef:
-            assert isinstance(inh_clsdef, prep_cls)
-            graph.add_dependency(clsdef, inh_clsdef)
+def resolve_cls(cls: 'prep_cls'):
+    resolve_cls_inheritence(cls)
 
 
 def resolve_cls_placeholder(clsdef: 'prep_cls', mbox: 'MessageBox'):
@@ -75,49 +34,15 @@ def resolve_cls_placeholder(clsdef: 'prep_cls', mbox: 'MessageBox'):
     clstemp.placeholders = visitor.get_typevar_list()
 
 
-def resolve_cls_inheritence(clsdef: 'prep_cls', mbox: 'MessageBox'):
+def resolve_cls_inheritence(clsdef: 'prep_cls'):
     """Resolve baseclasses of a class"""
     clstemp = clsdef.clstemp
     for base_node in clsdef.defnode.bases:
         base_option = eval_typedef_expr(base_node, clsdef.def_prepinfo, False)
-        base_option.dump_to_box(mbox)
         res_type = base_option.value
         assert isinstance(res_type, TypeType)
         if res_type:
             add_baseclass(clstemp, res_type.get_default_ins())
-
-
-class _FirstClassTempVisitor(NoGenVisitor):
-    """Get the first class template.
-
-    Used to build dependency graph. For example class C inherits A.B,
-    this should return A's template so you can add edge from C to A.
-
-    If the inherited class has already defined in symtable, then it won't
-    return the TypeTemp of that class.
-    """
-    def __init__(self, prepinfo: 'PrepInfo') -> None:
-        self.prepinfo = prepinfo
-
-    def accept(self, node):
-        try:
-            return self.visit(node)
-        except VisitorMethodNotFound:
-            return None
-
-    def visit_Name(self, node: ast.Name):
-        prep_def = self.prepinfo.get_prep_def(node.id)
-        if isinstance(prep_def, prep_impt):
-            prep_def = prep_def.value
-        if not isinstance(prep_def, prep_cls):
-            return None
-        return prep_def
-
-    def visit_Attribute(self, node: ast.Attribute):
-        return self.visit(node.value)
-
-    def visit_Subscript(self, node: ast.Subscript):
-        return self.visit(node.value)
 
 
 class _TypeVarVisitor(BaseVisitor):
@@ -206,23 +131,23 @@ def resolve_cls_method(target: 'BlockTarget', env: 'PrepEnvironment',
 
     while len(queue):
         cur_prepinfo = queue.popleft()
-        for clsdef in cur_prepinfo.cls_def.values():
+        for clsdef in cur_prepinfo.cls.values():
             method_targets = _resolve_cls_method(clsdef, mbox)
             for blk_target in method_targets:
                 # NOTE: here we add the target directly to the queue
                 # that get around manager, which may be problematic
                 env.add_target_prepinfo(
                     blk_target,
-                    MethodPrepInfo(clsdef.clstemp, cur_prepinfo, env))
+                    PrepMethodInfo(clsdef.clstemp, cur_prepinfo, env))
                 manager.q_preprocess.append(blk_target)
 
-            for subclsdef in clsdef.prepinfo.cls_def.values():
+            for subclsdef in clsdef.prepinfo.cls.values():
                 queue.append(subclsdef.prepinfo)
 
 
 def _resolve_cls_method(clsdef: 'prep_cls',
                         mbox: 'MessageBox') -> List[MethodTarget]:
-    targets = []
+    targets = []  # method targets that need to be preprocessed
     prepinfo = clsdef.prepinfo
     clstemp = clsdef.clstemp
     symid = clstemp.name
@@ -287,20 +212,7 @@ def _resolve_cls_method(clsdef: 'prep_cls',
         modify_argument(args, is_classmethod, is_staticmethod)
         ins.add_overload(args, ret)
 
-    template_resolve_fun(prepinfo, add_func_def, add_func_overload, mbox)
+    for func in clsdef.prepinfo.func.values():
+        resolve_func_template(func, add_func_def, add_func_overload, mbox)
 
     return targets
-
-
-def dump_to_symtable(target: 'BlockTarget', env: 'PrepEnvironment'):
-    init_prepinfo = env.get_target_prepinfo(target)
-    assert init_prepinfo
-    queue: Deque[PrepInfo] = deque()
-    queue.append(init_prepinfo)
-
-    while len(queue):
-        cur_prepinfo = queue.popleft()
-        cur_prepinfo.dump()
-
-        for clsdef in cur_prepinfo.cls_def.values():
-            queue.append(clsdef.prepinfo)

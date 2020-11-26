@@ -18,7 +18,7 @@ def resolve_spt(target: 'BlockTarget', env: PrepEnvironment):
     queue.append(init_prepinfo)
     while len(queue) > 0:
         cur_prepinfo = queue.popleft()
-        for typevar_def in cur_prepinfo.typevar_def.values():
+        for typevar_def in cur_prepinfo.typevar.values():
             value = typevar_def.defnode.value
             # TODO: change assert to recoverable error
             assert value, "TypeVar definition shouldn't be empty"
@@ -36,7 +36,7 @@ def resolve_spt(target: 'BlockTarget', env: PrepEnvironment):
             assert isinstance(typetype, TypeType)
             typealias.bindlist = typetype.bindlist
 
-        for clsdef in cur_prepinfo.cls_def.values():
+        for clsdef in cur_prepinfo.cls.values():
             queue.append(clsdef.prepinfo)
 
 

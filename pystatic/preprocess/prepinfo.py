@@ -1,5 +1,5 @@
 import ast
-from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union, List)
+from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union, List, Set)
 from pystatic.errorcode import *
 from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pystatic.target import BlockTarget
 
 AssignNode = Union[ast.Assign, ast.AnnAssign]
-
+PrepDef = Union['prep_cls', 'prep_func', 'prep_local']
 
 class PrepInfoItem(Protocol):
     def getins(self) -> 'TypeIns':
@@ -27,22 +27,25 @@ class PrepInfo:
         self.enclosing = enclosing
         self.is_special = is_special
 
-        self.cls_def: Dict[str, 'prep_cls'] = {}
+        self.cls: Dict[str, 'prep_cls'] = {}
         self.local: Dict[str, 'prep_local'] = {}
         self.func: Dict[str, 'prep_func'] = {}
         self.impt: Dict[str, 'prep_impt'] = {}
-        self.typevar_def: Dict[str, 'prep_typevar'] = {}
-        self.type_alias: Dict[str, 'prep_type_alias'] = {}
+
+        self.typevar: Set[str] = set()
+        self.type_alias: Set[str] = set()
 
         self.symtable = symtable
         self.env = env
         self.star_import: List[SymId] = []
 
-        self.tick = 1
-
     def name_collide(self, name: str):
-        return (name in self.typevar_def or name in self.func
-                or name in self.local or name in self.cls_def)
+        return (name in self.typevar or name in self.func
+                or name in self.local or name in self.cls)
+    
+    @property
+    def glob_symid(self) -> str:
+        return self.symtable.glob_symid
     
     def new_cls_prepinfo(self, symtable: 'SymTable'):
         return PrepInfo(symtable, self, self.env, False)
@@ -50,7 +53,7 @@ class PrepInfo:
     def add_cls_def(self, node: ast.ClassDef, mbox: 'MessageBox'):
         # TODO: check name collision
         clsname = node.name
-        if (old_def := self.cls_def.get(clsname)):
+        if (old_def := self.cls.get(clsname)):
             mbox.add_err(SymbolRedefine(node, clsname, old_def.defnode))
             return old_def.prepinfo
 
@@ -71,7 +74,7 @@ class PrepInfo:
 
         new_prepinfo = self.new_cls_prepinfo(new_symtable)
         cls_def = prep_cls(clstemp, new_prepinfo, self, node)
-        self.cls_def[clsname] = cls_def
+        self.cls[clsname] = cls_def
         self.symtable.add_type_def(clsname, clstemp)
         self.symtable.add_entry(clsname, Entry(clstemp.get_default_typetype(), node))
         return new_prepinfo
@@ -82,18 +85,18 @@ class PrepInfo:
             # name collision of different function is checked later
             self.func[name].defnodes.append(node)
         else:
-            if (old_def := self.cls_def.get(name)):
+            if (old_def := self.cls.get(name)):
                 mbox.add_err(VarTypeCollide(old_def.defnode, name, node))
                 return
             elif (old_def := self.local.get(name)):
                 mbox.add_err(VarTypeCollide(node, name, old_def.defnode))
                 self.local.pop(name)
 
-            self.func[name] = prep_func(node)
+            self.func[name] = prep_func(self, node)
 
     def add_local_def(self, node: AssignNode, is_method: bool, mbox: 'MessageBox'):
         def is_strong_def(node: AssignNode):
-            """If a assignment has annotation or type_comment, then it's a strong
+            """If a assignment has annotations or type_comments, then it's a strong
             definition.
             """
             return getattr(node, 'type_comment', None) or getattr(node, 'annotation', None)
@@ -103,7 +106,7 @@ class PrepInfo:
             if isinstance(target, ast.Attribute):
                 if isinstance(target.value, ast.Name) and target.value.id == 'self':
                     attr = target.attr
-                    assert isinstance(self, MethodPrepInfo)
+                    assert isinstance(self, PrepMethodInfo)
                     if attr in self.var_attr:
                         # TODO: warning here because of redefinition
                         return
@@ -118,7 +121,7 @@ class PrepInfo:
                         return
 
                 # NOTE: local_def finally added here
-                if (old_def := self.cls_def.get(name)):
+                if (old_def := self.cls.get(name)):
                     mbox.add_err(VarTypeCollide(old_def.defnode, name, defnode))
                     return
                 elif (old_def := self.func.get(name)):
@@ -134,7 +137,7 @@ class PrepInfo:
                     else:
                         return
 
-                local_def = prep_local(name, defnode)
+                local_def = prep_local(name, self, defnode)
                 self.local[name] = local_def
 
             elif isinstance(target, ast.Tuple):
@@ -186,28 +189,32 @@ class PrepInfo:
 
     def add_typevar_def(self, name: str, typevar: 'TypeVarIns',
                         defnode: AssignNode):
-        self.typevar_def[name] = prep_typevar(name, typevar, defnode)
-        self.symtable.add_entry(name, Entry(typevar, defnode))
+        assert name in self.local
+        self.typevar.add(name)
 
     def add_type_alias(self, alias: str, typealias: TypeAlias,
                        defnode: AssignNode):
-        prep = prep_type_alias(typealias, defnode)
-        self.type_alias[alias] = prep
+        assert alias in self.local
+        self.type_alias.add(alias)
         self.symtable.add_entry(alias, Entry(typealias, defnode))
 
     def get_prep_def(self, name: str) -> Optional[PrepInfoItem]:
-        if name in self.cls_def:
-            return self.cls_def[name]
-        elif name in self.local:
-            return self.local[name]
-        elif name in self.func:
-            return self.func[name]
-        elif name in self.impt:
-            return self.impt[name]
+        res = None
+        if (res := self.cls.get(name)):
+            return res
+        elif (res := self.local.get(name)):
+            return res
+        elif (res := self.func.get(name)):
+            return res
+        elif (res := self.impt.get(name)):
+            if res.value and not isinstance(res.value, TypeIns):
+                return res.value
+            else:
+                return None
 
     def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
-        if name in self.cls_def:
-            return Option(self.cls_def[name].clstemp.get_default_typetype())
+        if name in self.cls:
+            return Option(self.cls[name].clstemp.get_default_typetype())
         elif name in self.impt:
             impt = self.impt[name]
             return Option(impt.getins())
@@ -237,22 +244,12 @@ class PrepInfo:
                 return Option(any_ins)
 
     def dump(self):
-        for name, clsdef in self.cls_def.items():
-            # classes must have been added before
-            # TODO: remove this
-            assert not self.symtable.getattribute(name,
-                                                  clsdef.defnode).haserr()
-
-        for name, typevar_def in self.typevar_def.items():
-            value = typevar_def.getins()
-            self.symtable.add_entry(name, Entry(value, typevar_def.defnode))
         for name, local in self.local.items():
             value = local.getins()
             self.symtable.add_entry(name, Entry(value, local.defnode))
         for name, func in self.func.items():
             value = func.getins()
             self.symtable.add_entry(name, Entry(value, func.defnode))
-
         for name, impt in self.impt.items():
             value = impt.getins()
             self.symtable.import_cache.add_cache(impt.symid, impt.origin_name,
@@ -263,7 +260,7 @@ class PrepInfo:
         self.symtable.star_import.extend(self.star_import)
 
 
-class MethodPrepInfo(PrepInfo):
+class PrepMethodInfo(PrepInfo):
     def __init__(self, clstemp: TypeClassTemp,
                  enclosing: Optional['PrepInfo'], env: 'PrepEnvironment'):
         super().__init__(clstemp.get_inner_symtable(), enclosing, env, False)
@@ -271,7 +268,7 @@ class MethodPrepInfo(PrepInfo):
         self.var_attr: Dict[str, 'prep_local'] = {}
 
     def add_attr_def(self, name: str, defnode: AssignNode):
-        attr_def = prep_local(name, defnode)
+        attr_def = prep_local(name, self, defnode)
         self.var_attr[name] = attr_def
 
     def dump(self):
@@ -330,30 +327,6 @@ class PrepEnvironment:
             return module_temp.get_inner_symtable().legb_lookup(name)
 
 
-class prep_typevar:
-    __slots__ = ['name', 'typevar', 'defnode']
-
-    def __init__(self, name: str, typevar: 'TypeVarIns',
-                 defnode: AssignNode) -> None:
-        self.name = name
-        self.typevar = typevar
-        self.defnode = defnode
-
-    def getins(self) -> TypeVarIns:
-        return self.typevar
-
-
-class prep_type_alias:
-    __slots__ = ['defnode', 'value']
-
-    def __init__(self, typealias: 'TypeAlias', defnode: AssignNode) -> None:
-        self.value = typealias
-        self.defnode = defnode
-
-    def getins(self) -> TypeAlias:
-        return self.value
-
-
 class prep_cls:
     def __init__(self, clstemp: 'TypeClassTemp', prepinfo: 'PrepInfo',
                  def_prepinfo: 'PrepInfo', defnode: ast.ClassDef) -> None:
@@ -369,7 +342,7 @@ class prep_cls:
         return self.defnode.name
 
     def add_attr(self, name: str, defnode: AssignNode):
-        local_def = prep_local(name, defnode)
+        local_def = prep_local(name, self.prepinfo, defnode)
         self.var_attr[name] = local_def
 
     def getins(self) -> TypeType:
@@ -377,9 +350,10 @@ class prep_cls:
 
 
 class prep_func:
-    def __init__(self, defnode: ast.FunctionDef) -> None:
+    def __init__(self, def_prepinfo: PrepInfo, defnode: ast.FunctionDef) -> None:
         assert isinstance(defnode, ast.FunctionDef)
         self.defnodes = [defnode]
+        self.def_prepinfo = def_prepinfo
         self.value: Optional[TypeFuncIns] = None
 
     def add_defnode(self, defnode: ast.FunctionDef):
@@ -396,13 +370,14 @@ class prep_func:
 
 
 class prep_local:
-    __slots__ = ['name', 'defnode', 'value']
+    __slots__ = ['name', 'def_prepinfo', 'defnode', 'value']
 
-    def __init__(self, name: str, defnode: AssignNode) -> None:
+    def __init__(self, name: str, def_prepinfo: 'PrepInfo', defnode: AssignNode) -> None:
         assert isinstance(defnode, ast.Assign) or isinstance(
             defnode, ast.AnnAssign)
         self.name = name
         self.defnode = defnode
+        self.def_prepinfo = def_prepinfo
         self.value: Optional[TypeIns] = None
 
     def getins(self) -> TypeIns:
@@ -437,6 +412,6 @@ class prep_impt:
 
 
 def clear_prep_info(prep_info: 'PrepInfo'):
-    for clsdef in prep_info.cls_def.values():
+    for clsdef in prep_info.cls.values():
         clear_prep_info(clsdef.prepinfo)
     del prep_info
