@@ -68,6 +68,10 @@ class Target(BlockTarget):
     def analyse_path(self):
         return self.path
 
+    def clear(self):
+        self.symtable.clear()
+        self.mbox.clear()
+
 
 class PackageTarget(Target):
     def __init__(self,
@@ -77,7 +81,7 @@ class PackageTarget(Target):
                  path: str,
                  analyse_path: str,
                  stage: Stage = Stage.Parse):
-        super().__init__(symid, symtable, mbox, path, stage)
+        super().__init__(symid, symtable, mbox, path, False, stage)
         self.__analyse_path = analyse_path
 
     @property
