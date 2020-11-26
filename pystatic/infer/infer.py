@@ -16,7 +16,7 @@ from pystatic.config import Config
 from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
-from pystatic.TypeCompatible.simpleType import TypeCompatible, is_any, type_consistent
+from pystatic.TypeCompatible.simpleType import TypeCompatible, is_any, is_none, type_consistent
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -220,8 +220,9 @@ class InferVisitor(BaseVisitor):
         ret_list = list(ret_set)
         ret_annotation = self.recorder.get_ret_annotation()
         num = len(ret_list)
-        if not is_any(ret_annotation) and num == 0:
-            self.err_maker.add_err(ReturnValueExpected(node))
+        if num == 0:
+            if not is_any(ret_annotation) and not is_none(ret_annotation):
+                self.err_maker.add_err(ReturnValueExpected(node))
         else:
             # TODO
             pass
@@ -233,10 +234,14 @@ class InferVisitor(BaseVisitor):
         self.check_ret_type(ret_annotation, node, ret_type)
         self.recorder.add_ret(ret_type)
 
-    def check_ret_type(self, annotation, ret_node: ast.Return, ret_type):
+    def check_ret_type(self, annotation: TypeIns, ret_node: ast.Return, ret_type: TypeIns):
         if not self.type_consistent(annotation, ret_type):
-            self.err_maker.add_err(
-                IncompatibleReturnType(ret_node.value, annotation, ret_type))
+            if is_none(ret_type):
+                self.err_maker.add_err(
+                    ReturnValueExpected(ret_node))
+            else:
+                self.err_maker.add_err(
+                    IncompatibleReturnType(ret_node.value, annotation, ret_type))
 
     def accept_condition_stmt_list(self, stmt_list: List[ast.stmt], stmt_type):
         for stmt in stmt_list:
