@@ -4,9 +4,7 @@ from pystatic.preprocess.util import update_symtable_import_cache
 from pystatic.preprocess.prepinfo import *
 
 
-def resolve_import(target: 'BlockTarget', env: 'PrepEnvironment'):
-    prepinfo = env.get_target_prepinfo(target)
-    assert prepinfo
+def resolve_import(prepinfo: 'PrepInfo', env: 'PrepEnvironment'):
     queue: Deque['PrepInfo'] = deque()
     queue.append(prepinfo)
 
@@ -20,7 +18,7 @@ def resolve_import(target: 'BlockTarget', env: 'PrepEnvironment'):
                 assert asname
                 _resolve_import_chain(cur_prepinfo, asname, env)
 
-        for clsdef in cur_prepinfo.cls_def.values():
+        for clsdef in cur_prepinfo.cls.values():
             queue.append(clsdef.prepinfo)
 
 

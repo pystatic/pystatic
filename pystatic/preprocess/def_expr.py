@@ -1,12 +1,11 @@
 import ast
-from pystatic.symtable import SymTable, TableScope, TypeDefNode
-from typing import Callable, List, Optional, Union
+from pystatic.symtable import TableScope, TypeDefNode
+from typing import List, Optional, Union
 from pystatic.typesys import TypeIns, TypeType, any_ins
 from pystatic.predefined import TypeFuncIns
 from pystatic.arg import Argument, Arg
 from pystatic.option import Option
 from pystatic.exprparse import eval_expr
-from pystatic.message import MessageBox
 from pystatic.preprocess.prepinfo import *
 
 
@@ -154,49 +153,3 @@ def eval_arg_type(node: ast.arg, prepinfo: 'PrepInfo') -> Option[Arg]:
         res_option.combine_error(ann_option)
         new_arg.ann = ann_option.value
     return res_option
-
-
-TAddFunDef = Callable[[ast.FunctionDef], TypeFuncIns]
-TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef],
-                           None]
-
-
-def template_resolve_fun(prepinfo: 'PrepInfo', add_func_def: TAddFunDef,
-                         add_func_overload: TAddFunOverload,
-                         mbox: 'MessageBox'):
-    """Template to resolve functions"""
-    def get_arg_ret(node: ast.FunctionDef):
-        """Get the argument and return type of the function"""
-        argument_option = eval_argument_type(node.args, prepinfo)
-        return_option = eval_return_type(node.returns, prepinfo)
-        argument_option.dump_to_box(mbox)
-        return_option.dump_to_box(mbox)
-        return argument_option.value, return_option.value
-
-    for name, entry in prepinfo.func.items():
-        assert isinstance(entry, prep_func)
-
-        overload_list = []
-        not_overload = None  # function def that's not decorated by overload
-        for astnode in entry.defnodes:
-            is_overload = False
-            for decs in astnode.decorator_list:
-                if isinstance(decs, ast.Name) and decs.id == 'overload':
-                    # TODO: add warning here if defined is already true before
-                    is_overload = True
-                    break
-            if is_overload:
-                overload_list.append((astnode, *get_arg_ret(astnode)))
-            else:
-                not_overload = astnode
-
-        # TODO: name collision check
-        if len(overload_list) > 0:
-            func_ins = add_func_def(overload_list[0][0])
-
-            for node, argument, ret_ins in overload_list[1:]:
-                add_func_overload(func_ins, argument, ret_ins, node)
-
-        else:
-            assert not_overload
-            add_func_def(not_overload)

@@ -1,61 +1,119 @@
-from typing import List, Dict, Deque
 from collections import deque
-from pystatic.typesys import TypeClassTemp
-from pystatic.preprocess.prepinfo import prep_cls
+from typing import Deque, List
+from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
+from pystatic.preprocess.topo import DependencyGraph
+from pystatic.preprocess.prepinfo import *
 
 
-class _Node:
-    def __init__(self, clstemp: 'prep_cls') -> None:
-        self.clstemp = clstemp
-        self.dependency: List['_Node'] = []
+def toposort_prepdef(prepinfo_list: List[PrepInfo]):
+    graph = DependencyGraph()
+    for prepinfo in prepinfo_list:
+        _first_prepdef_visitor.set_prepinfo(prepinfo)
+        for cls in prepinfo.cls.values():
+            create_cls_dependency(graph, cls)
+        for func in prepinfo.func.values():
+            create_func_dependency(graph, func)
+        for local in prepinfo.local.values():
+            create_local_dependency(graph, local)
 
-        self.indeg: int = 0
+        if isinstance(prepinfo, PrepMethodInfo):
+            for attr in prepinfo.var_attr.values():
+                create_local_dependency(graph, attr)
 
-    def add_dependency(self, node: '_Node'):
-        if node not in self.dependency:
-            self.dependency.append(node)
+    _first_prepdef_visitor.clear_prepinfo()
+    return graph.toposort()
 
 
-class DependencyGraph:
-    def __init__(self) -> None:
-        self._nodes: List['_Node'] = []
-        self._mapping: Dict[prep_cls, _Node] = {}
+def create_cls_dependency(graph: 'DependencyGraph', cls: prep_cls):
+    queue: Deque['prep_cls'] = deque()
+    queue.append(cls)
 
-    def lookup(self, clsdef: 'prep_cls'):
-        if clsdef not in self._mapping:
-            newnode = _Node(clsdef)
-            self._nodes.append(newnode)
-            self._mapping[clsdef] = newnode
-        return self._mapping[clsdef]
+    while len(queue):
+        curcls = queue.popleft()
+        prepinfo = curcls.prepinfo
+        graph.add_prepdef(curcls)
+        node = cls.defnode
+        assert isinstance(node, ast.ClassDef)
 
-    def add_dependency(self, cls_from: prep_cls, cls_to: prep_cls):
-        from_node = self.lookup(cls_from)
-        to_node = self.lookup(cls_to)
-        from_node.add_dependency(to_node)
+        for basenode in node.bases:
+            inh_prepdef = _first_prepdef_visitor.accept(basenode)
+            if inh_prepdef:
+                graph.add_dependency(curcls, inh_prepdef)
 
-    def add_clsdef(self, clsdef: prep_cls):
-        self.lookup(clsdef)
+        for func in prepinfo.func.values():
+            graph.add_dependency(cls, func)
+            create_func_dependency(graph, func)
+        for local in prepinfo.local.values():
+            graph.add_dependency(cls, local)
+            create_local_dependency(graph, local)
 
-    def toposort(self) -> List['prep_cls']:
-        que: Deque['_Node'] = deque()
-        for node in self._nodes:
-            node.indeg = 0
-        for node in self._nodes:
-            for depend_node in node.dependency:
-                depend_node.indeg += 1
-        for node in self._nodes:
-            if node.indeg == 0:
-                que.append(node)
+        for subclsdef in prepinfo.cls.values():
+            graph.add_dependency(curcls, subclsdef)
+            queue.append(subclsdef)
 
-        res = []
 
-        while len(que) != 0:
-            curnode = que[0]
-            que.popleft()
-            res.append(curnode.clstemp)
-            for depend_node in curnode.dependency:
-                depend_node.indeg -= 1
-                if depend_node.indeg == 0:
-                    que.append(depend_node)
+def create_func_dependency(graph: 'DependencyGraph', func: prep_func):
+    node_list = func.defnodes
+    graph.add_prepdef(func)
+    for node in node_list:
+        assert isinstance(node, ast.FunctionDef)
+        arg_def = _first_prepdef_visitor.accept(node.args)
+        if arg_def:
+            graph.add_dependency(func, arg_def)
+        ret_def = _first_prepdef_visitor.accept(node.returns)
+        if ret_def:
+            graph.add_dependency(func, ret_def)
 
-        return list(reversed(res))
+
+def create_local_dependency(graph: 'DependencyGraph', local: prep_local):
+    node = local.defnode
+    assert isinstance(node, (ast.Assign, ast.AnnAssign))
+    graph.add_prepdef(local)
+    if isinstance(node, ast.AnnAssign):
+        depend = _first_prepdef_visitor.accept(node.annotation)
+    else:
+        depend = _first_prepdef_visitor.accept(node.value)
+    if depend:
+        graph.add_dependency(local, depend)
+
+
+class _FirstPrepDefVisitor(NoGenVisitor):
+    """Get the first class template.
+
+    Used to build dependency graph. For example class C inherits A.B,
+    this should return A's template so you can add edge from C to A.
+
+    If the inherited class has already defined in symtable, then it won't
+    return the TypeTemp of that class.
+    """
+    def __init__(self, prepinfo: Optional['PrepInfo']) -> None:
+        self.prepinfo = prepinfo
+
+    def set_prepinfo(self, prepinfo: 'PrepInfo'):
+        self.prepinfo = prepinfo
+
+    def clear_prepinfo(self):
+        self.prepinfo = None
+
+    def accept(self, node):
+        assert self.prepinfo
+        if not node:
+            return None
+        try:
+            return self.visit(node)
+        except VisitorMethodNotFound:
+            return None
+
+    def visit_Name(self, node: ast.Name):
+        assert self.prepinfo
+        prep_def = self.prepinfo.get_prep_def(node.id)
+        return prep_def
+
+    def visit_Attribute(self, node: ast.Attribute):
+        return self.visit(node.value)
+
+    def visit_Subscript(self, node: ast.Subscript):
+        return self.visit(node.value)
+
+
+_first_prepdef_visitor = _FirstPrepDefVisitor(None)
