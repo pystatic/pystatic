@@ -175,7 +175,8 @@ class Manager:
 
     def add_check_file(self,
                        path: FilePath,
-                       to_check: bool = True) -> Option[bool]:
+                       to_check: bool = True,
+                       recheck: bool = False) -> Option[bool]:
         path = self.fsys.realpath(path)
 
         if not os.path.exists(path):
@@ -186,6 +187,8 @@ class Manager:
             rt_path = crawl_path(os.path.dirname(path))
             self.fsys.add_userpath(rt_path)
             symid = relpath2symid(rt_path, path)
+            if recheck and symid in self.targets:
+                return self.recheck(symid)
             return self.__add_check_symid(symid, None, to_check, path, False)
 
     def add_check_symid(self,
@@ -259,11 +262,17 @@ class Manager:
         except SyntaxError as e:
             return None
 
-    def recheck(self, module_symid: SymId):
+    def recheck(self, module_symid: SymId) -> Option[bool]:
         module_target = self.targets.get(module_symid)
         assert isinstance(module_target, Target)
-        module_target.clear()
-        self.update_stage(module_target, Stage.Preprocess, False)
+        try:
+            new_ast = path2ast(module_target.path)
+            module_target.ast = new_ast
+            module_target.clear()
+            self.update_stage(module_target, Stage.Preprocess, False)
+            return Option(True)
+        except SyntaxError:
+            return Option(False)
 
 
 def path2ast(path: FilePath) -> ast.AST:

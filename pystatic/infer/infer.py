@@ -16,7 +16,7 @@ from pystatic.config import Config
 from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
-from pystatic.TypeCompatible.simpleType import TypeCompatible, is_any, type_consistent
+from pystatic.TypeCompatible.simpleType import TypeCompatible, is_any, is_none, type_consistent
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -46,9 +46,9 @@ class InferVisitor(BaseVisitor):
         option.dump_to_box(self.mbox)
         return option.value
 
-    def set_type(self, name: str, cur_type: TypeIns):
+    def record_type(self, name: str, cur_type: TypeIns):
         self.cond_infer.save_type(name)
-        self.recorder.set_type(name, cur_type)
+        self.recorder.record_type(name, cur_type)
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
         return type_consistent(ltype, rtype)
@@ -70,12 +70,12 @@ class InferVisitor(BaseVisitor):
         name = target.id
         comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):
-            self.recorder.set_type(target.id, comment)
+            self.recorder.record_type(target.id, comment)
         if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
-            self.set_type(name, rtype)
+            self.record_type(name, rtype)
 
     def check_composed_node_of_assign(self, target: ast.AST, rtype: TypeIns,
                                       rnode: Optional[ast.AST]):
@@ -125,20 +125,20 @@ class InferVisitor(BaseVisitor):
         assert isinstance(target, ast.Name)
         name = target.id
         comment = self.recorder.get_comment_type(name)
-        self.recorder.set_type(name, comment)
+        self.recorder.record_type(name, comment)
 
     def check_name_node_of_annassign(self, target: ast.Name, rtype, rnode):
         name = target.id
         comment = self.recorder.get_comment_type(name)
         setattr(target, 'type', comment)
         if not self.recorder.is_defined(name):  # var appear first time
-            self.recorder.set_type(name, comment)
+            self.recorder.record_type(name, comment)
 
         if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
-            self.set_type(name, rtype)
+            self.record_type(name, rtype)
 
     def check_composed_node_of_annassign(self, target: ast.AST, rtype: TypeIns,
                                          rnode: Optional[ast.AST]):
@@ -170,7 +170,7 @@ class InferVisitor(BaseVisitor):
     @contextmanager
     def visit_scope(self, node):
         tp = self.recorder.get_comment_type(node.name)
-        self.recorder.set_type(node.name, tp)
+        self.recorder.record_type(node.name, tp)
         setattr(node, 'type', tp)
         yield tp
         self.recorder.leave_scope()
@@ -184,12 +184,7 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         with self.visit_condition(node):
             with self.visit_scope(node) as func_type:
-                func_name = func_type.get_func_name()
-                # new_table = func_type.get_inner_symtable().new_symtable(func_name, TableScope.FUNC)
-                new_table = func_type.get_inner_symtable()
-                func_target = FunctionTarget(self.symid, new_table, node,
-                                             self.mbox)
-                self.manager.preprocess_block(func_target)
+                self.preprocess_in_func(node, func_type)
                 argument, ret_annotation = func_type.get_func_def()
                 self.recorder.enter_func(func_type,
                                          self.infer_argument(argument),
@@ -198,6 +193,11 @@ class InferVisitor(BaseVisitor):
                                                 ConditionStmtType.FUNC)
 
                 self.infer_return_value_of_func(node.returns)
+
+    def preprocess_in_func(self, node: ast.FunctionDef, func_type: TypeFuncIns):
+        new_table = func_type.get_inner_symtable()
+        func_target = FunctionTarget(self.symid, new_table, node, self.mbox)
+        self.manager.preprocess_block(func_target)
 
     def infer_argument(self, argument: Argument):
         args = {}
@@ -220,8 +220,9 @@ class InferVisitor(BaseVisitor):
         ret_list = list(ret_set)
         ret_annotation = self.recorder.get_ret_annotation()
         num = len(ret_list)
-        if not is_any(ret_annotation) and num == 0:
-            self.err_maker.add_err(ReturnValueExpected(node))
+        if num == 0:
+            if not is_any(ret_annotation) and not is_none(ret_annotation):
+                self.err_maker.add_err(ReturnValueExpected(node))
         else:
             # TODO
             pass
@@ -233,10 +234,14 @@ class InferVisitor(BaseVisitor):
         self.check_ret_type(ret_annotation, node, ret_type)
         self.recorder.add_ret(ret_type)
 
-    def check_ret_type(self, annotation, ret_node: ast.Return, ret_type):
+    def check_ret_type(self, annotation: TypeIns, ret_node: ast.Return, ret_type: TypeIns):
         if not self.type_consistent(annotation, ret_type):
-            self.err_maker.add_err(
-                IncompatibleReturnType(ret_node.value, annotation, ret_type))
+            if is_none(ret_type):
+                self.err_maker.add_err(
+                    ReturnValueExpected(ret_node))
+            else:
+                self.err_maker.add_err(
+                    IncompatibleReturnType(ret_node.value, annotation, ret_type))
 
     def accept_condition_stmt_list(self, stmt_list: List[ast.stmt], stmt_type):
         for stmt in stmt_list:
@@ -308,3 +313,4 @@ class InferStarter:
                                          target.mbox, symid, self.config,
                                          self.manager)
             infer_visitor.infer()
+        self.q_infer.clear()

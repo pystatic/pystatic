@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from pystatic.config import Config
 
 
-def is_accessible(test: ast.expr, config: 'Config'):
+def is_accessible(test: 'ast.expr', config: 'Config'):
     res = static_infer(test, config)
     if res != Reach.UNKNOWN:
         setattr(test, 'reach', res)
