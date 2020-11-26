@@ -46,9 +46,9 @@ class InferVisitor(BaseVisitor):
         option.dump_to_box(self.mbox)
         return option.value
 
-    def set_type(self, name: str, cur_type: TypeIns):
+    def record_type(self, name: str, cur_type: TypeIns):
         self.cond_infer.save_type(name)
-        self.recorder.set_type(name, cur_type)
+        self.recorder.record_type(name, cur_type)
 
     def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
         return type_consistent(ltype, rtype)
@@ -70,12 +70,12 @@ class InferVisitor(BaseVisitor):
         name = target.id
         comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):
-            self.recorder.set_type(target.id, comment)
+            self.recorder.record_type(target.id, comment)
         if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
-            self.set_type(name, rtype)
+            self.record_type(name, rtype)
 
     def check_composed_node_of_assign(self, target: ast.AST, rtype: TypeIns,
                                       rnode: Optional[ast.AST]):
@@ -125,20 +125,20 @@ class InferVisitor(BaseVisitor):
         assert isinstance(target, ast.Name)
         name = target.id
         comment = self.recorder.get_comment_type(name)
-        self.recorder.set_type(name, comment)
+        self.recorder.record_type(name, comment)
 
     def check_name_node_of_annassign(self, target: ast.Name, rtype, rnode):
         name = target.id
         comment = self.recorder.get_comment_type(name)
         setattr(target, 'type', comment)
         if not self.recorder.is_defined(name):  # var appear first time
-            self.recorder.set_type(name, comment)
+            self.recorder.record_type(name, comment)
 
         if not self.type_consistent(comment, rtype):
             self.err_maker.add_err(
                 IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
-            self.set_type(name, rtype)
+            self.record_type(name, rtype)
 
     def check_composed_node_of_annassign(self, target: ast.AST, rtype: TypeIns,
                                          rnode: Optional[ast.AST]):
@@ -170,7 +170,7 @@ class InferVisitor(BaseVisitor):
     @contextmanager
     def visit_scope(self, node):
         tp = self.recorder.get_comment_type(node.name)
-        self.recorder.set_type(node.name, tp)
+        self.recorder.record_type(node.name, tp)
         setattr(node, 'type', tp)
         yield tp
         self.recorder.leave_scope()
@@ -184,10 +184,7 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         with self.visit_condition(node):
             with self.visit_scope(node) as func_type:
-                func_name = func_type.get_func_name()
-                new_table = func_type.get_inner_symtable().new_symtable(func_name, TableScope.FUNC)
-                func_target = FunctionTarget(self.symid, new_table, node, self.mbox)
-                self.manager.preprocess_block(func_target)
+                self.preprocess_in_func(node, func_type)
                 argument, ret_annotation = func_type.get_func_def()
                 self.recorder.enter_func(func_type,
                                          self.infer_argument(argument),
@@ -196,6 +193,12 @@ class InferVisitor(BaseVisitor):
                                                 ConditionStmtType.FUNC)
 
                 self.infer_return_value_of_func(node.returns)
+
+    def preprocess_in_func(self, node: ast.FunctionDef, func_type: TypeFuncIns):
+        func_name = func_type.get_func_name()
+        new_table = func_type.get_inner_symtable()
+        func_target = FunctionTarget(self.symid, new_table, node, self.mbox)
+        self.manager.preprocess_block(func_target)
 
     def infer_argument(self, argument: Argument):
         args = {}
