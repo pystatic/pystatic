@@ -20,6 +20,7 @@ class Stage(IntEnum):
 
 class BlockTarget:
     """Block target mainly used for function"""
+
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',
@@ -32,12 +33,19 @@ class BlockTarget:
         self.stage = stage
 
 
+class FunctionTarget(BlockTarget):
+    def __init__(self, symid: 'SymId', symtable: 'SymTable', astnode: 'ast.FunctionDef', mbox: 'MessageBox',
+                 stage: Stage = Stage.Preprocess):
+        super().__init__(symid, symtable, mbox, stage)
+        self.ast = astnode
+
+
 class MethodTarget(BlockTarget):
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',
                  clstemp: 'TypeClassTemp',
-                 astnode: 'ast.AST',
+                 astnode: 'ast.FunctionDef',
                  mbox: 'MessageBox',
                  stage: Stage = Stage.Preprocess) -> None:
         super().__init__(symid, symtable, mbox, stage)
@@ -47,6 +55,7 @@ class MethodTarget(BlockTarget):
 
 class Target(BlockTarget):
     """Module level block target"""
+
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',

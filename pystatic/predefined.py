@@ -549,6 +549,9 @@ class TypeFuncIns(TypeIns):
     def get_func_def(self) -> Tuple['Argument', 'TypeIns']:
         return self.overloads[0].argument, self.overloads[0].ret_type
 
+    def get_func_name(self):
+        return self.funname
+
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         # TODO: deal with arguments
         assert self.overloads

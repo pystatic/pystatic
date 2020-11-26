@@ -1,28 +1,33 @@
 import ast
 import logging
 from contextlib import contextmanager
-from typing import Optional, Set, Deque
+from typing import Optional, Set, Deque, TYPE_CHECKING
 from pystatic.typesys import *
 from pystatic.predefined import *
-from pystatic.target import BlockTarget, Target
+from pystatic.target import FunctionTarget, Target, BlockTarget
 from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
 from pystatic.errorcode import *
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
 from pystatic.opmap import *
+from pystatic.symtable import SymTable, TableScope
 from pystatic.config import Config
 from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
 from pystatic.TypeCompatible.simpleType import TypeCompatible, is_any, type_consistent
 
+if TYPE_CHECKING:
+    from pystatic.manager import Manager
+
 logger = logging.getLogger(__name__)
 
 
 class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleTemp,
-                 mbox: MessageBox, symid: SymId, config: Config):
+                 mbox: MessageBox, symid: SymId, config: Config,
+                 manager: 'Manager'):
         self.root = node
         self.mbox = mbox
         self.symid = symid
@@ -31,6 +36,7 @@ class InferVisitor(BaseVisitor):
         self.recorder = SymbolRecorder(module)
         self.config = config
         self.cond_infer = ConditionInfer(self.recorder, self.err_maker, self.config)
+        self.manager = manager
 
     def infer(self):
         self.visit(self.root)
@@ -178,7 +184,10 @@ class InferVisitor(BaseVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef):
         with self.visit_condition(node):
             with self.visit_scope(node) as func_type:
-                # block_target = BlockTarget(self.symid)
+                func_name = func_type.get_func_name()
+                new_table = func_type.get_inner_symtable().new_symtable(func_name, TableScope.FUNC)
+                func_target = FunctionTarget(self.symid, new_table, node, self.mbox)
+                self.manager.preprocess_block(func_target)
                 argument, ret_annotation = func_type.get_func_def()
                 self.recorder.enter_func(func_type,
                                          self.infer_argument(argument),
@@ -275,21 +284,23 @@ class InferVisitor(BaseVisitor):
         # print(container.temp.placeholders)
         self.get_element_type_in_container(container)
 
-    def get_element_type_in_container(container):
+    def get_element_type_in_container(self, container):
         # print(container)
         # print(container.bindlist)
         pass
 
 
 class InferStarter:
-    def __init__(self, q_infer: Deque[BlockTarget], config: Config):
+    def __init__(self, q_infer: Deque[BlockTarget], config: Config, manager: 'Manager'):
         self.q_infer = q_infer
         self.config = config
+        self.manager = manager
 
     def start_infer(self):
         for target in self.q_infer:
             symid = target.symid
             logger.info(f'Type infer in module \'{symid}\'')
             infer_visitor = InferVisitor(target.ast, target.module_temp,
-                                         target.mbox, symid, self.config)
+                                         target.mbox, symid, self.config,
+                                         self.manager)
             infer_visitor.infer()
