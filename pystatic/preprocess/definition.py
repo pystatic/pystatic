@@ -6,7 +6,7 @@ from pystatic.typesys import TypeClassTemp
 from pystatic.message import MessageBox
 from pystatic.symid import symid2list
 from pystatic.symtable import TableScope, ImportNode
-from pystatic.target import BlockTarget, MethodTarget
+from pystatic.target import BlockTarget, MethodTarget, FunctionTarget
 from pystatic.preprocess.util import analyse_import_stmt
 from pystatic.preprocess.prepinfo import *
 
@@ -31,6 +31,15 @@ def get_definition(target: 'BlockTarget', env: 'PrepEnvironment',
         target, PrepInfo(symtable, None, env, is_special))
 
     TypeDefVisitor(env, prepinfo, mbox).accept(cur_ast)
+
+
+def get_definition_in_function(target: 'FunctionTarget',
+                               env: 'PrepEnvironment', mbox: 'MessageBox'):
+    cur_ast = target.ast
+    assert isinstance(cur_ast, ast.FunctionDef)
+    prepinfo = env.try_add_target_prepinfo(
+        target, PrepInfo(target.symtable, None, env, False))
+    return TypeDefVisitor(env, prepinfo, mbox, False).accept_func(cur_ast)
 
 
 def get_definition_in_method(target: 'MethodTarget', env: 'PrepEnvironment',
