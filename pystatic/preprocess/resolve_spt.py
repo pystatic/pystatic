@@ -18,21 +18,25 @@ def resolve_spt(target: 'BlockTarget', env: PrepEnvironment):
     queue.append(init_prepinfo)
     while len(queue) > 0:
         cur_prepinfo = queue.popleft()
-        for typevar_def in cur_prepinfo.typevar.values():
-            value = typevar_def.defnode.value
+        for typevar_name in cur_prepinfo.typevar:
+            typevar_def = cur_prepinfo.local[typevar_name]
+            assign_node = typevar_def.defnode.value  # right part of assignment
+            typevar = typevar_def.value
             # TODO: change assert to recoverable error
-            assert value, "TypeVar definition shouldn't be empty"
-            fill_typevar(value, typevar_def.typevar, cur_prepinfo)
+            assert assign_node, "TypeVar definition shouldn't be empty"
+            assert isinstance(typevar, TypeVarIns)
+            fill_typevar(assign_node, typevar, cur_prepinfo)
 
-        for typealias_def in cur_prepinfo.type_alias.values():
-            value = typealias_def.defnode.value
+        for typealias_name in cur_prepinfo.type_alias:
+            typealias_def = cur_prepinfo.local[typealias_name]
             typealias = typealias_def.value
-            # TODO: change assert to
-            assert value, "TypeAlias definition shouldn't be empty"
+            assign_node = typealias_def.defnode.value
             # expression in the right assignment mustn't a string literal
-            assert not isinstance(typealias_def.defnode.value, ast.Constant)
+            assert assign_node, "TypeAlias definition shouldn't be empty"
+            assert not isinstance(assign_node, ast.Constant)
             # TODO: add warning
-            typetype = eval_expr(value, cur_prepinfo, annotation=True).value
+            typetype = eval_expr(assign_node, cur_prepinfo,
+                                 annotation=True).value
             assert isinstance(typetype, TypeType)
             typealias.bindlist = typetype.bindlist
 
@@ -54,21 +58,10 @@ def copy_typevar(src: 'TypeVarIns', dst: 'TypeVarIns'):
 
 
 class TypeVarFiller(ExprParser):
-    class TypeVarFillerComplete(Exception):
-        pass
-
     def __init__(self, typevar: 'TypeVarIns', prepinfo: 'PrepInfo') -> None:
         super().__init__(prepinfo, False, False)
         self.typevar = typevar
         self.outermost = True
-
-    def accept(self, node: ast.AST):
-        try:
-            self.visit(node)
-            # TODO: change this to recoverable error
-            raise ValueError("node is not a TypeVar")
-        except self.TypeVarFillerComplete:
-            return self.typevar
 
     def generate_applyargs(self, node: ast.Call) -> ApplyArgs:
         # TODO: warning here for failing.
@@ -102,7 +95,7 @@ class TypeVarFiller(ExprParser):
             call_option = typevar_type.call(applyargs)
             assert isinstance(call_option.value, TypeVarIns)
             copy_typevar(call_option.value, self.typevar)
-            raise self.TypeVarFillerComplete()
+            return self.typevar
         else:
             return super().visit_Call(node)
 

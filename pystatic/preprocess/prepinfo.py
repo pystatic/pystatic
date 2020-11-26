@@ -213,11 +213,13 @@ class PrepInfo:
                 return None
 
     def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
-        if name in self.cls:
-            return Option(self.cls[name].clstemp.get_default_typetype())
-        elif name in self.impt:
-            impt = self.impt[name]
-            return Option(impt.getins())
+        res = None
+        if (res := self.cls.get(name)):
+            return Option(res.clstemp.get_default_typetype())
+        elif (res := self.impt.get(name)):
+            return Option(res.getins())
+        elif (res := self.local.get(name)):
+            return Option(res.getins())
         else:
             for star_impt in self.star_import:
                 res = self.env.lookup(star_impt, name)

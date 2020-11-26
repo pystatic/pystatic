@@ -92,7 +92,7 @@ class _TypeVarVisitor(BaseVisitor):
                 self.typevars.append(tpvarins)
 
     def visit_Name(self, node: ast.Name):
-        name_option = eval_expr(node, self.prepinfo)
+        name_option = self.prepinfo.getattribute(node.id, node)
         if isinstance(name_option.value, TypeVarIns):
             self.add_tpvar(name_option.value)
         name_option.dump_to_box(self.mbox)

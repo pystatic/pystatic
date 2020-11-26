@@ -1,7 +1,9 @@
 from typing import List
 from pystatic.preprocess.resolve_local import resolve_func, resolve_local
-from pystatic.preprocess.resolve_cls import resolve_cls, resolve_cls_method
+from pystatic.preprocess.resolve_cls import (resolve_cls, resolve_cls_method,
+                                             resolve_cls_placeholder)
 from pystatic.preprocess.resolve_impt import resolve_import
+from pystatic.preprocess.resolve_spt import resolve_spt
 from pystatic.preprocess.prepinfo import *
 
 
