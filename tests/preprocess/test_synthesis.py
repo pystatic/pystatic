@@ -1,16 +1,11 @@
 import sys
-import os
-import ast
 
 sys.path.extend(['.', '..'])
 
 from ..util import get_manager_path
 
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import TypeModuleTemp, TypeFuncIns, TypeVarIns
-from pystatic.config import Config
-from pystatic.manager import Manager
-from pystatic.exprparse import eval_expr
+from pystatic.predefined import TypeModuleTemp, TypeFuncIns
 
 
 def test_synthesis_1():

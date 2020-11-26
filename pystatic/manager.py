@@ -1,7 +1,7 @@
 import os
 import logging
 from collections import deque
-from typing import Optional, Dict, TYPE_CHECKING, Deque, Set
+from typing import Optional, Dict, Deque, Set
 from pystatic.config import Config
 from pystatic.exprparse import eval_expr
 from pystatic.errorcode import *
@@ -10,15 +10,12 @@ from pystatic.infer.infer import InferStarter
 from pystatic.message import MessageBox
 from pystatic.option import Option
 from pystatic.preprocess import Preprocessor
-from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
-                                 get_init_module_symtable)
+from pystatic.predefined import builtins_symtable, typing_symtable
 from pystatic.symid import SymId, relpath2symid, symid2list
 from pystatic.typesys import TypeIns
 from pystatic.predefined import TypeModuleTemp, TypePackageTemp
 from pystatic.target import BlockTarget, Target, Stage, PackageTarget
-
-if TYPE_CHECKING:
-    from pystatic.symtable import SymTable
+from pystatic.symtable import SymTable, TableScope
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +37,9 @@ class Manager:
             self.__init_typeshed()
 
     def __init_typeshed(self):
-        self.__add_check_symid('builtins', get_builtin_symtable(), False, None,
+        self.__add_check_symid('builtins', builtins_symtable, False, None,
                                True)
-        self.__add_check_symid('typing', get_typing_symtable(), False, None,
-                               True)
+        self.__add_check_symid('typing', typing_symtable, False, None, True)
         self.preprocess()
 
     def __add_check_symid(self, symid: 'SymId',
@@ -70,7 +66,10 @@ class Manager:
             if default_symtable:
                 symtable = default_symtable
             else:
-                symtable = get_init_module_symtable(symid)
+                # Generate new symtable for the new target
+                symtable = SymTable(symid, None, None, builtins_symtable, self,
+                                    TableScope.GLOB)
+                symtable.glob = symtable
             mbox = MessageBox(symid)
 
             # TODO: support namespace

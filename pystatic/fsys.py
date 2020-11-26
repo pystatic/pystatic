@@ -123,9 +123,16 @@ def _walk_single(subsymid: str, paths: List[str]) -> Optional[ModuleFindRes]:
 
         if os.path.isdir(sub_target):
             init_file = os.path.join(sub_target, '__init__.py')
+            init_pyi_file = os.path.join(sub_target, '__init__.pyi')
             if os.path.isfile(init_file):
+                # FIXME: should we take .py file over .pyi file?
                 target = sub_target
                 target_file = init_file
+                break
+            elif os.path.isfile(init_pyi_file):
+                target = sub_target
+                target_file = init_pyi_file
+                break
             else:
                 ns_paths.append(sub_target)
     if target:

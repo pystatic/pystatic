@@ -51,8 +51,8 @@ class Config:
 
         # typeshed: typeshed path
         # default: typeshed variable in this module
-        if get('typeshed', str):
-            self.typeshed: Optional[str] = get('typeshed')
+        if user_typeshed := get('typeshed', str):
+            self.typeshed: Optional[str] = user_typeshed
         else:
             if os.path.isdir(os.path.join(pystatic_dir, typeshed)):
                 self.typeshed = os.path.join(pystatic_dir, typeshed)
