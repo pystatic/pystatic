@@ -6,6 +6,7 @@ from pystatic.typesys import TypeClassTemp
 from pystatic.message import MessageBox
 from pystatic.symid import symid2list
 from pystatic.symtable import TableScope, ImportNode
+from pystatic.staticinfer import is_accessible
 from pystatic.target import BlockTarget, MethodTarget, FunctionTarget
 from pystatic.preprocess.util import analyse_import_stmt
 from pystatic.preprocess.prepinfo import *
@@ -108,3 +109,8 @@ class TypeDefVisitor(BaseVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.prepinfo.add_func_def(node, self.mbox)
+
+    def visit_If(self, node: ast.If):
+        if is_accessible(node.test, self.env.manager.config):
+            for subnode in node.body:
+                self.visit(subnode)
