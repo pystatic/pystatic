@@ -3,9 +3,10 @@ from collections import deque
 from pystatic.preprocess.resolve_cls import resolve_cls_placeholder
 from pystatic.preprocess.resolve_spt import resolve_spt
 from typing import TYPE_CHECKING, List, Deque
-from pystatic.target import BlockTarget, MethodTarget, Stage, Target
+from pystatic.target import BlockTarget, FunctionTarget, MethodTarget, Stage, Target
 from pystatic.preprocess.definition import (get_definition,
-                                            get_definition_in_method)
+                                            get_definition_in_method,
+                                            get_definition_in_function)
 from pystatic.preprocess.dependency import toposort_prepdef
 from pystatic.preprocess.resolve import resolve, resolve_import, resolve_cls_method
 from pystatic.preprocess.prepinfo import *
@@ -45,6 +46,8 @@ class Preprocessor:
                 # get current module's class definitions.
                 if isinstance(current, MethodTarget):
                     get_definition_in_method(current, self.env, current.mbox)
+                elif isinstance(current, FunctionTarget):
+                    get_definition_in_function(current, self.env, current.mbox)
                 else:
                     get_definition(current, self.env, current.mbox)
 
@@ -76,3 +79,4 @@ class Preprocessor:
                 if isinstance(target, Target) and manager.is_on_check(
                         target.symid):
                     manager.update_stage(target, Stage.Infer)
+        self.env.clear()

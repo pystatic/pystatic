@@ -15,7 +15,7 @@ class SupportGetAttribute(Protocol):
         ...
 
 
-def eval_expr(node: ast.AST,
+def eval_expr(node: Optional[ast.AST],
               attr_consultant: SupportGetAttribute,
               explicit=False,
               annotation=False):
@@ -26,7 +26,10 @@ def eval_expr(node: ast.AST,
     :param annotation: If True, strings inside this node is treated
     as forward-reference other than Literal string.
     """
-    return ExprParser(attr_consultant, explicit, annotation).accept(node)
+    if not node:
+        return Option(none_ins)
+    else:
+        return ExprParser(attr_consultant, explicit, annotation).accept(node)
 
 
 class ExprParser(NoGenVisitor):

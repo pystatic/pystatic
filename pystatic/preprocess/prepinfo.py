@@ -327,6 +327,10 @@ class PrepEnvironment:
             return None
         else:
             return module_temp.get_inner_symtable().legb_lookup(name)
+    
+    def clear(self):
+        self.symid_prepinfo = {}
+        self.target_prepinfo = {}
 
 
 class prep_cls:

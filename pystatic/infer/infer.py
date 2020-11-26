@@ -25,9 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class InferVisitor(BaseVisitor):
-    def __init__(self, node: ast.AST, module: TypeModuleTemp,
-                 mbox: MessageBox, symid: SymId, config: Config,
-                 manager: 'Manager'):
+    def __init__(self, node: ast.AST, module: TypeModuleTemp, mbox: MessageBox,
+                 symid: SymId, config: Config, manager: 'Manager'):
         self.root = node
         self.mbox = mbox
         self.symid = symid
@@ -35,7 +34,8 @@ class InferVisitor(BaseVisitor):
         self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
         self.config = config
-        self.cond_infer = ConditionInfer(self.recorder, self.err_maker, self.config)
+        self.cond_infer = ConditionInfer(self.recorder, self.err_maker,
+                                         self.config)
         self.manager = manager
 
     def infer(self):
@@ -195,7 +195,6 @@ class InferVisitor(BaseVisitor):
                 self.infer_return_value_of_func(node.returns)
 
     def preprocess_in_func(self, node: ast.FunctionDef, func_type: TypeFuncIns):
-        func_name = func_type.get_func_name()
         new_table = func_type.get_inner_symtable()
         func_target = FunctionTarget(self.symid, new_table, node, self.mbox)
         self.manager.preprocess_block(func_target)
@@ -273,7 +272,8 @@ class InferVisitor(BaseVisitor):
             self.visit_stmt_after_condition(node.body, ConditionStmtType.IF)
             if node.orelse:
                 self.cond_infer.flip()
-                self.visit_stmt_after_condition(node.orelse, ConditionStmtType.IF)
+                self.visit_stmt_after_condition(node.orelse,
+                                                ConditionStmtType.IF)
 
     def visit_Break(self, node: ast.Break):
         self.cond_infer.accept(node)
@@ -294,7 +294,8 @@ class InferVisitor(BaseVisitor):
 
 
 class InferStarter:
-    def __init__(self, q_infer: Deque[BlockTarget], config: Config, manager: 'Manager'):
+    def __init__(self, q_infer: Deque[BlockTarget], config: Config,
+                 manager: 'Manager'):
         self.q_infer = q_infer
         self.config = config
         self.manager = manager
