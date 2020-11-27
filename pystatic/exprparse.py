@@ -145,8 +145,9 @@ class ExprParser(NoGenVisitor):
             return tpins
 
     def visit_Attribute(self, node: ast.Attribute) -> TypeIns:
-        res = self.visit(node.value)
-        assert isinstance(res, TypeIns)
+        with self.block_container():
+            res = self.visit(node.value)
+            assert isinstance(res, TypeIns)
         attr_option = res.getattribute(node.attr, node)
 
         self.add_error(attr_option.errors)
