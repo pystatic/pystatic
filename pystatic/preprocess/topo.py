@@ -57,4 +57,9 @@ class DependencyGraph:
                 if depend_node.indeg == 0:
                     que.append(depend_node)
 
+        for node in self._nodes:
+            if node.indeg != 0:
+                raise NotImplementedError(
+                    "resolve dependency error not implemented")
+
         return res
