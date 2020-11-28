@@ -29,7 +29,7 @@ def parse_file(file_path):
 file_list = ['check_assign',
              'check_attribute',
              'check_tuple',
-             # 'check_funcdef',
+             'check_funcdef',
              'check_reach']
 
 
