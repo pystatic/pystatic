@@ -25,13 +25,17 @@ def test_import():
 
     banana = manager.get_sym_type(symid, 'banana')
     Banana = manager.get_sym_type(symid, 'Banana')
+    vegetable = manager.get_sym_type(symid, 'vegetable')
+    c = manager.get_sym_type(symid, 'c')
     assert isinstance(banana, TypeIns)
     assert isinstance(Banana, TypeType)
+    assert isinstance(c, TypeIns) and not isinstance(c, TypeType)
     assert banana.temp == Banana.temp
 
     love_fruit = manager.eval_expr(symid, 'love_banana(banana)')
     assert isinstance(love_fruit, TypeIns)
     assert love_fruit.temp == Banana.temp
+
 
 def test_star_import():
     symid = 'preprocess.star_import'
@@ -41,7 +45,7 @@ def test_star_import():
     module_temp = manager.get_module_temp(symid)
     assert isinstance(module_temp, TypeModuleTemp)
     assert module_temp.module_symid == symid
-    
+
     a = manager.get_sym_type(symid, 'a')
     pack_type = manager.get_sym_type(symid, 'Pack')
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)

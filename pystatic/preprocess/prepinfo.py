@@ -4,7 +4,7 @@ from pystatic.errorcode import *
 from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
-from pystatic.predefined import TypeVarIns, TypeFuncIns
+from pystatic.predefined import TypeModuleTemp, TypeVarIns, TypeFuncIns
 from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry, TableScope
 from pystatic.option import Option
 from pystatic.message import MessageBox
@@ -14,11 +14,7 @@ if TYPE_CHECKING:
     from pystatic.target import BlockTarget
 
 AssignNode = Union[ast.Assign, ast.AnnAssign]
-PrepDef = Union['prep_cls', 'prep_func', 'prep_local']
-
-class PrepInfoItem(Protocol):
-    def getins(self) -> 'TypeIns':
-        ...
+PrepDef = Union['prep_cls', 'prep_func', 'prep_local', 'prep_module']
 
 
 class PrepInfo:
@@ -176,7 +172,7 @@ class PrepInfo:
                 manager.add_check_symid(cur_prefix, False)
 
             if infoitem.origin_name == '*':
-                if infoitem.origin_name not in self.star_import:
+                if infoitem.symid not in self.star_import:
                     self.star_import.append(infoitem.symid)
 
             if not infoitem.is_import_module():
@@ -198,7 +194,7 @@ class PrepInfo:
         self.type_alias.add(alias)
         self.symtable.add_entry(alias, Entry(typealias, defnode))
 
-    def get_prep_def(self, name: str) -> Optional[PrepInfoItem]:
+    def get_prep_def(self, name: str) -> Optional[PrepDef]:
         res = None
         if (res := self.cls.get(name)):
             return res
@@ -286,10 +282,8 @@ class PrepEnvironment:
         self.target_prepinfo: Dict['BlockTarget', 'PrepInfo'] = {}
 
     def get_prepinfo(self, symid: 'SymId'):
-        if symid in self.symid_prepinfo:
-            return self.symid_prepinfo[symid]
-        else:
-            return None
+        if (prepinfo := self.symid_prepinfo.get(symid)):
+            return prepinfo
 
     def add_target_prepinfo(self, target: 'BlockTarget', prepinfo: 'PrepInfo'):
         assert target not in self.target_prepinfo
@@ -415,6 +409,11 @@ class prep_impt:
             return self.value
         else:
             return self.value.getins()
+
+
+class prep_module:
+    def __init__(self, prepinfo: 'PrepInfo') -> None:
+        self.prepinfo = prepinfo
 
 
 def clear_prep_info(prep_info: 'PrepInfo'):

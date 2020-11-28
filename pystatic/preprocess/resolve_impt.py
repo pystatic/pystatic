@@ -13,7 +13,17 @@ def resolve_import(prepinfo: 'PrepInfo', env: 'PrepEnvironment'):
         symtable = cur_prepinfo.symtable
         for _, entry in cur_prepinfo.impt.items():
             update_symtable_import_cache(symtable, entry, env.manager)
-            if not entry.value:
+            if not entry.origin_name:
+                # import <module_name>
+                prepinfo = env.get_prepinfo(entry.symid)
+                if prepinfo:
+                    entry.value = prep_module(prepinfo)
+                else:
+                    module_temp = env.manager.get_module_temp(entry.symid)
+                    assert module_temp
+                    entry.value = module_temp.get_default_ins().value
+
+            elif not entry.value:
                 asname = entry.asname
                 assert asname
                 _resolve_import_chain(cur_prepinfo, asname, env)
