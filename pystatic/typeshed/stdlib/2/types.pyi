@@ -2,6 +2,7 @@
 # Note, all classes "defined" here require special handling.
 
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Type, TypeVar, Union, overload
+import types
 
 _T = TypeVar("_T")
 

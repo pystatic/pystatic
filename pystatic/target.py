@@ -2,7 +2,7 @@ import ast
 from enum import IntEnum
 from typing import TYPE_CHECKING, Optional
 from pystatic.typesys import TypeClassTemp
-from pystatic.predefined import TypeModuleTemp
+from pystatic.predefined import TypeModuleIns
 from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
@@ -20,7 +20,6 @@ class Stage(IntEnum):
 
 class BlockTarget:
     """Block target mainly used for function"""
-
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',
@@ -34,7 +33,11 @@ class BlockTarget:
 
 
 class FunctionTarget(BlockTarget):
-    def __init__(self, symid: 'SymId', symtable: 'SymTable', astnode: 'ast.FunctionDef', mbox: 'MessageBox',
+    def __init__(self,
+                 symid: 'SymId',
+                 symtable: 'SymTable',
+                 astnode: 'ast.FunctionDef',
+                 mbox: 'MessageBox',
                  stage: Stage = Stage.Preprocess):
         super().__init__(symid, symtable, mbox, stage)
         self.ast = astnode
@@ -55,7 +58,6 @@ class MethodTarget(BlockTarget):
 
 class Target(BlockTarget):
     """Module level block target"""
-
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',
@@ -69,7 +71,7 @@ class Target(BlockTarget):
         """
         super().__init__(symid, symtable, mbox, stage)
         # NOTE: TpStage.OVER may be wrong.
-        self.module_temp = TypeModuleTemp(symid, self.symtable)
+        self.module_ins = TypeModuleIns(self.symtable)
         self.path: str = path
         self.is_special = is_special
 

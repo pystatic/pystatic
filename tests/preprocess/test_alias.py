@@ -15,9 +15,9 @@ def test_alias():
     manager, filepath = get_manager_path({}, symid)
     manager.preprocess()
 
-    module_temp = manager.get_module_temp(symid)
-    assert isinstance(module_temp, TypeModuleTemp)
-    assert module_temp.module_symid == symid
+    module_ins = manager.get_module_ins(symid)
+    assert isinstance(module_ins, TypeModuleIns)
+    assert module_ins.symid == symid
 
     A_temp = manager.get_sym_type(symid, 'A').temp
     B_temp = manager.get_sym_type(symid, 'B').temp

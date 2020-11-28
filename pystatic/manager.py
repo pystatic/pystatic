@@ -10,10 +10,10 @@ from pystatic.infer.infer import InferStarter
 from pystatic.message import MessageBox
 from pystatic.option import Option
 from pystatic.preprocess import Preprocessor
-from pystatic.predefined import builtins_symtable, typing_symtable
+from pystatic.predefined import TypePackageIns, builtins_symtable, typing_symtable
 from pystatic.symid import SymId, relpath2symid, symid2list
 from pystatic.typesys import TypeIns
-from pystatic.predefined import TypeModuleTemp, TypePackageTemp
+from pystatic.predefined import TypeModuleIns
 from pystatic.target import BlockTarget, Target, Stage, PackageTarget
 from pystatic.symtable import SymTable, TableScope
 
@@ -104,10 +104,14 @@ class Manager:
 
                 assert dir_path == os.path.dirname(analyse_path)
 
+                # modify symtable's symid to the symid of the module preprocessed
+                # to handle relative import correctly
+                symtable.symid = symtable.symid + '.__init__'
+
                 new_target = PackageTarget(symid, symtable, mbox, dir_path,
                                            analyse_path)
-                new_target.module_temp = TypePackageTemp(
-                    find_res.paths, new_target.symtable, new_target.symid)
+                new_target.module_ins = TypePackageIns(new_target.symtable,
+                                                       find_res.paths, None)
                 new_target.path = self.fsys.realpath(find_res.paths[0])
 
                 self.__parse(new_target)
@@ -168,9 +172,9 @@ class Manager:
         elif stage == Stage.FINISH:
             pass
 
-    def get_module_temp(self, symid: 'SymId') -> Optional[TypeModuleTemp]:
+    def get_module_ins(self, symid: 'SymId') -> Optional[TypeModuleIns]:
         if symid in self.targets:
-            return self.targets[symid].module_temp
+            return self.targets[symid].module_ins
         return None
 
     def add_check_file(self,
@@ -210,8 +214,10 @@ class Manager:
         target = self.targets.get(symid)
         if target:
             return target.mbox
-        else:
-            return None
+        elif symid.endswith('.__init__'):
+            package_id = symid[:-len('.__init__')]
+            if (target := self.targets.get(package_id)):
+                return target.mbox
 
     def get_mbox(self, path: FilePath) -> Optional[MessageBox]:
         path = os.path.normcase(path)
@@ -234,12 +240,12 @@ class Manager:
 
     def get_sym_type(self, module_symid: SymId,
                      var_symid: SymId) -> Optional['TypeIns']:
-        module_temp = self.get_module_temp(module_symid)
-        if not module_temp:
+        module_ins = self.get_module_ins(module_symid)
+        if not module_ins:
             return None
         else:
             varid_list = symid2list(var_symid)
-            cur_ins = module_temp.get_default_ins().value
+            cur_ins = module_ins
             for subid in varid_list:
                 res_option = cur_ins.getattribute(subid, None)
                 if res_option.haserr():
@@ -250,10 +256,9 @@ class Manager:
     def eval_expr(self, module_symid: SymId, expr: str) -> Optional['TypeIns']:
         try:
             astnode = ast.parse(expr, mode='eval')
-            module_temp = self.get_module_temp(module_symid)
-            if not module_temp:
+            module_ins = self.get_module_ins(module_symid)
+            if not module_ins:
                 return None
-            module_ins = module_temp.get_default_ins().value
             res_option = eval_expr(astnode.body, module_ins)  # type: ignore
             if res_option.haserr():
                 return None

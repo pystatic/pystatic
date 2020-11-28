@@ -1,12 +1,9 @@
 import ast
 from contextlib import contextmanager
-from typing import List, Optional, Union
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import TypeClassTemp
 from pystatic.message import MessageBox
-from pystatic.symid import symid2list
-from pystatic.symtable import TableScope, ImportNode
-from pystatic.staticinfer import is_accessible
+from pystatic.reach import is_true, Reach
+from pystatic.staticinfer import static_infer
 from pystatic.target import BlockTarget, MethodTarget, FunctionTarget
 from pystatic.preprocess.util import analyse_import_stmt
 from pystatic.preprocess.prepinfo import *
@@ -111,6 +108,17 @@ class TypeDefVisitor(BaseVisitor):
         self.prepinfo.add_func_def(node, self.mbox)
 
     def visit_If(self, node: ast.If):
-        if is_accessible(node.test, self.env.manager.config):
+        reach_res = static_infer(node.test, self.env.manager.config)
+        if reach_res == Reach.UNKNOWN:
             for subnode in node.body:
                 self.visit(subnode)
+            for subnode in node.orelse:
+                self.visit(subnode)
+        else:
+            setattr(node.test, 'reach', reach_res)
+            if is_true(reach_res, False):
+                for subnode in node.body:
+                    self.visit(subnode)
+            else:
+                for subnode in node.orelse:
+                    self.visit(subnode)

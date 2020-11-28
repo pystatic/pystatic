@@ -1,5 +1,5 @@
 import ast
-from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union, List, Set)
+from typing import (Optional, TYPE_CHECKING, Dict, Union, List, Set)
 from pystatic.errorcode import *
 from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
@@ -15,10 +15,6 @@ if TYPE_CHECKING:
 
 AssignNode = Union[ast.Assign, ast.AnnAssign]
 PrepDef = Union['prep_cls', 'prep_func', 'prep_local']
-
-class PrepInfoItem(Protocol):
-    def getins(self) -> 'TypeIns':
-        ...
 
 
 class PrepInfo:
@@ -176,7 +172,7 @@ class PrepInfo:
                 manager.add_check_symid(cur_prefix, False)
 
             if infoitem.origin_name == '*':
-                if infoitem.origin_name not in self.star_import:
+                if infoitem.symid not in self.star_import:
                     self.star_import.append(infoitem.symid)
 
             if not infoitem.is_import_module():
@@ -198,7 +194,7 @@ class PrepInfo:
         self.type_alias.add(alias)
         self.symtable.add_entry(alias, Entry(typealias, defnode))
 
-    def get_prep_def(self, name: str) -> Optional[PrepInfoItem]:
+    def get_prep_def(self, name: str) -> Optional[PrepDef]:
         res = None
         if (res := self.cls.get(name)):
             return res
@@ -286,10 +282,8 @@ class PrepEnvironment:
         self.target_prepinfo: Dict['BlockTarget', 'PrepInfo'] = {}
 
     def get_prepinfo(self, symid: 'SymId'):
-        if symid in self.symid_prepinfo:
-            return self.symid_prepinfo[symid]
-        else:
-            return None
+        if (prepinfo := self.symid_prepinfo.get(symid)):
+            return prepinfo
 
     def add_target_prepinfo(self, target: 'BlockTarget', prepinfo: 'PrepInfo'):
         assert target not in self.target_prepinfo
@@ -322,14 +316,17 @@ class PrepEnvironment:
             if res:
                 return res
 
-        module_temp = self.manager.get_module_temp(module_symid)
-        if not module_temp:
+        module_ins = self.manager.get_module_ins(module_symid)
+        if not module_ins:
             return None
         else:
-            return module_temp.get_inner_symtable().legb_lookup(name)
+            return module_ins._inner_symtable.legb_lookup(name)
     
     def clear(self):
         self.symid_prepinfo = {}
+        for blk_target in self.target_prepinfo.keys():
+            if isinstance(blk_target, Target):
+                blk_target.module_ins.clear_consultant()
         self.target_prepinfo = {}
 
 
@@ -402,7 +399,7 @@ class prep_impt:
         self.asname = asname
         self.defnode = defnode
         self.def_prepinfo = def_prepinfo
-        self.value: Union[PrepInfoItem, TypeIns, None] = None
+        self.value: Union[PrepDef, TypeIns, None] = None
 
     def is_import_module(self):
         """Import the whole module?"""
@@ -416,8 +413,3 @@ class prep_impt:
         else:
             return self.value.getins()
 
-
-def clear_prep_info(prep_info: 'PrepInfo'):
-    for clsdef in prep_info.cls.values():
-        clear_prep_info(clsdef.prepinfo)
-    del prep_info

@@ -2,8 +2,7 @@ import ast
 from typing import Optional, TYPE_CHECKING, List
 from pystatic.exprparse import SupportGetAttribute
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import (TypeModuleTemp, TypePackageTemp,
-                                 TypePackageIns, TypeClassTemp)
+from pystatic.predefined import (TypeModuleIns, TypePackageIns, TypeClassTemp)
 from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
 from pystatic.option import Option
 from pystatic.symtable import ImportNode, SymTable
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
 def omit_inst_typetype(node: ast.AST, consultant: SupportGetAttribute,
                        allow_tuple: bool) -> Optional[TypeType]:
     """Get typetype a node represents while omitting instantiate args
-    
+
     :param allow_tuple: allow analyse inside tuple node or not
     """
     try:
@@ -121,41 +120,34 @@ def update_symtable_import_cache(symtable: 'SymTable', entry: 'prep_impt',
 
     # get the initial module ins or package ins
     cur_symid = symidlist[0]
-    cur_ins = cache.get_moduleins(cur_symid)
+    cur_ins = cache.get_module_ins(cur_symid)
 
     if not cur_ins:
-        temp = manager.get_module_temp(symidlist[0])
-        if not temp:
+        cur_ins = manager.get_module_ins(symidlist[0])
+        if not cur_ins:
             return None
-
-        if isinstance(temp, TypePackageTemp):
-            cur_ins = TypePackageIns(temp)
-        else:
-            assert isinstance(temp, TypeModuleTemp)
-            cur_ins = temp.get_default_ins().value
-
         cache.set_moduleins(cur_symid, cur_ins)
 
-    assert isinstance(cur_ins.temp, TypeModuleTemp)
+    assert isinstance(cur_ins, TypeModuleIns)
     for i in range(1, len(symidlist)):
         if not isinstance(cur_ins, TypePackageIns):
             return None
 
         cur_symid += f'.{symidlist[i]}'
         if symidlist[i] not in cur_ins.submodule:
-            temp = manager.get_module_temp(cur_symid)
-            if not temp:
+            module_ins = manager.get_module_ins(cur_symid)
+            if not module_ins:
                 return None
 
-            assert isinstance(temp, TypeModuleTemp)
-            if isinstance(temp, TypePackageTemp):
-                cur_ins.add_submodule(symidlist[i], TypePackageIns(temp))
+            # FIXME: fix me after modify TypePackageIns
+            assert isinstance(module_ins, TypeModuleIns)
+            if isinstance(module_ins, TypePackageIns):
+                cur_ins.add_submodule(symidlist[i], module_ins)
             else:
                 if i != len(symidlist) - 1:
                     return None
-                res_ins = temp.get_default_ins().value
-                cur_ins.add_submodule(symidlist[i], res_ins)
-                return res_ins
+                cur_ins.add_submodule(symidlist[i], module_ins)
+                return module_ins
 
         cur_ins = cur_ins.submodule[symidlist[i]]
 
@@ -169,11 +161,10 @@ def update_symtable_import_cache(symtable: 'SymTable', entry: 'prep_impt',
     if isinstance(cur_ins, TypePackageIns):
         if not entry.is_import_module():
             cur_symid += f'.{entry.origin_name}'
-            temp = manager.get_module_temp(cur_symid)
+            module_ins = manager.get_module_ins(cur_symid)
 
-            if temp:
-                cur_ins.add_submodule(entry.origin_name,
-                                      temp.get_default_ins().value)
+            if module_ins:
+                cur_ins.add_submodule(entry.origin_name, module_ins)
     return cur_ins
 
 
