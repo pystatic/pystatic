@@ -19,9 +19,10 @@ PrepDef = Union['prep_cls', 'prep_func', 'prep_local']
 
 class PrepInfo:
     def __init__(self, symtable: 'SymTable', enclosing: Optional['PrepInfo'],
-                 env: 'PrepEnvironment', is_special: bool):
+                 env: 'PrepEnvironment', mbox: 'MessageBox', is_special: bool):
         self.enclosing = enclosing
         self.is_special = is_special
+        self.mbox = mbox
 
         self.cls: Dict[str, 'prep_cls'] = {}
         self.local: Dict[str, 'prep_local'] = {}
@@ -44,7 +45,7 @@ class PrepInfo:
         return self.symtable.glob_symid
     
     def new_cls_prepinfo(self, symtable: 'SymTable'):
-        return PrepInfo(symtable, self, self.env, False)
+        return PrepInfo(symtable, self, self.env, self.mbox, False)
 
     def add_cls_def(self, node: ast.ClassDef, mbox: 'MessageBox'):
         # TODO: check name collision
@@ -260,8 +261,9 @@ class PrepInfo:
 
 class PrepMethodInfo(PrepInfo):
     def __init__(self, clstemp: TypeClassTemp,
-                 enclosing: Optional['PrepInfo'], env: 'PrepEnvironment'):
-        super().__init__(clstemp.get_inner_symtable(), enclosing, env, False)
+                 enclosing: Optional['PrepInfo'], mbox: 'MessageBox',
+                 env: 'PrepEnvironment'):
+        super().__init__(clstemp.get_inner_symtable(), enclosing, env, mbox, False)
         self.clstemp = clstemp
         self.var_attr: Dict[str, 'prep_local'] = {}
 

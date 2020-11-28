@@ -6,16 +6,18 @@ from pystatic.typesys import TypeIns, TypeType
 from pystatic.visitor import NoGenVisitor
 from pystatic.evalutil import ApplyArgs
 from pystatic.predefined import TypeVarIns, typevar_type, typevar_temp
-from pystatic.target import BlockTarget
 from pystatic.preprocess.prepinfo import PrepEnvironment, PrepInfo
 
 
-def resolve_spt(target: 'BlockTarget', env: PrepEnvironment):
-    init_prepinfo = env.get_target_prepinfo(target)
-    assert init_prepinfo
+def resolve_typevar(prepinfo: 'PrepInfo', env: PrepEnvironment):
+    pass
+
+
+def resolve_spt(prepinfo: 'PrepInfo', env: PrepEnvironment):
+    assert prepinfo
 
     queue: Deque['PrepInfo'] = deque()
-    queue.append(init_prepinfo)
+    queue.append(prepinfo)
     while len(queue) > 0:
         cur_prepinfo = queue.popleft()
         for typevar_name in cur_prepinfo.typevar:

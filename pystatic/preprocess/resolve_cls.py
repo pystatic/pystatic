@@ -16,9 +16,6 @@ from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
 from pystatic.preprocess.resolve_local import resolve_func_template
 from pystatic.preprocess.prepinfo import *
 
-if TYPE_CHECKING:
-    from pystatic.target import BlockTarget
-
 
 def resolve_cls(cls: 'prep_cls'):
     resolve_cls_inheritence(cls)
@@ -120,14 +117,12 @@ class _TypeVarVisitor(BaseVisitor):
         return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(target: 'BlockTarget', env: 'PrepEnvironment',
+def resolve_cls_method(prepinfo: 'PrepInfo', env: 'PrepEnvironment',
                        mbox: 'MessageBox'):
     # TODO: symid here is not set correctly
-    init_prepinfo = env.get_target_prepinfo(target)
-    assert init_prepinfo
     manager = env.manager
     queue: Deque['PrepInfo'] = deque()
-    queue.append(init_prepinfo)
+    queue.append(prepinfo)
 
     while len(queue):
         cur_prepinfo = queue.popleft()
@@ -138,7 +133,8 @@ def resolve_cls_method(target: 'BlockTarget', env: 'PrepEnvironment',
                 # that get around manager, which may be problematic
                 env.add_target_prepinfo(
                     blk_target,
-                    PrepMethodInfo(clsdef.clstemp, cur_prepinfo, env))
+                    PrepMethodInfo(clsdef.clstemp, cur_prepinfo,
+                                   cur_prepinfo.mbox, env))
                 manager.q_preprocess.append(blk_target)
 
             for subclsdef in clsdef.prepinfo.cls.values():

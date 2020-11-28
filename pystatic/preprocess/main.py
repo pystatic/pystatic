@@ -15,11 +15,9 @@ if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 
-def dump_to_symtable(target: 'BlockTarget', env: 'PrepEnvironment'):
-    init_prepinfo = env.get_target_prepinfo(target)
-    assert init_prepinfo
+def dump_to_symtable(prepinfo: 'PrepInfo', env: 'PrepEnvironment'):
     queue: Deque[PrepInfo] = deque()
-    queue.append(init_prepinfo)
+    queue.append(prepinfo)
 
     while len(queue):
         cur_prepinfo = queue.popleft()
@@ -45,11 +43,11 @@ class Preprocessor:
 
                 # get current module's class definitions.
                 if isinstance(current, MethodTarget):
-                    get_definition_in_method(current, self.env, current.mbox)
+                    get_definition_in_method(current, self.env)
                 elif isinstance(current, FunctionTarget):
-                    get_definition_in_function(current, self.env, current.mbox)
+                    get_definition_in_function(current, self.env)
                 else:
-                    get_definition(current, self.env, current.mbox)
+                    get_definition(current, self.env)
 
             prepinfo_list = [
                 prepinfo for target in to_check if (prepinfo := self.env.get_target_prepinfo(target))
@@ -65,15 +63,12 @@ class Preprocessor:
 
             for prepdef in resolve_order:
                 if isinstance(prepdef, prep_cls):
-                    temp_mbox = manager.get_mbox_by_symid(
-                        prepdef.clstemp.module_symid)
-                    assert temp_mbox, "This should always true because pystatic must have added the mbox before"
-                    resolve_cls_placeholder(prepdef, temp_mbox)
+                    resolve_cls_placeholder(prepdef, prepdef.def_prepinfo.mbox)
 
-            for target in to_check:
-                resolve_cls_method(target, self.env, target.mbox)
-                resolve_spt(target, self.env)
-                dump_to_symtable(target, self.env)
+            for prepinfo in prepinfo_list:
+                resolve_cls_method(prepinfo, self.env, prepinfo.mbox)
+                resolve_spt(prepinfo, self.env)
+                dump_to_symtable(prepinfo, self.env)
 
             for target in to_check:
                 if isinstance(target, Target) and manager.is_on_check(
