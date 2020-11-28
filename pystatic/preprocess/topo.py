@@ -1,4 +1,4 @@
-from typing import List, Dict, Deque
+from typing import List, Dict, Deque, Set
 from collections import deque
 from pystatic.preprocess.prepinfo import PrepDef
 
@@ -8,13 +8,12 @@ class _Node:
 
     def __init__(self, prepdef: 'PrepDef') -> None:
         self.prepdef = prepdef
-        self.dependency: List['_Node'] = []
+        self.dependency: Set['_Node'] = set()
 
         self.indeg: int = 0
 
     def add_dependency(self, node: '_Node'):
-        if node not in self.dependency:
-            self.dependency.append(node)
+        self.dependency.add(node)
 
 
 class DependencyGraph:
@@ -32,7 +31,7 @@ class DependencyGraph:
     def add_dependency(self, def_from: PrepDef, def_to: PrepDef):
         from_node = self.lookup(def_from)
         to_node = self.lookup(def_to)
-        from_node.add_dependency(to_node)
+        to_node.add_dependency(from_node)
 
     def add_prepdef(self, prepdef: PrepDef):
         self.lookup(prepdef)
@@ -58,4 +57,4 @@ class DependencyGraph:
                 if depend_node.indeg == 0:
                     que.append(depend_node)
 
-        return list(reversed(res))
+        return res
