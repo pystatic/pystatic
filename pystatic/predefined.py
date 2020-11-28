@@ -605,5 +605,6 @@ type_meta_temp = TypeClassTemp(
     'type', builtins_symtable,
     builtins_symtable.new_symtable('type', TableScope.CLASS), None)
 type_meta_ins = type_meta_temp.get_default_ins().value
+type_meta_type = type_meta_temp.get_default_typetype()
 builtins_symtable.add_type_def('type', type_meta_temp)
-builtins_symtable.add_entry('type', Entry(type_meta_ins))
+builtins_symtable.add_entry('type', Entry(type_meta_type))
