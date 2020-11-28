@@ -40,11 +40,11 @@ def create_cls_dependency(graph: 'DependencyGraph', cls: prep_cls):
             if inh_prepdef:
                 graph.add_dependency(curcls, inh_prepdef)
 
+        # FIXME: there should be dependency from this class to its attributes,
+        # but doing so will create dependency loop.
         for func in prepinfo.func.values():
-            graph.add_dependency(cls, func)
             create_func_dependency(graph, func)
         for local in prepinfo.local.values():
-            graph.add_dependency(cls, local)
             create_local_dependency(graph, local)
 
         for subclsdef in prepinfo.cls.values():

@@ -26,7 +26,7 @@ def test_predefined_type():
     assert byte_type is builtins_ins.getattribute('byte', None).value
     assert complex_type is builtins_ins.getattribute('complex', None).value
     assert bool_type is builtins_ins.getattribute('bool', None).value
-    assert type_meta_ins is builtins_ins.getattribute('type', None).value
+    assert type_meta_type is builtins_ins.getattribute('type', None).value
 
     assert int_temp.getattribute('__add__', None)
     assert int_temp.getattribute('__sub__', None)
