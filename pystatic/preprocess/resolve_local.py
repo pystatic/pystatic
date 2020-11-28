@@ -66,7 +66,7 @@ def resolve_local(local: 'prep_local'):
     assert isinstance(local, prep_local)
     defnode = local.defnode
     prepinfo = local.def_prepinfo
-    
+
     if (typevar := judge_typevar(prepinfo, local.defnode)):
         local.value = typevar
     elif (typealias := judge_typealias(prepinfo, local.defnode)):
