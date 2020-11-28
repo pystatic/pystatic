@@ -15,13 +15,17 @@ def resolve_import(prepinfo: 'PrepInfo', env: 'PrepEnvironment'):
             update_symtable_import_cache(symtable, entry, env.manager)
             if not entry.origin_name:
                 # import <module_name>
-                prepinfo = env.get_prepinfo(entry.symid)
-                if prepinfo:
-                    entry.value = prep_module(prepinfo)
+                module_ins = env.manager.get_module_ins(entry.symid)
+                if module_ins:
+                    module_prepinfo = env.get_prepinfo(entry.symid)
+                    if module_prepinfo:
+                        # used for eval_expr because new symbols haven't been
+                        # added to module instance yet.
+                        module_ins.set_consultant(module_prepinfo)
+                    entry.value = module_ins
                 else:
-                    module_temp = env.manager.get_module_temp(entry.symid)
-                    assert module_temp
-                    entry.value = module_temp.get_default_ins().value
+                    # TODO: error: module not found
+                    entry.value = None
 
             elif not entry.value:
                 asname = entry.asname

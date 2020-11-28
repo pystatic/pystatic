@@ -5,7 +5,7 @@ sys.path.extend(['.', '..'])
 from ..util import get_manager_path
 
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import TypeModuleTemp, TypeFuncIns, TypeVarIns
+from pystatic.predefined import TypeModuleIns, TypeModuleTemp, TypeFuncIns, TypeVarIns
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.typesys import TypeIns, TypeType
@@ -19,9 +19,9 @@ def test_import():
     manager, filepath = get_manager_path({}, symid)
     manager.preprocess()
 
-    module_temp = manager.get_module_temp(symid)
-    assert isinstance(module_temp, TypeModuleTemp)
-    assert module_temp.module_symid == symid
+    module_ins = manager.get_module_ins(symid)
+    assert isinstance(module_ins, TypeModuleIns)
+    assert module_ins.symid == symid
 
     banana = manager.get_sym_type(symid, 'banana')
     Banana = manager.get_sym_type(symid, 'Banana')
@@ -42,9 +42,9 @@ def test_star_import():
     manager, filepath = get_manager_path({}, symid)
     manager.preprocess()
 
-    module_temp = manager.get_module_temp(symid)
-    assert isinstance(module_temp, TypeModuleTemp)
-    assert module_temp.module_symid == symid
+    module_ins = manager.get_module_ins(symid)
+    assert isinstance(module_ins, TypeModuleIns)
+    assert module_ins.symid == symid
 
     a = manager.get_sym_type(symid, 'a')
     pack_type = manager.get_sym_type(symid, 'Pack')

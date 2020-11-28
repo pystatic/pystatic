@@ -1,5 +1,6 @@
 from enum import Enum, auto
-from typing import Dict, List, TYPE_CHECKING, Tuple, Type
+from pystatic.errorcode import SymbolUndefined
+from typing import Dict, List, TYPE_CHECKING, Tuple, Type, List
 from pystatic.symtable import SymTable, TableScope, Entry
 from pystatic.arg import Argument
 from pystatic.symid import SymId
@@ -260,34 +261,13 @@ class TypeFuncTemp(TypeTemp):
         return 'builtins'
 
 
-class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, symid: SymId, symtable: 'SymTable'):
-        # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(symid, symtable, symtable)
+class TypeModuleTemp(TypeTemp):
+    def __init__(self) -> None:
+        super().__init__('module')
 
     @property
-    def symid(self):
-        return self.name
-
-    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
-        return self._inner_symtable.get_type_def(name)
-
-    def getattribute(
-            self,
-            name: str,
-            bindlist: BindList,
-            context: Optional['TypeContext'] = None) -> Optional['TypeIns']:
-        return self._inner_symtable.lookup_local(name)
-
-
-class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], symtable: 'SymTable', symid: SymId):
-        super().__init__(symid, symtable)
-        self.paths = paths
-        self._cached_typetype = TypePackageType(self)
-
-    def get_default_typetype(self) -> 'TypeType':
-        return self._cached_typetype
+    def module_symid(self) -> str:
+        return 'builtins'
 
 
 class TypeListTemp(TypeClassTemp):
@@ -483,25 +463,52 @@ class TypeLiteralIns(TypeIns):
             return fmt.format(str(value))
 
 
-class TypePackageType(TypeType):
-    def __init__(self, temp: TypePackageTemp) -> None:
-        super().__init__(temp, None)
+class TypeModuleIns(TypeIns):
+    def __init__(self, symtable: 'SymTable', consultant=None) -> None:
+        super().__init__(module_temp, None)
+        self._inner_symtable = symtable
+        self.consultant = consultant
 
-    def getins(self, typetype_option: Option['TypeIns']) -> 'TypeIns':
-        assert isinstance(self.temp, TypePackageTemp)
-        return TypePackageIns(self.temp)
+    @property
+    def symid(self):
+        return self._inner_symtable.symid
+
+    def set_consultant(self, consultant):
+        assert hasattr(consultant, 'getattribute')
+        self.consultant = consultant
+
+    def clear_consultant(self):
+        self.consultant = None
+
+    def get_inner_symtable(self):
+        return self._inner_symtable
+
+    def getattribute(self, name: str,
+                     node: Optional[ast.AST]) -> Option['TypeIns']:
+        res = self._inner_symtable.legb_lookup(name)
+        if res:
+            return Option(res)
+        elif self.consultant:
+            return self.consultant.getattribute(name, node)
+        else:
+            res_option = Option(any_ins)
+            res_option.add_error(SymbolUndefined(node, name))
+            return res_option
 
 
-class TypePackageIns(TypeIns):
-    def __init__(self, pkgtemp: TypePackageTemp) -> None:
-        super().__init__(pkgtemp, None)
-        self.submodule: Dict[str, TypeIns] = {}  # submodule
+class TypePackageIns(TypeModuleIns):
+    def __init__(self,
+                 symtable: 'SymTable',
+                 paths: List[str],
+                 consultant=None) -> None:
+        super().__init__(symtable, consultant)
+        self.paths = paths
+        self.submodule = {}
 
-    def add_submodule(self, name: str, ins: TypeIns):
-        self.submodule[name] = ins
-        assert isinstance(self.temp, TypePackageTemp)
-        inner_sym = self.temp.get_inner_symtable()
-        inner_sym.add_entry(name, Entry(ins))
+    def add_submodule(self, name: str, module_ins: TypeModuleIns):
+        # FIXME: modify this
+        self.submodule[name] = module_ins
+        self._inner_symtable.add_entry(name, Entry(module_ins))
 
 
 class OverloadItem:
@@ -557,6 +564,7 @@ class TypeFuncIns(TypeIns):
 typevar_temp, typevar_type, _ = _add_spt_to_symtable(TypeVarTemp,
                                                      typing_symtable)
 func_temp = TypeFuncTemp()
+module_temp = TypeModuleTemp()
 
 _invariant_tpvar = TypeVarIns('_invariant_tpvar',
                               bound=any_ins,

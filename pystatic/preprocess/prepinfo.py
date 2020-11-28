@@ -1,10 +1,10 @@
 import ast
-from typing import (Optional, Protocol, TYPE_CHECKING, Dict, Union, List, Set)
+from typing import (Optional, TYPE_CHECKING, Dict, Union, List, Set)
 from pystatic.errorcode import *
 from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
-from pystatic.predefined import TypeModuleTemp, TypeVarIns, TypeFuncIns
+from pystatic.predefined import TypeVarIns, TypeFuncIns
 from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry, TableScope
 from pystatic.option import Option
 from pystatic.message import MessageBox
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pystatic.target import BlockTarget
 
 AssignNode = Union[ast.Assign, ast.AnnAssign]
-PrepDef = Union['prep_cls', 'prep_func', 'prep_local', 'prep_module']
+PrepDef = Union['prep_cls', 'prep_func', 'prep_local']
 
 
 class PrepInfo:
@@ -316,14 +316,17 @@ class PrepEnvironment:
             if res:
                 return res
 
-        module_temp = self.manager.get_module_temp(module_symid)
-        if not module_temp:
+        module_ins = self.manager.get_module_ins(module_symid)
+        if not module_ins:
             return None
         else:
-            return module_temp.get_inner_symtable().legb_lookup(name)
+            return module_ins._inner_symtable.legb_lookup(name)
     
     def clear(self):
         self.symid_prepinfo = {}
+        for blk_target in self.target_prepinfo.keys():
+            if isinstance(blk_target, Target):
+                blk_target.module_ins.clear_consultant()
         self.target_prepinfo = {}
 
 
@@ -396,7 +399,7 @@ class prep_impt:
         self.asname = asname
         self.defnode = defnode
         self.def_prepinfo = def_prepinfo
-        self.value: Union[PrepInfoItem, TypeIns, None] = None
+        self.value: Union[PrepDef, TypeIns, None] = None
 
     def is_import_module(self):
         """Import the whole module?"""
@@ -410,13 +413,3 @@ class prep_impt:
         else:
             return self.value.getins()
 
-
-class prep_module:
-    def __init__(self, prepinfo: 'PrepInfo') -> None:
-        self.prepinfo = prepinfo
-
-
-def clear_prep_info(prep_info: 'PrepInfo'):
-    for clsdef in prep_info.cls.values():
-        clear_prep_info(clsdef.prepinfo)
-    del prep_info

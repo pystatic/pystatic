@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class InferVisitor(BaseVisitor):
-    def __init__(self, node: ast.AST, module: TypeModuleTemp, mbox: MessageBox,
+    def __init__(self, node: ast.AST, module: TypeModuleIns, mbox: MessageBox,
                  symid: SymId, config: Config, manager: 'Manager'):
         self.root = node
         self.mbox = mbox
@@ -194,7 +194,8 @@ class InferVisitor(BaseVisitor):
 
                 self.infer_return_value_of_func(node.returns)
 
-    def preprocess_in_func(self, node: ast.FunctionDef, func_type: TypeFuncIns):
+    def preprocess_in_func(self, node: ast.FunctionDef,
+                           func_type: TypeFuncIns):
         new_table = func_type.get_inner_symtable()
         func_target = FunctionTarget(self.symid, new_table, node, self.mbox)
         self.manager.preprocess_block(func_target)
@@ -234,14 +235,15 @@ class InferVisitor(BaseVisitor):
         self.check_ret_type(ret_annotation, node, ret_type)
         self.recorder.add_ret(ret_type)
 
-    def check_ret_type(self, annotation: TypeIns, ret_node: ast.Return, ret_type: TypeIns):
+    def check_ret_type(self, annotation: TypeIns, ret_node: ast.Return,
+                       ret_type: TypeIns):
         if not self.type_consistent(annotation, ret_type):
             if is_none(ret_type):
-                self.err_maker.add_err(
-                    ReturnValueExpected(ret_node))
+                self.err_maker.add_err(ReturnValueExpected(ret_node))
             else:
                 self.err_maker.add_err(
-                    IncompatibleReturnType(ret_node.value, annotation, ret_type))
+                    IncompatibleReturnType(ret_node.value, annotation,
+                                           ret_type))
 
     def accept_condition_stmt_list(self, stmt_list: List[ast.stmt], stmt_type):
         for stmt in stmt_list:
@@ -309,7 +311,8 @@ class InferStarter:
         for target in self.q_infer:
             symid = target.symid
             logger.info(f'Type infer in module \'{symid}\'')
-            infer_visitor = InferVisitor(target.ast, target.module_temp,
+            assert isinstance(target, Target)
+            infer_visitor = InferVisitor(target.ast, target.module_ins,
                                          target.mbox, symid, self.config,
                                          self.manager)
             infer_visitor.infer()

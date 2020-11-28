@@ -63,7 +63,7 @@ class ImportCache:
 
         self._cache: Dict[SymId, Dict[SymId, 'TypeIns']] = {}
 
-    def get_moduleins(self, abssymid: 'SymId') -> Optional['TypeIns']:
+    def get_module_ins(self, abssymid: 'SymId') -> Optional['TypeIns']:
         from pystatic.predefined import TypePackageIns, TypeModuleTemp
 
         symidlist = symid2list(abssymid)
@@ -103,7 +103,7 @@ class ImportCache:
             return None
         else:
             return module_map.get(origin_name)
-    
+
     def clear(self):
         self.import_map = {}
         self.import_nodes = []
@@ -186,11 +186,11 @@ class SymTable:
         res = self.local.get(name)
         if search_star_import and not res:
             searched = set(self.glob_symid)
-            for module in self.star_import:
-                if module not in searched:
-                    searched.add(module)
-                    module_temp = self.manager.get_module_temp(module)
-                    res = module_temp._inner_symtable.lookup_local(name, False)
+            for module_symid in self.star_import:
+                if module_symid not in searched:
+                    searched.add(module_symid)
+                    module_ins = self.manager.get_module_ins(module_symid)
+                    res = module_ins._inner_symtable.lookup_local(name, False)
                     if res:
                         return res
             return None
