@@ -169,7 +169,8 @@ class TypeTypeAnnTemp(TypeTemp):
 
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
         if not bindlist or len(bindlist) != 1:
-            raise NotImplementedError()  # TODO: warning here
+            # FIXME: add error here
+            return Option(any_ins)
 
         if not isinstance(bindlist[0], TypeIns):
             raise NotImplementedError()

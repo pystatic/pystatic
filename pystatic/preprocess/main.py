@@ -1,7 +1,7 @@
 import ast
 from collections import deque
 from pystatic.preprocess.resolve_cls import resolve_cls_placeholder
-from pystatic.preprocess.resolve_spt import resolve_spt
+from pystatic.preprocess.resolve_spt import resolve_typevar
 from typing import TYPE_CHECKING, List, Deque
 from pystatic.target import BlockTarget, FunctionTarget, MethodTarget, Stage, Target
 from pystatic.preprocess.definition import (get_definition,
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 
-def dump_to_symtable(prepinfo: 'PrepInfo', env: 'PrepEnvironment'):
+def dump_to_symtable(prepinfo: 'PrepInfo'):
     queue: Deque[PrepInfo] = deque()
     queue.append(prepinfo)
 
@@ -54,21 +54,21 @@ class Preprocessor:
             ]
             assert len(prepinfo_list) == len(to_check)
 
-            # get type imported from other module.
             for prepinfo in prepinfo_list:
                 resolve_import(prepinfo, self.env)
 
             resolve_order = toposort_prepdef(prepinfo_list)
-            resolve(resolve_order)
-
             for prepdef in resolve_order:
-                if isinstance(prepdef, prep_cls):
-                    resolve_cls_placeholder(prepdef, prepdef.def_prepinfo.mbox)
+                resolve(prepdef, shallow=True)
+
+            for prepinfo in prepinfo_list:
+                resolve_typevar(prepinfo)
+            for prepdef in resolve_order:
+                resolve(prepdef, shallow=False)
 
             for prepinfo in prepinfo_list:
                 resolve_cls_method(prepinfo, self.env, prepinfo.mbox)
-                resolve_spt(prepinfo, self.env)
-                dump_to_symtable(prepinfo, self.env)
+                dump_to_symtable(prepinfo)
 
             for target in to_check:
                 if isinstance(target, Target) and manager.is_on_check(

@@ -1,14 +1,14 @@
 import ast
-from collections import deque
-from typing import Deque, Callable
+from typing import Callable
 from pystatic.arg import Argument
 from pystatic.typesys import TypeIns
 from pystatic.predefined import TypeFuncIns, TypeVarTemp
 from pystatic.message import MessageBox
 from pystatic.exprparse import eval_expr
-from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,
-                                          eval_argument_type, eval_return_type)
+from pystatic.preprocess.def_expr import (eval_func_type, eval_argument_type, eval_return_type)
+from pystatic.preprocess.resolve_spt import resolve_typealias
 from pystatic.preprocess.util import omit_inst_typetype
+from pystatic.preprocess.resolve_util import eval_preptype
 from pystatic.preprocess.prepinfo import *
 
 
@@ -60,21 +60,46 @@ def judge_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeAlia
                     raise NotImplementedError()
     return None
 
-
-def resolve_local(local: 'prep_local'):
-    """Resolve local symbols' TypeIns"""
+def resolve_local(local: 'prep_local', shallow: bool):
+    """Resolve local symbols' TypeIns
+    
+    :param shallow: if set True, local's current stage must be LOCAL_NORMAL. 
+    This function will judge the type of the local symbol(typevar or typealias)
+    and won't visit node inside subscript node.
+    """
     assert isinstance(local, prep_local)
-    defnode = local.defnode
     prepinfo = local.def_prepinfo
 
-    if (typevar := judge_typevar(prepinfo, local.defnode)):
-        local.value = typevar
-    elif (typealias := judge_typealias(prepinfo, local.defnode)):
-        local.value = typealias
-    else:
-        tpins_option = eval_typedef_expr(defnode, local.def_prepinfo, False)
-        local.value = tpins_option.value
+    if shallow:
+        assert local.stage == LOCAL_NORMAL
+        if (typevar := judge_typevar(prepinfo, local.defnode)):
+            local.value = typevar
+            local.type = LOCAL_TYPEVAR
+            return
+        elif (typealias := judge_typealias(prepinfo, local.defnode)):
+            local.value = typealias
+            local.type = LOCAL_TYPEALIAS
+            return
 
+    assert not local.type == LOCAL_TYPEVAR
+    if local.type == LOCAL_TYPEALIAS:
+        resolve_typealias(local)
+        return
+
+    typenode = local.typenode
+    if not typenode:
+        local.stage = PREP_COMPLETE
+        return
+
+    eval_res = eval_preptype(typenode, local.def_prepinfo, False, shallow)
+    if isinstance(eval_res.typeins, TypeType):
+        local.value = eval_res.typeins.get_default_ins()
+    else:
+        local.value = eval_res.typeins
+    if shallow and eval_res.generic:
+        local.stage = PREP_NULL
+    else:
+        local.stage = PREP_COMPLETE
 
 def resolve_func(func: 'prep_func'):
     """Resolve local function's TypeIns"""

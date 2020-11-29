@@ -6,16 +6,11 @@ from pystatic.typesys import TypeIns, TypeType
 from pystatic.visitor import NoGenVisitor
 from pystatic.evalutil import ApplyArgs
 from pystatic.predefined import TypeVarIns, typevar_type, typevar_temp
-from pystatic.preprocess.prepinfo import PrepEnvironment, PrepInfo
+from pystatic.preprocess.prepinfo import *
 
 
-def resolve_typevar(prepinfo: 'PrepInfo', env: PrepEnvironment):
-    pass
-
-
-def resolve_spt(prepinfo: 'PrepInfo', env: PrepEnvironment):
+def resolve_typevar(prepinfo: 'PrepInfo'):
     assert prepinfo
-
     queue: Deque['PrepInfo'] = deque()
     queue.append(prepinfo)
     while len(queue) > 0:
@@ -28,26 +23,26 @@ def resolve_spt(prepinfo: 'PrepInfo', env: PrepEnvironment):
             assert assign_node, "TypeVar definition shouldn't be empty"
             assert isinstance(typevar, TypeVarIns)
             fill_typevar(assign_node, typevar, cur_prepinfo)
+            typevar_def.stage = PREP_COMPLETE
 
-        for typealias_name in cur_prepinfo.type_alias:
-            typealias_def = cur_prepinfo.local[typealias_name]
-            typealias = typealias_def.value
-            assign_node = typealias_def.defnode.value
-            # expression in the right assignment mustn't a string literal
-            assert assign_node, "TypeAlias definition shouldn't be empty"
-            assert not isinstance(assign_node, ast.Constant)
-            # TODO: add warning
-            typetype = eval_expr(assign_node, cur_prepinfo,
-                                 annotation=True).value
-            assert isinstance(typetype, TypeType)
-            typealias.bindlist = typetype.bindlist
 
-        for clsdef in cur_prepinfo.cls.values():
-            queue.append(clsdef.prepinfo)
+def resolve_typealias(typealias_def: 'prep_local'):
+    assert typealias_def.type == LOCAL_TYPEALIAS
+    typealias = typealias_def.value
+    assign_node = typealias_def.defnode.value
+    # expression in the right assignment mustn't a string literal
+    assert assign_node, "TypeAlias definition shouldn't be empty"
+    assert not isinstance(assign_node, ast.Constant)
+    # TODO: add warning
+    typetype = eval_expr(assign_node,
+                         typealias_def.def_prepinfo,
+                         annotation=True).value
+    assert isinstance(typetype, TypeType)
+    typealias.bindlist = typetype.bindlist
 
 
 def fill_typevar(node: ast.AST, typevar: 'TypeVarIns', prepinfo: 'PrepInfo'):
-    TypeVarFiller(typevar, prepinfo).accept(node)
+    return TypeVarFiller(typevar, prepinfo).accept(node)
 
 
 def copy_typevar(src: 'TypeVarIns', dst: 'TypeVarIns'):

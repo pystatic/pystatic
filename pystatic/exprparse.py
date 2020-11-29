@@ -34,14 +34,21 @@ def eval_expr(node: Optional[ast.AST],
 
 class ExprParser(NoGenVisitor):
     def __init__(self, consultant: SupportGetAttribute, explicit: bool,
-                 annotation: bool) -> None:
+                 annotation: bool):
         self.consultant = consultant
         self.explicit = explicit
         self.annotation = annotation
         self.errors = []
+        self.in_subs = False
+        self.container = None
 
-        self.in_subs = False  # under a subscription node?
-        self.container = []
+    def accept(self, node) -> Option[TypeIns]:
+        self.errors = []
+        tpins = self.visit(node)
+        assert isinstance(tpins, TypeIns)
+        res_option = Option(tpins)
+        res_option.add_error_list(self.errors)
+        return res_option
 
     @contextlib.contextmanager
     def register_container(self, container: list):
@@ -100,14 +107,6 @@ class ExprParser(NoGenVisitor):
             assert kwargnode.arg, "**kwargs is not supported now"
             applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
         return applyargs
-
-    def accept(self, node: ast.AST) -> Option[TypeIns]:
-        self.errors = []
-        tpins = self.visit(node)
-        assert isinstance(tpins, TypeIns)
-        res_option = Option(tpins)
-        res_option.add_error_list(self.errors)
-        return res_option
 
     def visit_Name(self, node: ast.Name) -> TypeIns:
         name_option = self.consultant.getattribute(node.id, node)

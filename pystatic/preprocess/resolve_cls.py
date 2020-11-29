@@ -1,24 +1,38 @@
 import ast
 import contextlib
 from collections import deque
-from typing import Deque, List, TYPE_CHECKING
+from typing import Deque, List
 from pystatic.target import MethodTarget
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.predefined import TypeGenericTemp, TypeVarIns, TypeFuncIns
-from pystatic.exprparse import eval_expr
 from pystatic.visitor import BaseVisitor
 from pystatic.message import MessageBox
 from pystatic.symtable import TableScope
 from pystatic.arg import Argument
-from pystatic.preprocess.util import add_baseclass
-from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type,
-                                          eval_typedef_expr)
+from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type)
 from pystatic.preprocess.resolve_local import resolve_func_template
+from pystatic.preprocess.resolve_util import eval_preptype
 from pystatic.preprocess.prepinfo import *
 
 
-def resolve_cls(cls: 'prep_cls'):
-    resolve_cls_inheritence(cls)
+def resolve_cls(clsdef: 'prep_cls', shallow: bool):
+    # resolve super classes
+    clstemp = clsdef.clstemp
+    clstemp.baseclass = []
+    is_generic = True
+    for base_node in clsdef.defnode.bases:
+        base_res = eval_preptype(base_node, clsdef.prepinfo, False, shallow)
+        res_type = base_res.typeins
+        assert isinstance(res_type, TypeType)
+        if res_type:
+            clstemp.baseclass.append(res_type.get_default_ins())
+        is_generic = is_generic or base_res.generic
+
+    if not shallow:
+        resolve_cls_placeholder(clsdef, clsdef.def_prepinfo.mbox)
+
+    if not shallow or not is_generic:
+        clsdef.stage = PREP_COMPLETE
 
 
 def resolve_cls_placeholder(clsdef: 'prep_cls', mbox: 'MessageBox'):
@@ -29,17 +43,6 @@ def resolve_cls_placeholder(clsdef: 'prep_cls', mbox: 'MessageBox'):
         visitor.accept(base_node)
 
     clstemp.placeholders = visitor.get_typevar_list()
-
-
-def resolve_cls_inheritence(clsdef: 'prep_cls'):
-    """Resolve baseclasses of a class"""
-    clstemp = clsdef.clstemp
-    for base_node in clsdef.defnode.bases:
-        base_option = eval_typedef_expr(base_node, clsdef.def_prepinfo, False)
-        res_type = base_option.value
-        assert isinstance(res_type, TypeType)
-        if res_type:
-            add_baseclass(clstemp, res_type.get_default_ins())
 
 
 class _TypeVarVisitor(BaseVisitor):
@@ -55,6 +58,9 @@ class _TypeVarVisitor(BaseVisitor):
         self.in_gen = False
 
         self.met_gen = False
+
+    def accept(self, node):
+        return self.visit(node)
 
     @contextlib.contextmanager
     def enter_generic(self):

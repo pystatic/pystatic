@@ -70,6 +70,9 @@ class TypeDefVisitor(BaseVisitor):
         for stmt in node.body:
             self.visit(stmt)
 
+    def accept(self, node: ast.AST):
+        self.visit(node)
+
     @contextmanager
     def enter_class(self, new_prepinfo: 'PrepInfo'):
         old_prepinfo = self.prepinfo

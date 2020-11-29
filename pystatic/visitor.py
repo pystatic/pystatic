@@ -44,7 +44,7 @@ class BaseVisitor(object):
                 rt = self.visit(value, *args, **kwargs)
         return rt
 
-    def accept(self, node):
+    def accept(self, node, *args, **kwargs):
         return self.visit(node)
 
 
