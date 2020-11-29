@@ -1,15 +1,15 @@
 from typing import List, Union
-# from typing import Tuple,Dict,Literal,List,Set
-# # b:Dict[int,str] = {1:12}
+from typing import Tuple,Dict,Literal,List,Set
+# b:Dict[int,str] = {1:12}
 
-# # c:Tuple[int,int,str]=(12,23,'a')
-# # d:Tuple[int,int,str]=(12,23,1)
+# c:Tuple[int,int,str]=(12,23,'a')
+# d:Tuple[int,int,str]=(12,23,1)
 
-# # a = 1
-# # b:Literal[1] =a 
-# # test1:Literal['test']=1
-# # f = 'test'
-# # test1:Literal['test']=f
+a = 1
+b:Literal[1] =a 
+# test1:Literal['test']=1
+# f = 'test'
+# test1:Literal['test']=f
 
 # w:List[int]=[1,2,'a',1]
 # s:Set[int]={1,3,'a',1}
@@ -34,12 +34,3 @@ from typing import List, Union
 # t: int = D()
 
 # t: int = float(1)
-
-# # (3) there is a correct test, but the error is shown below. 
-# class H:
-#     pass
-
-# class M(H):
-#     pass
-
-# h: List[H] = [M(), M()]

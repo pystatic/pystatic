@@ -4,7 +4,6 @@ from pystatic.predefined import TypeLiteralIns
 from typing import Callable, Tuple, Optional, Type, TypeVar, Union
 from pystatic.typesys import TypeIns, TypeTemp, TypeClassTemp, TypeType
 from pystatic.predefined import TypeOptionalTemp, TypeTupleTemp, TypeCallableTemp
-from pystatic.TypeCompatible.type2TypeTemp import Literal2Type
 
 
 class compatibleState(enum.IntEnum):
@@ -20,7 +19,6 @@ class TypeCompatible:
         self.specialTypestr = [
             'Callable', 'Literal', 'Any', 'None', 'Union', 'Optional'
         ]
-        self.literal2Type = Literal2Type()
 
     def TypeCompatible(self, a: TypeIns, b: TypeIns) -> bool:
         # print(a,b,a.temp.name,b.temp.name)
@@ -100,7 +98,7 @@ class TypeCompatible:
         # print(tempb.name)
         if tempb.name == 'Literal':
             # print("IN BaseTypeCom1")
-            b = self.literal2Type.Literal2SpecTypeIns(b)
+            b = b.get_value_type()
             tempb = b.temp
 
         if tempa.name in self.baseTypestr and tempb.name in self.baseTypestr:
@@ -167,7 +165,7 @@ class TypeCompatible:
                 return False  # None与其它类型的比较都返回False
 
         if tempb.name == 'Literal' and tempa.name != 'Literal':  # Literal只能存放None 和简单类型
-            b = self.literal2Type.Literal2SpecTypeIns(b)
+            b = b.get_value_type()
             # print('Here')
             # print(b)
 
@@ -284,12 +282,8 @@ class TypeCompatible:
 
     def ListCom(self, a: TypeIns, b: TypeIns) -> bool:
         a = a.bindlist[0]
-        tempb = self.literal2Type.Literal2SpecTypeTemp(b.bindlist[0])
-
-        if a.temp.name == tempb.name:
-            return True
-        else:
-            return False
+        b = b.bindlist[0]
+        return self.TypeCompatible(a, b)
 
     def Literal_com(self, a: TypeLiteralIns, b: TypeLiteralIns) -> bool:
         # print(a,b,a.temp.name,b.temp.name)
