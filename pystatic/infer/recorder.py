@@ -1,13 +1,21 @@
 import ast
+from collections import namedtuple
 from typing import List, Dict, Set, Union
 from pystatic.errorcode import SymbolUndefined, ErrorCode
 from pystatic.typesys import TypeIns, TypeType, any_type
-from pystatic.predefined import TypeFuncIns, TypeModuleIns
+from pystatic.predefined import (TypeFuncIns, TypeModuleIns, TypeUnionTemp,
+                                 TypeLiteralIns, builtins_symtable)
 from pystatic.option import Option
 from pystatic.symtable import SymTable
 from pystatic.TypeCompatible.simpleType import type_consistent
 
 ScopeType = Union[TypeType, TypeFuncIns, TypeModuleIns]
+
+
+class StoredType:
+    def __init__(self, pre_type: TypeIns, is_permanent: bool):
+        self.pre_type = pre_type
+        self.is_permanent = is_permanent
 
 
 class Scope:
@@ -116,11 +124,37 @@ class SymbolRecorder:
             option.add_error(SymbolUndefined(node, name))
             return option
 
-    def clean_dirty(self, dirty_map: Dict[str, TypeIns]):
-        for name, pre_type in dirty_map.items():
-            cur_type = self.get_run_time_type(name)
-            if type_consistent(pre_type, cur_type):
-                self.record_type(name, pre_type)
+    def recover_type(self, dirty_map: Dict[str, StoredType]):
+        for name, stored_type in dirty_map.items():
+            if not stored_type.is_permanent:
+                self.record_type(name, stored_type.pre_type)
             else:
-                comment = self.get_comment_type(name)
-                self.record_type(name, comment)
+                pre_type = stored_type.pre_type
+                cur_type = self.get_run_time_type(name)
+                if type_consistent(pre_type, cur_type):
+                    self.record_type(name, cur_type)
+                else:
+                    union_type = make_union_type([pre_type, cur_type])
+                    self.record_type(name, union_type)
+
+
+def literal_to_normal_type(literal_ins: TypeLiteralIns):
+    val = literal_ins.value
+    name = type(val).__name__
+    builtin_type = builtins_symtable.legb_lookup(name)
+    assert builtin_type
+    return builtin_type.call(None).value
+
+
+def make_union_type(type_list) -> TypeIns:
+    bindlist: List[TypeIns] = []
+    for tp in type_list:
+        if tp.temp.name == 'Union':
+            bindlist.extend(tp.bindlist)
+        elif isinstance(tp, TypeLiteralIns):
+            bindlist.append(literal_to_normal_type(tp))
+        else:
+            bindlist.append(tp)
+    bindlist = list(set(bindlist))
+    tmp = TypeUnionTemp()
+    return TypeIns(tmp, bindlist)

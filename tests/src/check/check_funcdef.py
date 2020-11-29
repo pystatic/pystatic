@@ -10,8 +10,8 @@ def f3() -> int:# E Return value expected
     a: int = 1
 
 
-# def f4() -> None:
-#     return
+def f4() -> None:
+    return
 
 
 def f5() -> None:
