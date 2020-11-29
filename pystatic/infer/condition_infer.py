@@ -153,9 +153,6 @@ class ConditionInfer(BaseVisitor):
             name = test.func.id
             args = test.args
             if name == "isinstance":
-                # option = eval_expr(test, self.recorder)
-                # if self.err_maker.exsit_error(option):
-                #     self.err_maker.dump_option(option)
                 first_type = self.err_maker.dump_option(
                     eval_expr(args[0], self.recorder))
                 second_type = self.err_maker.dump_option(

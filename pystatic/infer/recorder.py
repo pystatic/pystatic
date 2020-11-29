@@ -1,15 +1,17 @@
 import ast
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Union
 from pystatic.errorcode import SymbolUndefined, ErrorCode
 from pystatic.typesys import TypeIns, TypeType, any_type
-from pystatic.predefined import TypeFuncIns
+from pystatic.predefined import TypeFuncIns, TypeModuleIns
 from pystatic.option import Option
 from pystatic.symtable import SymTable
 from pystatic.TypeCompatible.simpleType import type_consistent
 
+ScopeType = Union[TypeType, TypeFuncIns, TypeModuleIns]
+
 
 class Scope:
-    def __init__(self, tp: TypeIns):
+    def __init__(self, tp: ScopeType):
         self.type_map: Dict[str, TypeIns] = {}
         self.tp = tp
 
@@ -27,17 +29,18 @@ class FuncScope(Scope):
 
 
 class ClassScope(Scope):
-    def __init__(self, tp: TypeIns):
+    def __init__(self, tp: TypeType):
         super().__init__(tp)
 
 
 class ModuleScope(Scope):
-    def __init__(self, tp: TypeIns):
+    def __init__(self, tp: TypeModuleIns):
         super().__init__(tp)
 
 
 class SymbolRecorder:
     """record the appeared symbol"""
+
     def __init__(self, module):
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))
@@ -49,7 +52,7 @@ class SymbolRecorder:
     def is_defined(self, name: str):
         return name in self.cur_scope.type_map
 
-    def enter_scope(self, tp: TypeIns):
+    def enter_scope(self, tp: ScopeType):
         self.stack.append(Scope(tp))
 
     def leave_scope(self):
@@ -62,7 +65,7 @@ class SymbolRecorder:
     def leave_func(self):
         self.leave_scope()
 
-    def enter_cls(self, tp: TypeIns):
+    def enter_cls(self, tp: TypeType):
         self.stack.append(ClassScope(tp))
 
     def leave_cls(self):
@@ -96,26 +99,15 @@ class SymbolRecorder:
             return tp
         assert False, f"undefined {name}"
 
-    def get_run_time_type(self, name):
+    def get_run_time_type(self, name: str):
         tp = self.cur_scope.type_map.get(name)
         if tp:
             return tp
-        for scope in self.stack[::-1][1:]:
-            tp = scope.type_map.get(name)
-            if tp:
-                return tp
-            else:
-                if isinstance(scope, (FuncScope, ModuleScope)):
-                    table: SymTable = scope.tp.get_inner_symtable()
-                    tp = table.lookup_local(name)
-                if tp:
-                    return tp
-        if len(self.stack) != 1:
-            table = self.stack[-1].tp.get_inner_symtable()
-            return table.legb_lookup(name)
-        return None
+        table = self.stack[-1].tp.get_inner_symtable()
+        tp = table.egb_lookup(name)
+        return tp
 
-    def getattribute(self, name, node: ast.AST) -> Option:
+    def getattribute(self, name: str, node: ast.AST) -> Option:
         tp = self.get_run_time_type(name)
         if tp:
             return Option(tp)
