@@ -406,6 +406,21 @@ class TypeLiteralTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
+    def getitem_typetype(self, bindlist: Optional[BindList],
+                         itemarg: Optional[GetItemArg]) -> Option['TypeType']:
+        if not itemarg:
+            # TODO warning here
+            return Option(any_ins)
+
+        constant = itemarg.ins
+        if isinstance(constant, (bool, bytes, str, int, float, complex)):
+            return Option(TypeLiteralIns(constant))
+        elif isinstance(constant, TypeLiteralIns):
+            return Option(constant)
+        else:
+            # TODO: warning here
+            return Option(any_ins)
+
     def arity(self) -> int:
         return 1
 

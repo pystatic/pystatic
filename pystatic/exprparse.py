@@ -34,7 +34,10 @@ def eval_expr(node: Optional[ast.AST],
 
 class ExprParser(NoGenVisitor):
     def __init__(self, consultant: SupportGetAttribute, explicit: bool,
-                 annotation: bool):
+                 annotation: bool) -> None:
+        """
+        :param annotation: whether regard str as type annotation
+        """
         self.consultant = consultant
         self.explicit = explicit
         self.annotation = annotation
@@ -199,13 +202,18 @@ class ExprParser(NoGenVisitor):
             left_ins = self.visit(node.value)
             assert isinstance(left_ins, TypeIns)
 
+        old_annotation = self.annotation
+        if left_ins.temp == literal_temp:
+            self.annotation = False
+
         container = []
         with self.register_container(container):
             items = self.visit(node.slice)
             assert isinstance(items, (list, tuple, TypeIns))
-
         assert len(container) == 1
         res_option = left_ins.getitem(container[0])
+
+        self.annotation = old_annotation
 
         self.add_to_container(res_option.value, node)
         return res_option.value
