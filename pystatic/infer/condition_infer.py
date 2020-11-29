@@ -182,7 +182,10 @@ class ConditionInfer(BaseVisitor):
                 self.temp_type[name] = StoredType(pre_type, False)
                 self.recorder.record_type(name, second_type)
                 self.isinstance_cond = True
-            return Reach.ALWAYS_TRUE
+            if first_type.temp.name == 'Union':
+                return Reach.UNKNOWN
+            else:
+                return Reach.ALWAYS_TRUE
         else:
             return Reach.ALWAYS_FALSE
 

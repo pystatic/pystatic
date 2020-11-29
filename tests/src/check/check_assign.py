@@ -20,10 +20,10 @@ b = A()  # E Incompatible type in assignment(expression has type 'A', variable h
 c: A = A  # E Incompatible type in assignment(expression has type 'Type[A]', variable has type 'A')
 c = A()
 
-t1 = "s"
-if A:
-    t1 = A()
-t2: int = t1  # ok
+# t1 = "s"
+# if A:
+#     t1 = A()
+# t2: int = t1
 
 t3: int = "s"  # E Incompatible type in assignment(expression has type 'Literal['s']', variable has type 'int')
 t4: int = t3  # ok
