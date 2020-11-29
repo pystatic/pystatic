@@ -1,16 +1,11 @@
 import sys
-import os
-import ast
 
 sys.path.extend(['.', '..'])
 
 from ..util import get_manager_path
 
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import TypeModuleTemp, TypeFuncIns, TypeVarIns
-from pystatic.config import Config
-from pystatic.manager import Manager
-from pystatic.exprparse import eval_expr
+from pystatic.predefined import TypeModuleIns, TypeModuleTemp, TypeFuncIns
 
 
 def test_synthesis_1():
@@ -18,9 +13,9 @@ def test_synthesis_1():
     manager, filepath = get_manager_path({}, symid)
     manager.preprocess()
 
-    module_temp = manager.get_module_temp(symid)
-    assert isinstance(module_temp, TypeModuleTemp)
-    assert module_temp.module_symid == symid
+    module_ins = manager.get_module_ins(symid)
+    assert isinstance(module_ins, TypeModuleIns)
+    assert module_ins.symid == symid
 
     int_typetype = manager.get_sym_type('builtins', 'int')
     assert int_typetype

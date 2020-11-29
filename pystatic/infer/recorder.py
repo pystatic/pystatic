@@ -85,13 +85,12 @@ class SymbolRecorder:
         cur_scope.ret_type = set()
         return ret
 
-    def set_type(self, name: str, tp: TypeIns):
+    def record_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)
 
     def get_comment_type(self, name) -> TypeIns:
         scope = self.cur_scope
         table: SymTable = scope.tp.get_inner_symtable()
-        # print([e for e in table.local])
         tp = table.legb_lookup(name)
         if tp:
             return tp
@@ -129,8 +128,7 @@ class SymbolRecorder:
         for name, pre_type in dirty_map.items():
             cur_type = self.get_run_time_type(name)
             if type_consistent(pre_type, cur_type):
-                self.set_type(name, pre_type)
+                self.record_type(name, pre_type)
             else:
                 comment = self.get_comment_type(name)
-                print("comment", comment)
-                self.set_type(name, comment)
+                self.record_type(name, comment)

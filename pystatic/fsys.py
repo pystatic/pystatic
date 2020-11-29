@@ -4,7 +4,7 @@ from typing import List, Dict, Optional, TYPE_CHECKING
 from pystatic.symid import symid2list, absolute_symidlist, list2symid
 
 if TYPE_CHECKING:
-    from pystatic.predefined import TypeModuleTemp
+    from pystatic.predefined import TypeModuleIns
     from pystatic.config import PY_VERSION, Config
     from pystatic.symid import SymId
 
@@ -102,7 +102,7 @@ class Filesys:
 
     def relative_find_module(
             self, symid: str,
-            module: 'TypeModuleTemp') -> Optional[ModuleFindRes]:
+            module: 'TypeModuleIns') -> Optional[ModuleFindRes]:
         abs_symid = symidlist_from_impitem(symid, module)
         return self.find_module(list2symid(abs_symid))
 
@@ -123,9 +123,16 @@ def _walk_single(subsymid: str, paths: List[str]) -> Optional[ModuleFindRes]:
 
         if os.path.isdir(sub_target):
             init_file = os.path.join(sub_target, '__init__.py')
+            init_pyi_file = os.path.join(sub_target, '__init__.pyi')
             if os.path.isfile(init_file):
+                # FIXME: should we take .py file over .pyi file?
                 target = sub_target
                 target_file = init_file
+                break
+            elif os.path.isfile(init_pyi_file):
+                target = sub_target
+                target_file = init_pyi_file
+                break
             else:
                 ns_paths.append(sub_target)
     if target:
@@ -165,12 +172,12 @@ def _resolve_typeshed(typeshed: str, pyv: PY_VERSION) -> List[str]:
     return stdlib_res + third_party_res
 
 
-def symid_from_impitem(symid: str, curmodule: 'TypeModuleTemp') -> str:
+def symid_from_impitem(symid: str, curmodule: 'TypeModuleIns') -> str:
     return list2symid(symidlist_from_impitem(symid, curmodule))
 
 
 def symidlist_from_impitem(symid: str,
-                           curmodule: 'TypeModuleTemp') -> List[str]:
+                           curmodule: 'TypeModuleIns') -> List[str]:
     package = symid2list(
         curmodule.symid)[:-1]  # the package that cur_module in
     return absolute_symidlist(list2symid(package), symid)

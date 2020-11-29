@@ -5,8 +5,9 @@ def f1():
 def f2() -> int:
     return "s"
 
+
 def f3() -> int:
-    a = 3
+    a: int = "sdfdsf"
 
 
 def f4() -> None:
@@ -15,4 +16,3 @@ def f4() -> None:
 
 def f5() -> None:
     a = 1
-

@@ -1,5 +1,6 @@
 from enum import Enum, auto
-from typing import Dict, List, TYPE_CHECKING, Tuple, Type
+from pystatic.errorcode import SymbolUndefined
+from typing import Dict, List, TYPE_CHECKING, Tuple, Type, List
 from pystatic.symtable import SymTable, TableScope, Entry
 from pystatic.arg import Argument
 from pystatic.symid import SymId
@@ -18,11 +19,12 @@ class TpVarKind(Enum):
 TypeContext = Dict['TypeVarIns', 'TypeIns']
 TypeVarList = List['TypeVarIns']
 
-builtin_symtable = SymTable('builtins', None, None, None, TableScope.GLOB)
-builtin_symtable.glob = builtin_symtable
-builtin_symtable.builtins = builtin_symtable
+builtins_symtable = SymTable('builtins', None, None, None, None,
+                             TableScope.GLOB)
+builtins_symtable.glob = builtins_symtable
+builtins_symtable.builtins = builtins_symtable
 
-typing_symtable = SymTable('typing', None, None, builtin_symtable,
+typing_symtable = SymTable('typing', None, None, builtins_symtable, None,
                            TableScope.GLOB)
 typing_symtable.glob = typing_symtable
 
@@ -30,24 +32,9 @@ typing_symtable.add_type_def('Any', any_temp)
 typing_symtable.add_entry('Any', Entry(any_type))
 
 
-def get_builtin_symtable() -> SymTable:
-    return builtin_symtable
-
-
-def get_typing_symtable() -> SymTable:
-    return typing_symtable
-
-
-def get_init_module_symtable(symid: SymId) -> SymTable:
-    new_symtable = SymTable(symid, None, None, builtin_symtable,
-                            TableScope.GLOB)
-    new_symtable.glob = new_symtable
-    return new_symtable
-
-
 def _add_cls_to_symtable(name: str, def_sym: 'SymTable'):
     symtable = def_sym.new_symtable(name, TableScope.CLASS)
-    clstemp = TypeClassTemp(name, builtin_symtable, symtable)
+    clstemp = TypeClassTemp(name, builtins_symtable, symtable)
     clstype = clstemp.get_default_typetype()
     clsins = clstemp.get_default_ins().value
 
@@ -67,14 +54,16 @@ def _add_spt_to_symtable(spt_temp_cls: Type[TypeTemp], def_sym: 'SymTable',
     return spt_temp, spt_type, spt_temp.get_default_ins().value
 
 
-int_temp, int_type, int_ins = _add_cls_to_symtable('int', builtin_symtable)
+int_temp, int_type, int_ins = _add_cls_to_symtable('int', builtins_symtable)
 float_temp, float_type, float_ins = _add_cls_to_symtable(
-    'float', builtin_symtable)
-str_temp, str_type, str_ins = _add_cls_to_symtable('str', builtin_symtable)
-bool_temp, bool_type, bool_ins = _add_cls_to_symtable('bool', builtin_symtable)
+    'float', builtins_symtable)
+str_temp, str_type, str_ins = _add_cls_to_symtable('str', builtins_symtable)
+bool_temp, bool_type, bool_ins = _add_cls_to_symtable('bool',
+                                                      builtins_symtable)
 complex_temp, complex_type, complex_ins = _add_cls_to_symtable(
-    'complex', builtin_symtable)
-byte_temp, byte_type, byte_ins = _add_cls_to_symtable('byte', builtin_symtable)
+    'complex', builtins_symtable)
+byte_temp, byte_type, byte_ins = _add_cls_to_symtable('byte',
+                                                      builtins_symtable)
 
 
 class TypeVarTemp(TypeClassTemp):
@@ -272,27 +261,13 @@ class TypeFuncTemp(TypeTemp):
         return 'builtins'
 
 
-class TypeModuleTemp(TypeClassTemp):
-    def __init__(self, symid: SymId, symtable: 'SymTable'):
-        # FIXME: inner_symtable and def_symtable should be different
-        super().__init__(symid, symtable, symtable)
+class TypeModuleTemp(TypeTemp):
+    def __init__(self) -> None:
+        super().__init__('module')
 
     @property
-    def symid(self):
-        return self.name
-
-    def get_inner_typedef(self, name: str) -> Optional['TypeTemp']:
-        return self._inner_symtable.get_type_def(name)
-
-
-class TypePackageTemp(TypeModuleTemp):
-    def __init__(self, paths: List[str], symtable: 'SymTable', symid: SymId):
-        super().__init__(symid, symtable)
-        self.paths = paths
-        self._cached_typetype = TypePackageType(self)
-
-    def get_default_typetype(self) -> 'TypeType':
-        return self._cached_typetype
+    def module_symid(self) -> str:
+        return 'builtins'
 
 
 class TypeListTemp(TypeClassTemp):
@@ -350,9 +325,10 @@ class TypeDictTemp(TypeClassTemp):
         return self._cached_typetype
 
 
-class TypeEllipsisTemp(TypeTemp):
+class TypeEllipsisTemp(TypeClassTemp):
     def __init__(self) -> None:
-        super().__init__('ellipsis')
+        symtable = builtins_symtable.new_symtable('ellipsis', TableScope.CLASS)
+        super().__init__('ellipsis', builtins_symtable, symtable)
 
     @property
     def module_symid(self) -> str:
@@ -487,25 +463,52 @@ class TypeLiteralIns(TypeIns):
             return fmt.format(str(value))
 
 
-class TypePackageType(TypeType):
-    def __init__(self, temp: TypePackageTemp) -> None:
-        super().__init__(temp, None)
+class TypeModuleIns(TypeIns):
+    def __init__(self, symtable: 'SymTable', consultant=None) -> None:
+        super().__init__(module_temp, None)
+        self._inner_symtable = symtable
+        self.consultant = consultant
 
-    def getins(self, typetype_option: Option['TypeIns']) -> 'TypeIns':
-        assert isinstance(self.temp, TypePackageTemp)
-        return TypePackageIns(self.temp)
+    @property
+    def symid(self):
+        return self._inner_symtable.symid
+
+    def set_consultant(self, consultant):
+        assert hasattr(consultant, 'getattribute')
+        self.consultant = consultant
+
+    def clear_consultant(self):
+        self.consultant = None
+
+    def get_inner_symtable(self):
+        return self._inner_symtable
+
+    def getattribute(self, name: str,
+                     node: Optional[ast.AST]) -> Option['TypeIns']:
+        res = self._inner_symtable.legb_lookup(name)
+        if res:
+            return Option(res)
+        elif self.consultant:
+            return self.consultant.getattribute(name, node)
+        else:
+            res_option = Option(any_ins)
+            res_option.add_error(SymbolUndefined(node, name))
+            return res_option
 
 
-class TypePackageIns(TypeIns):
-    def __init__(self, pkgtemp: TypePackageTemp) -> None:
-        super().__init__(pkgtemp, None)
-        self.submodule: Dict[str, TypeIns] = {}  # submodule
+class TypePackageIns(TypeModuleIns):
+    def __init__(self,
+                 symtable: 'SymTable',
+                 paths: List[str],
+                 consultant=None) -> None:
+        super().__init__(symtable, consultant)
+        self.paths = paths
+        self.submodule = {}
 
-    def add_submodule(self, name: str, ins: TypeIns):
-        self.submodule[name] = ins
-        assert isinstance(self.temp, TypePackageTemp)
-        inner_sym = self.temp.get_inner_symtable()
-        inner_sym.add_entry(name, Entry(ins))
+    def add_submodule(self, name: str, module_ins: TypeModuleIns):
+        # FIXME: modify this
+        self.submodule[name] = module_ins
+        self._inner_symtable.add_entry(name, Entry(module_ins))
 
 
 class OverloadItem:
@@ -549,6 +552,9 @@ class TypeFuncIns(TypeIns):
     def get_func_def(self) -> Tuple['Argument', 'TypeIns']:
         return self.overloads[0].argument, self.overloads[0].ret_type
 
+    def get_func_name(self):
+        return self.funname
+
     def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
         # TODO: deal with arguments
         assert self.overloads
@@ -558,6 +564,7 @@ class TypeFuncIns(TypeIns):
 typevar_temp, typevar_type, _ = _add_spt_to_symtable(TypeVarTemp,
                                                      typing_symtable)
 func_temp = TypeFuncTemp()
+module_temp = TypeModuleTemp()
 
 _invariant_tpvar = TypeVarIns('_invariant_tpvar',
                               bound=any_ins,
@@ -590,13 +597,14 @@ Type_temp, Type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp,
                                                typing_symtable)
 
 none_temp, none_type, none_ins = _add_spt_to_symtable(TypeNoneTemp,
-                                                      builtin_symtable)
+                                                      builtins_symtable)
 ellipsis_temp, ellipsis_type, ellipsis_ins = _add_spt_to_symtable(
-    TypeEllipsisTemp, builtin_symtable)
+    TypeEllipsisTemp, builtins_symtable)
 
 type_meta_temp = TypeClassTemp(
-    'type', builtin_symtable,
-    builtin_symtable.new_symtable('type', TableScope.CLASS), None)
+    'type', builtins_symtable,
+    builtins_symtable.new_symtable('type', TableScope.CLASS), None)
 type_meta_ins = type_meta_temp.get_default_ins().value
-builtin_symtable.add_type_def('type', type_meta_temp)
-builtin_symtable.add_entry('type', Entry(type_meta_ins))
+type_meta_type = type_meta_temp.get_default_typetype()
+builtins_symtable.add_type_def('type', type_meta_temp)
+builtins_symtable.add_entry('type', Entry(type_meta_type))

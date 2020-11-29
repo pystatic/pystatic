@@ -176,6 +176,7 @@ class TypeType(TypeIns):
         return self.temp.init_ins(applyargs, self.bindlist)
 
     def get_inner_symtable(self):
+        assert isinstance(self.temp, TypeClassTemp)
         return self.temp._inner_symtable
 
     def __str__(self):

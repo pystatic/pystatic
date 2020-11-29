@@ -4,9 +4,7 @@ from pystatic.preprocess.util import update_symtable_import_cache
 from pystatic.preprocess.prepinfo import *
 
 
-def resolve_import(target: 'BlockTarget', env: 'PrepEnvironment'):
-    prepinfo = env.get_target_prepinfo(target)
-    assert prepinfo
+def resolve_import(prepinfo: 'PrepInfo', env: 'PrepEnvironment'):
     queue: Deque['PrepInfo'] = deque()
     queue.append(prepinfo)
 
@@ -15,12 +13,26 @@ def resolve_import(target: 'BlockTarget', env: 'PrepEnvironment'):
         symtable = cur_prepinfo.symtable
         for _, entry in cur_prepinfo.impt.items():
             update_symtable_import_cache(symtable, entry, env.manager)
-            if not entry.value:
+            if not entry.origin_name:
+                # import <module_name>
+                module_ins = env.manager.get_module_ins(entry.symid)
+                if module_ins:
+                    module_prepinfo = env.get_prepinfo(entry.symid)
+                    if module_prepinfo:
+                        # used for eval_expr because new symbols haven't been
+                        # added to module instance yet.
+                        module_ins.set_consultant(module_prepinfo)
+                    entry.value = module_ins
+                else:
+                    # TODO: error: module not found
+                    entry.value = None
+
+            elif not entry.value:
                 asname = entry.asname
                 assert asname
                 _resolve_import_chain(cur_prepinfo, asname, env)
 
-        for clsdef in cur_prepinfo.cls_def.values():
+        for clsdef in cur_prepinfo.cls.values():
             queue.append(clsdef.prepinfo)
 
 

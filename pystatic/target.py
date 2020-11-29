@@ -2,7 +2,7 @@ import ast
 from enum import IntEnum
 from typing import TYPE_CHECKING, Optional
 from pystatic.typesys import TypeClassTemp
-from pystatic.predefined import TypeModuleTemp
+from pystatic.predefined import TypeModuleIns
 from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
@@ -32,12 +32,23 @@ class BlockTarget:
         self.stage = stage
 
 
+class FunctionTarget(BlockTarget):
+    def __init__(self,
+                 symid: 'SymId',
+                 symtable: 'SymTable',
+                 astnode: 'ast.FunctionDef',
+                 mbox: 'MessageBox',
+                 stage: Stage = Stage.Preprocess):
+        super().__init__(symid, symtable, mbox, stage)
+        self.ast = astnode
+
+
 class MethodTarget(BlockTarget):
     def __init__(self,
                  symid: 'SymId',
                  symtable: 'SymTable',
                  clstemp: 'TypeClassTemp',
-                 astnode: 'ast.AST',
+                 astnode: 'ast.FunctionDef',
                  mbox: 'MessageBox',
                  stage: Stage = Stage.Preprocess) -> None:
         super().__init__(symid, symtable, mbox, stage)
@@ -60,13 +71,17 @@ class Target(BlockTarget):
         """
         super().__init__(symid, symtable, mbox, stage)
         # NOTE: TpStage.OVER may be wrong.
-        self.module_temp = TypeModuleTemp(symid, self.symtable)
+        self.module_ins = TypeModuleIns(self.symtable)
         self.path: str = path
         self.is_special = is_special
 
     @property
     def analyse_path(self):
         return self.path
+
+    def clear(self):
+        self.symtable.clear()
+        self.mbox.clear()
 
 
 class PackageTarget(Target):
@@ -77,7 +92,7 @@ class PackageTarget(Target):
                  path: str,
                  analyse_path: str,
                  stage: Stage = Stage.Parse):
-        super().__init__(symid, symtable, mbox, path, stage)
+        super().__init__(symid, symtable, mbox, path, False, stage)
         self.__analyse_path = analyse_path
 
     @property

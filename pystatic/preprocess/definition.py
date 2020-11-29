@@ -1,12 +1,10 @@
 import ast
 from contextlib import contextmanager
-from typing import List, Optional, Union
 from pystatic.visitor import BaseVisitor
-from pystatic.typesys import TypeClassTemp
 from pystatic.message import MessageBox
-from pystatic.symid import symid2list
-from pystatic.symtable import TableScope, ImportNode
-from pystatic.target import BlockTarget, MethodTarget
+from pystatic.reach import is_true, Reach
+from pystatic.staticinfer import static_infer
+from pystatic.target import BlockTarget, MethodTarget, FunctionTarget
 from pystatic.preprocess.util import analyse_import_stmt
 from pystatic.preprocess.prepinfo import *
 
@@ -28,9 +26,18 @@ def get_definition(target: 'BlockTarget', env: 'PrepEnvironment',
         symid), "call get_definition with the same symid is invalid"
 
     prepinfo = env.try_add_target_prepinfo(
-        target, PrepInfo(symtable, None, is_special))
+        target, PrepInfo(symtable, None, env, is_special))
 
     TypeDefVisitor(env, prepinfo, mbox).accept(cur_ast)
+
+
+def get_definition_in_function(target: 'FunctionTarget',
+                               env: 'PrepEnvironment', mbox: 'MessageBox'):
+    cur_ast = target.ast
+    assert isinstance(cur_ast, ast.FunctionDef)
+    prepinfo = env.try_add_target_prepinfo(
+        target, PrepInfo(target.symtable, None, env, False))
+    return TypeDefVisitor(env, prepinfo, mbox, False).accept_func(cur_ast)
 
 
 def get_definition_in_method(target: 'MethodTarget', env: 'PrepEnvironment',
@@ -39,8 +46,8 @@ def get_definition_in_method(target: 'MethodTarget', env: 'PrepEnvironment',
     assert isinstance(cur_ast, ast.FunctionDef)
     clstemp = target.clstemp
     prepinfo = env.try_add_target_prepinfo(target,
-                                           MethodPrepInfo(clstemp, None))
-    assert isinstance(prepinfo, MethodPrepInfo)
+                                           PrepMethodInfo(clstemp, None, env))
+    assert isinstance(prepinfo, PrepMethodInfo)
 
     return TypeDefVisitor(env, prepinfo, mbox, True).accept_func(cur_ast)
 
@@ -69,7 +76,7 @@ class TypeDefVisitor(BaseVisitor):
 
         self.prepinfo = new_prepinfo
         self.is_method = False
-        assert not isinstance(new_prepinfo, MethodPrepInfo)
+        assert not isinstance(new_prepinfo, PrepMethodInfo)
         yield new_prepinfo
 
         self.is_method = old_is_method
@@ -90,34 +97,28 @@ class TypeDefVisitor(BaseVisitor):
                 self.visit(body)
 
     def visit_Import(self, node: ast.Import):
-        info_list = analyse_import_stmt(self.prepinfo, node, self.glob_symid)
-        self._add_import_info(node, info_list)
+        infolist = analyse_import_stmt(self.prepinfo, node, self.glob_symid)
+        self.prepinfo.add_import_def(node, infolist)
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
-        info_list = analyse_import_stmt(self.prepinfo, node, self.glob_symid)
-        self._add_import_info(node, info_list)
+        infolist = analyse_import_stmt(self.prepinfo, node, self.glob_symid)
+        self.prepinfo.add_import_def(node, infolist)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self.prepinfo.add_func_def(node, self.mbox)
 
-    def _add_import_info(self, node: 'ImportNode', info_list: List[prep_impt]):
-        """Add import information to the symtable"""
-        manager = self.env.manager
-        for infoitem in info_list:
-            # analyse all the package along the way
-            symidlist = symid2list(infoitem.symid)
-            cur_prefix = ''
-            for subid in symidlist:
-                if cur_prefix:
-                    cur_prefix += f'.{subid}'
-                else:
-                    cur_prefix = subid
-                manager.add_check_symid(cur_prefix, False)
-
-            if not infoitem.is_import_module():
-                origin_symid = infoitem.symid + f'.{infoitem.origin_name}'
-                if manager.is_module(origin_symid):
-                    manager.add_check_symid(origin_symid, False)
-
-            # TODO: error check name collision here
-            self.prepinfo.impt[infoitem.asname] = infoitem
+    def visit_If(self, node: ast.If):
+        reach_res = static_infer(node.test, self.env.manager.config)
+        if reach_res == Reach.UNKNOWN:
+            for subnode in node.body:
+                self.visit(subnode)
+            for subnode in node.orelse:
+                self.visit(subnode)
+        else:
+            setattr(node.test, 'reach', reach_res)
+            if is_true(reach_res, False):
+                for subnode in node.body:
+                    self.visit(subnode)
+            else:
+                for subnode in node.orelse:
+                    self.visit(subnode)

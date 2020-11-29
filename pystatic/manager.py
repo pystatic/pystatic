@@ -1,7 +1,7 @@
 import os
 import logging
 from collections import deque
-from typing import Optional, Dict, TYPE_CHECKING, Deque, Set
+from typing import Optional, Dict, Deque, Set
 from pystatic.config import Config
 from pystatic.exprparse import eval_expr
 from pystatic.errorcode import *
@@ -10,15 +10,12 @@ from pystatic.infer.infer import InferStarter
 from pystatic.message import MessageBox
 from pystatic.option import Option
 from pystatic.preprocess import Preprocessor
-from pystatic.predefined import (get_builtin_symtable, get_typing_symtable,
-                                 get_init_module_symtable)
+from pystatic.predefined import TypePackageIns, builtins_symtable, typing_symtable
 from pystatic.symid import SymId, relpath2symid, symid2list
 from pystatic.typesys import TypeIns
-from pystatic.predefined import TypeModuleTemp, TypePackageTemp
+from pystatic.predefined import TypeModuleIns
 from pystatic.target import BlockTarget, Target, Stage, PackageTarget
-
-if TYPE_CHECKING:
-    from pystatic.symtable import SymTable
+from pystatic.symtable import SymTable, TableScope
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +37,9 @@ class Manager:
             self.__init_typeshed()
 
     def __init_typeshed(self):
-        self.__add_check_symid('builtins', get_builtin_symtable(), False, None,
+        self.__add_check_symid('builtins', builtins_symtable, False, None,
                                True)
-        self.__add_check_symid('typing', get_typing_symtable(), False, None,
-                               True)
+        self.__add_check_symid('typing', typing_symtable, False, None, True)
         self.preprocess()
 
     def __add_check_symid(self, symid: 'SymId',
@@ -70,7 +66,10 @@ class Manager:
             if default_symtable:
                 symtable = default_symtable
             else:
-                symtable = get_init_module_symtable(symid)
+                # Generate new symtable for the new target
+                symtable = SymTable(symid, None, None, builtins_symtable, self,
+                                    TableScope.GLOB)
+                symtable.glob = symtable
             mbox = MessageBox(symid)
 
             # TODO: support namespace
@@ -105,10 +104,14 @@ class Manager:
 
                 assert dir_path == os.path.dirname(analyse_path)
 
+                # modify symtable's symid to the symid of the module preprocessed
+                # to handle relative import correctly
+                symtable.symid = symtable.symid + '.__init__'
+
                 new_target = PackageTarget(symid, symtable, mbox, dir_path,
                                            analyse_path)
-                new_target.module_temp = TypePackageTemp(
-                    find_res.paths, new_target.symtable, new_target.symid)
+                new_target.module_ins = TypePackageIns(new_target.symtable,
+                                                       find_res.paths, None)
                 new_target.path = self.fsys.realpath(find_res.paths[0])
 
                 self.__parse(new_target)
@@ -169,14 +172,15 @@ class Manager:
         elif stage == Stage.FINISH:
             pass
 
-    def get_module_temp(self, symid: 'SymId') -> Optional[TypeModuleTemp]:
+    def get_module_ins(self, symid: 'SymId') -> Optional[TypeModuleIns]:
         if symid in self.targets:
-            return self.targets[symid].module_temp
+            return self.targets[symid].module_ins
         return None
 
     def add_check_file(self,
                        path: FilePath,
-                       to_check: bool = True) -> Option[bool]:
+                       to_check: bool = True,
+                       recheck: bool = False) -> Option[bool]:
         path = self.fsys.realpath(path)
 
         if not os.path.exists(path):
@@ -187,6 +191,8 @@ class Manager:
             rt_path = crawl_path(os.path.dirname(path))
             self.fsys.add_userpath(rt_path)
             symid = relpath2symid(rt_path, path)
+            if recheck and symid in self.targets:
+                return self.recheck(symid)
             return self.__add_check_symid(symid, None, to_check, path, False)
 
     def add_check_symid(self,
@@ -208,8 +214,10 @@ class Manager:
         target = self.targets.get(symid)
         if target:
             return target.mbox
-        else:
-            return None
+        elif symid.endswith('.__init__'):
+            package_id = symid[:-len('.__init__')]
+            if (target := self.targets.get(package_id)):
+                return target.mbox
 
     def get_mbox(self, path: FilePath) -> Optional[MessageBox]:
         path = os.path.normcase(path)
@@ -228,16 +236,16 @@ class Manager:
         pass
 
     def infer(self):
-        InferStarter(self.q_infer, self.config).start_infer()
+        InferStarter(self.q_infer, self.config, self).start_infer()
 
     def get_sym_type(self, module_symid: SymId,
                      var_symid: SymId) -> Optional['TypeIns']:
-        module_temp = self.get_module_temp(module_symid)
-        if not module_temp:
+        module_ins = self.get_module_ins(module_symid)
+        if not module_ins:
             return None
         else:
             varid_list = symid2list(var_symid)
-            cur_ins = module_temp.get_default_ins().value
+            cur_ins = module_ins
             for subid in varid_list:
                 res_option = cur_ins.getattribute(subid, None)
                 if res_option.haserr():
@@ -248,10 +256,9 @@ class Manager:
     def eval_expr(self, module_symid: SymId, expr: str) -> Optional['TypeIns']:
         try:
             astnode = ast.parse(expr, mode='eval')
-            module_temp = self.get_module_temp(module_symid)
-            if not module_temp:
+            module_ins = self.get_module_ins(module_symid)
+            if not module_ins:
                 return None
-            module_ins = module_temp.get_default_ins().value
             res_option = eval_expr(astnode.body, module_ins)  # type: ignore
             if res_option.haserr():
                 return None
@@ -259,6 +266,18 @@ class Manager:
                 return res_option.value
         except SyntaxError as e:
             return None
+
+    def recheck(self, module_symid: SymId) -> Option[bool]:
+        module_target = self.targets.get(module_symid)
+        assert isinstance(module_target, Target)
+        try:
+            new_ast = path2ast(module_target.path)
+            module_target.ast = new_ast
+            module_target.clear()
+            self.update_stage(module_target, Stage.Preprocess, False)
+            return Option(True)
+        except SyntaxError:
+            return Option(False)
 
 
 def path2ast(path: FilePath) -> ast.AST:
