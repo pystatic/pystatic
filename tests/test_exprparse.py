@@ -118,10 +118,9 @@ def test_exprparse():
     assert res_option.value
     manager.preprocess()
 
-    module_temp = manager.get_module_temp(src)
-    assert isinstance(module_temp, TypeModuleTemp)
-    assert module_temp.module_symid == src
-    module_ins = module_temp.get_default_ins().value
+    module_ins = manager.get_module_ins(src)
+    assert isinstance(module_ins, TypeModuleIns)
+    assert module_ins.symid == src
 
     int_typetype = manager.get_sym_type('builtins', 'int')
     assert int_typetype
