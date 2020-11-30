@@ -1,11 +1,6 @@
 import ast
-from typing import Callable
-from pystatic.arg import Argument
-from pystatic.typesys import TypeIns
-from pystatic.predefined import TypeFuncIns, TypeVarTemp
-from pystatic.message import MessageBox
+from pystatic.predefined import TypeVarTemp
 from pystatic.exprparse import eval_expr
-from pystatic.preprocess.def_expr import (eval_func_type, eval_argument_type, eval_return_type)
 from pystatic.preprocess.resolve_spt import resolve_typealias
 from pystatic.preprocess.util import omit_inst_typetype
 from pystatic.preprocess.resolve_util import eval_preptype
@@ -92,75 +87,15 @@ def resolve_local(local: 'prep_local', shallow: bool):
         return
 
     eval_res = eval_preptype(typenode, local.def_prepinfo, False, shallow)
-    if isinstance(eval_res.typeins, TypeType):
-        local.value = eval_res.typeins.get_default_ins()
+    typeins = eval_res.option_ins.value
+    if isinstance(typeins, TypeType):
+        local.value = typeins.get_default_ins()
     else:
-        local.value = eval_res.typeins
+        local.value = typeins
     if shallow and eval_res.generic:
         local.stage = PREP_NULL
     else:
         local.stage = PREP_COMPLETE
 
-def resolve_func(func: 'prep_func'):
-    """Resolve local function's TypeIns"""
-    def add_func_def(node: ast.FunctionDef):
-        nonlocal func
-        func_option = eval_func_type(node, func.def_prepinfo)
-        func_ins = func_option.value
-        assert isinstance(func_ins, TypeFuncIns)
-
-        assert not func.value
-        func.value = func_ins
-        return func_ins
-
-    def add_func_overload(func_ins: TypeFuncIns, argument: Argument,
-                          ret: TypeIns, node: ast.FunctionDef):
-        func_ins.add_overload(argument, ret)
-
-    symid = func.def_prepinfo.glob_symid
-    resolve_func_template(func, add_func_def, add_func_overload, MessageBox(symid))
-
-
-TAddFunDef = Callable[[ast.FunctionDef], TypeFuncIns]
-TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef],
-                           None]
-
-
-def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
-                         add_func_overload: TAddFunOverload,
-                         mbox: 'MessageBox'):
-    """Template to resolve functions"""
-    prepinfo = func.def_prepinfo
-    def get_arg_ret(node: ast.FunctionDef):
-        """Get the argument and return type of the function"""
-        nonlocal prepinfo
-        argument_option = eval_argument_type(node.args, prepinfo)
-        return_option = eval_return_type(node.returns, prepinfo)
-        argument_option.dump_to_box(mbox)
-        return_option.dump_to_box(mbox)
-        return argument_option.value, return_option.value
-
-    overload_list = []
-    not_overload = None  # function def that's not decorated by overload
-    for astnode in func.defnodes:
-        is_overload = False
-        for decs in astnode.decorator_list:
-            if isinstance(decs, ast.Name) and decs.id == 'overload':
-                # TODO: add warning here if defined is already true before
-                is_overload = True
-                break
-        if is_overload:
-            overload_list.append((astnode, *get_arg_ret(astnode)))
-        else:
-            not_overload = astnode
-
-    # TODO: name collision check
-    if len(overload_list) > 0:
-        func_ins = add_func_def(overload_list[0][0])
-
-        for node, argument, ret_ins in overload_list[1:]:
-            add_func_overload(func_ins, argument, ret_ins, node)
-
-    else:
-        assert not_overload
-        add_func_def(not_overload)
+    if not shallow:
+        eval_res.option_ins.dump_to_box(local.def_prepinfo.mbox)

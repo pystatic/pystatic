@@ -229,14 +229,14 @@ class TypeNoneTemp(TypeTemp):
                     node: ast.UnaryOp) -> Option['TypeIns']:
         none_ins = self._cached_ins
         res_option = Option(none_ins)
-        res_option.add_error(NoAttribute(node, none_ins, 'None'))
+        res_option.add_err(NoAttribute(node, none_ins, 'None'))
         return res_option
 
     def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
                   node: ast.BinOp) -> Option['TypeIns']:
         none_ins = self._cached_ins
         res_option = Option(none_ins)
-        res_option.add_error(NoAttribute(node, none_ins, 'None'))
+        res_option.add_err(NoAttribute(node, none_ins, 'None'))
         return res_option
 
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
@@ -508,7 +508,7 @@ class TypeModuleIns(TypeIns):
             return self.consultant.getattribute(name, node)
         else:
             res_option = Option(any_ins)
-            res_option.add_error(SymbolUndefined(node, name))
+            res_option.add_err(SymbolUndefined(node, name))
             return res_option
 
 

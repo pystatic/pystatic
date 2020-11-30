@@ -121,7 +121,7 @@ class SymbolRecorder:
             return Option(tp)
         else:
             option: Option = Option(any_type)
-            option.add_error(SymbolUndefined(node, name))
+            option.add_err(SymbolUndefined(node, name))
             return option
 
     def recover_type(self, dirty_map: Dict[str, StoredType]):

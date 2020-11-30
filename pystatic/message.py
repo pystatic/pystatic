@@ -1,4 +1,5 @@
 import ast
+from copy import Error
 from typing import Optional, List, TYPE_CHECKING
 from pystatic.errorcode import ErrorCode, CodeUnreachable, Level
 from pystatic.option import Option

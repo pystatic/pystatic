@@ -50,7 +50,7 @@ class ExprParser(NoGenVisitor):
         tpins = self.visit(node)
         assert isinstance(tpins, TypeIns)
         res_option = Option(tpins)
-        res_option.add_error_list(self.errors)
+        res_option.add_err_list(self.errors)
         return res_option
 
     @contextlib.contextmanager
@@ -71,7 +71,7 @@ class ExprParser(NoGenVisitor):
         yield
         self.in_subs = old_in_subs
 
-    def add_error(self, errlist: Optional[List[ErrorCode]]):
+    def add_err(self, errlist: Optional[List[ErrorCode]]):
         if errlist:
             self.errors.extend(errlist)
 
@@ -116,7 +116,7 @@ class ExprParser(NoGenVisitor):
         assert isinstance(name_option, Option)
         assert isinstance(name_option.value, TypeIns)
 
-        self.add_error(name_option.errors)
+        self.add_err(name_option.errors)
 
         self.add_to_container(name_option.value, node)
         return name_option.value
@@ -152,7 +152,7 @@ class ExprParser(NoGenVisitor):
             assert isinstance(res, TypeIns)
         attr_option = res.getattribute(node.attr, node)
 
-        self.add_error(attr_option.errors)
+        self.add_err(attr_option.errors)
 
         self.add_to_container(attr_option.value, node)
         return attr_option.value
@@ -164,7 +164,7 @@ class ExprParser(NoGenVisitor):
         applyargs = self.generate_applyargs(node)
         call_option = left_ins.call(applyargs)
 
-        self.add_error(call_option.errors)
+        self.add_err(call_option.errors)
 
         self.add_to_container(call_option.value, node)
         return call_option.value
@@ -177,7 +177,7 @@ class ExprParser(NoGenVisitor):
         assert op, f"{node.op} is not supported now"
         res_option = operand_ins.unaryop_mgf(op, node)
 
-        self.add_error(res_option.errors)
+        self.add_err(res_option.errors)
 
         self.add_to_container(res_option.value, node)
         return res_option.value
@@ -192,7 +192,7 @@ class ExprParser(NoGenVisitor):
         assert op, f"{node.op} is not supported now"
         res_option = left_ins.binop_mgf(right_ins, op, node)
 
-        self.add_error(res_option.errors)
+        self.add_err(res_option.errors)
 
         self.add_to_container(res_option.value, node)
         return res_option.value

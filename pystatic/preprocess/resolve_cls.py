@@ -9,8 +9,9 @@ from pystatic.visitor import BaseVisitor
 from pystatic.message import MessageBox
 from pystatic.symtable import TableScope
 from pystatic.arg import Argument
-from pystatic.preprocess.def_expr import (eval_argument_type, eval_return_type)
-from pystatic.preprocess.resolve_local import resolve_func_template
+from pystatic.preprocess.resolve_func import (resolve_func_template,
+                                              eval_argument_type,
+                                              eval_return_type)
 from pystatic.preprocess.resolve_util import eval_preptype
 from pystatic.preprocess.prepinfo import *
 
@@ -22,7 +23,7 @@ def resolve_cls(clsdef: 'prep_cls', shallow: bool):
     is_generic = True
     for base_node in clsdef.defnode.bases:
         base_res = eval_preptype(base_node, clsdef.prepinfo, False, shallow)
-        res_type = base_res.typeins
+        res_type = base_res.option_ins.value
         assert isinstance(res_type, TypeType)
         if res_type:
             clstemp.baseclass.append(res_type.get_default_ins())
@@ -150,7 +151,6 @@ def resolve_cls_method(prepinfo: 'PrepInfo', env: 'PrepEnvironment',
 def _resolve_cls_method(clsdef: 'prep_cls',
                         mbox: 'MessageBox') -> List[MethodTarget]:
     targets = []  # method targets that need to be preprocessed
-    prepinfo = clsdef.prepinfo
     clstemp = clsdef.clstemp
     symid = clstemp.name
     symtable = clstemp.get_inner_symtable()
@@ -177,28 +177,15 @@ def _resolve_cls_method(clsdef: 'prep_cls',
             default_ins_option.dump_to_box(mbox)
             argument.args[0].ann = default_ins_option.value
 
-    def add_func_def(node: ast.FunctionDef) -> TypeFuncIns:
-        nonlocal prepinfo, mbox
-        argument_option = eval_argument_type(node.args, prepinfo)
-        return_option = eval_return_type(node.returns, prepinfo)
-
-        argument_option.dump_to_box(mbox)
-        return_option.dump_to_box(mbox)
-
-        argument = argument_option.value
-        ret_ins = return_option.value
-
+    def add_func_def(argument: Argument, ret: TypeIns,
+                     node: ast.FunctionDef) -> TypeFuncIns:
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(argument, is_classmethod, is_staticmethod)
 
         name = node.name
         inner_symtable = symtable.new_symtable(name, TableScope.FUNC)
         func_ins = TypeFuncIns(name, symtable.glob_symid, inner_symtable,
-                               argument, ret_ins)
-
-        func_entry = prepinfo.func[name]
-        func_entry.value = func_ins
-
+                               argument, ret)
         # get attribute because of assignment of self
         if not is_staticmethod:
             symtb = func_ins.get_inner_symtable()
