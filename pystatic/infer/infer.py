@@ -193,6 +193,7 @@ class InferVisitor(BaseVisitor):
                                                 ConditionStmtType.FUNC)
 
                 self.infer_return_value_of_func(node.returns)
+                self.recorder.clear_ret_val()
 
     def preprocess_in_func(self, node: ast.FunctionDef,
                            func_type: TypeFuncIns):
@@ -216,17 +217,16 @@ class InferVisitor(BaseVisitor):
             args[vararg.name] = vararg.ann
         return args
 
-    def infer_return_value_of_func(self, node):
+    def infer_return_value_of_func(self, node: ast.AST):
         ret_set = self.recorder.get_ret_type()
         ret_list = list(ret_set)
         ret_annotation = self.recorder.get_ret_annotation()
         num = len(ret_list)
-        if num == 0:
-            if not is_any(ret_annotation) and not is_none(ret_annotation):
-                self.err_maker.add_err(ReturnValueExpected(node))
-        else:
-            # TODO
-            pass
+        if is_any(ret_annotation):
+            self.recorder.reset_ret_val()
+            return
+        if num == 0 and not is_none(ret_annotation):
+            self.err_maker.add_err(ReturnValueExpected(node))
 
     def visit_Return(self, node: ast.Return):
         self.cond_infer.accept(node)
