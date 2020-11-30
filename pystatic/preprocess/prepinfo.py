@@ -1,5 +1,5 @@
 import ast
-from typing import (Optional, TYPE_CHECKING, Dict, Union, List, Set)
+from typing import (Optional, TYPE_CHECKING, Dict, Union, List, Set, Final)
 from pystatic.errorcode import *
 from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
@@ -16,12 +16,19 @@ if TYPE_CHECKING:
 AssignNode = Union[ast.Assign, ast.AnnAssign]
 PrepDef = Union['prep_cls', 'prep_func', 'prep_local']
 
+LOCAL_NORMAL: Final[int] = 0
+LOCAL_TYPEALIAS: Final[int] = 1
+LOCAL_TYPEVAR: Final[int] = 2
+
+PREP_NULL = 0
+PREP_COMPLETE = 1
 
 class PrepInfo:
     def __init__(self, symtable: 'SymTable', enclosing: Optional['PrepInfo'],
-                 env: 'PrepEnvironment', is_special: bool):
+                 env: 'PrepEnvironment', mbox: 'MessageBox', is_special: bool):
         self.enclosing = enclosing
         self.is_special = is_special
+        self.mbox = mbox
 
         self.cls: Dict[str, 'prep_cls'] = {}
         self.local: Dict[str, 'prep_local'] = {}
@@ -44,7 +51,7 @@ class PrepInfo:
         return self.symtable.glob_symid
     
     def new_cls_prepinfo(self, symtable: 'SymTable'):
-        return PrepInfo(symtable, self, self.env, False)
+        return PrepInfo(symtable, self, self.env, self.mbox, False)
 
     def add_cls_def(self, node: ast.ClassDef, mbox: 'MessageBox'):
         # TODO: check name collision
@@ -115,7 +122,6 @@ class PrepInfo:
                     origin_local = self.symtable.lookup_local(name)
                     if origin_local:
                         return
-
                 # NOTE: local_def finally added here
                 if (old_def := self.cls.get(name)):
                     mbox.add_err(VarTypeCollide(old_def.defnode, name, defnode))
@@ -132,7 +138,6 @@ class PrepInfo:
                             return
                     else:
                         return
-
                 local_def = prep_local(name, self, defnode)
                 self.local[name] = local_def
 
@@ -260,8 +265,9 @@ class PrepInfo:
 
 class PrepMethodInfo(PrepInfo):
     def __init__(self, clstemp: TypeClassTemp,
-                 enclosing: Optional['PrepInfo'], env: 'PrepEnvironment'):
-        super().__init__(clstemp.get_inner_symtable(), enclosing, env, False)
+                 enclosing: Optional['PrepInfo'], mbox: 'MessageBox',
+                 env: 'PrepEnvironment'):
+        super().__init__(clstemp.get_inner_symtable(), enclosing, env, mbox, False)
         self.clstemp = clstemp
         self.var_attr: Dict[str, 'prep_local'] = {}
 
@@ -339,6 +345,7 @@ class prep_cls:
         self.def_prepinfo = def_prepinfo
         self.defnode = defnode
         self.var_attr: Dict[str, prep_local] = {}
+        self.stage = PREP_NULL
 
     @property
     def name(self):
@@ -358,6 +365,8 @@ class prep_func:
         self.defnodes = [defnode]
         self.def_prepinfo = def_prepinfo
         self.value: Optional[TypeFuncIns] = None
+        self.stage = PREP_NULL
+        self.name = defnode.name
 
     def add_defnode(self, defnode: ast.FunctionDef):
         assert isinstance(defnode, ast.FunctionDef)
@@ -373,25 +382,38 @@ class prep_func:
 
 
 class prep_local:
-    __slots__ = ['name', 'def_prepinfo', 'defnode', 'value']
-
     def __init__(self, name: str, def_prepinfo: 'PrepInfo', defnode: AssignNode) -> None:
-        assert isinstance(defnode, ast.Assign) or isinstance(
-            defnode, ast.AnnAssign)
+        """
+        :param typenode: if typenode is None then this symbol's stage is set to
+        PREP_COMPLETE.
+        """
         self.name = name
         self.defnode = defnode
         self.def_prepinfo = def_prepinfo
         self.value: Optional[TypeIns] = None
+
+        self.type = LOCAL_NORMAL
+        self.typenode = self.get_typenode(defnode)
+        self.stage = PREP_NULL
+
+    def get_typenode(self, node: AssignNode):
+        if isinstance(node, ast.AnnAssign):
+            return node.annotation
+        else:
+            assert isinstance(node, ast.Assign)
+            if node.type_comment:
+                try:
+                    typenode = ast.parse(node.type_comment, mode='eval')
+                    return typenode.body
+                except SyntaxError:
+                    return None
+        return None
 
     def getins(self) -> TypeIns:
         return self.value or any_ins
 
 
 class prep_impt:
-    __slots__ = [
-        'symid', 'origin_name', 'asname', 'defnode', 'def_prepinfo', 'value'
-    ]
-
     def __init__(self, symid: 'SymId', origin_name: str, asname: str,
                  def_prepinfo: 'PrepInfo', defnode: ImportNode) -> None:
         self.symid = symid

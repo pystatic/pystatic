@@ -9,7 +9,6 @@ class _Node:
     def __init__(self, prepdef: 'PrepDef') -> None:
         self.prepdef = prepdef
         self.dependency: Set['_Node'] = set()
-
         self.indeg: int = 0
 
     def add_dependency(self, node: '_Node'):

@@ -9,10 +9,10 @@ from pystatic.preprocess.util import analyse_import_stmt
 from pystatic.preprocess.prepinfo import *
 
 
-def get_definition(target: 'BlockTarget', env: 'PrepEnvironment',
-                   mbox: 'MessageBox'):
+def get_definition(target: 'BlockTarget', env: 'PrepEnvironment'):
     # TODO: seperate function block target and target
     cur_ast = target.ast
+    cur_mbox = target.mbox
     symtable = target.symtable
     symid = target.symid
 
@@ -26,30 +26,31 @@ def get_definition(target: 'BlockTarget', env: 'PrepEnvironment',
         symid), "call get_definition with the same symid is invalid"
 
     prepinfo = env.try_add_target_prepinfo(
-        target, PrepInfo(symtable, None, env, is_special))
+        target, PrepInfo(symtable, None, env, cur_mbox, is_special))
 
-    TypeDefVisitor(env, prepinfo, mbox).accept(cur_ast)
+    TypeDefVisitor(env, prepinfo, cur_mbox).accept(cur_ast)
 
 
 def get_definition_in_function(target: 'FunctionTarget',
-                               env: 'PrepEnvironment', mbox: 'MessageBox'):
+                               env: 'PrepEnvironment'):
     cur_ast = target.ast
+    cur_mbox = target.mbox
     assert isinstance(cur_ast, ast.FunctionDef)
     prepinfo = env.try_add_target_prepinfo(
-        target, PrepInfo(target.symtable, None, env, False))
-    return TypeDefVisitor(env, prepinfo, mbox, False).accept_func(cur_ast)
+        target, PrepInfo(target.symtable, None, env, cur_mbox, False))
+    return TypeDefVisitor(env, prepinfo, cur_mbox, False).accept_func(cur_ast)
 
 
-def get_definition_in_method(target: 'MethodTarget', env: 'PrepEnvironment',
-                             mbox: 'MessageBox'):
+def get_definition_in_method(target: 'MethodTarget', env: 'PrepEnvironment'):
     cur_ast = target.ast
+    cur_mbox = target.mbox
     assert isinstance(cur_ast, ast.FunctionDef)
     clstemp = target.clstemp
-    prepinfo = env.try_add_target_prepinfo(target,
-                                           PrepMethodInfo(clstemp, None, env))
+    prepinfo = env.try_add_target_prepinfo(
+        target, PrepMethodInfo(clstemp, None, cur_mbox, env))
     assert isinstance(prepinfo, PrepMethodInfo)
 
-    return TypeDefVisitor(env, prepinfo, mbox, True).accept_func(cur_ast)
+    return TypeDefVisitor(env, prepinfo, cur_mbox, True).accept_func(cur_ast)
 
 
 class TypeDefVisitor(BaseVisitor):
@@ -68,6 +69,9 @@ class TypeDefVisitor(BaseVisitor):
     def accept_func(self, node: ast.FunctionDef):
         for stmt in node.body:
             self.visit(stmt)
+
+    def accept(self, node: ast.AST):
+        self.visit(node)
 
     @contextmanager
     def enter_class(self, new_prepinfo: 'PrepInfo'):

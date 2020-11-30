@@ -48,7 +48,6 @@ class ModuleScope(Scope):
 
 class SymbolRecorder:
     """record the appeared symbol"""
-
     def __init__(self, module):
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))
@@ -121,7 +120,7 @@ class SymbolRecorder:
             return Option(tp)
         else:
             option: Option = Option(any_type)
-            option.add_error(SymbolUndefined(node, name))
+            option.add_err(SymbolUndefined(node, name))
             return option
 
     def recover_type(self, dirty_map: Dict[str, StoredType]):

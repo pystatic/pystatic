@@ -58,6 +58,12 @@ class Config:
                 self.typeshed = os.path.join(pystatic_dir, typeshed)
             else:
                 self.typeshed = None
+        
+        print('good')
+        if get('test_typeshed', bool):
+            print('hello')
+            self.typeshed = os.path.join(pystatic_dir, 'typeshed')
+            print(self.typeshed)
 
         # no_typeshed: if true, then typeshed is not automatically loaded.
         # default: False.
