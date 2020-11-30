@@ -199,6 +199,16 @@ class SymTable:
     def legb_lookup(self, name):
         return self._legb_lookup(name, SymTable.lookup_local)
 
+    def egb_lookup(self, name: str):
+        find = SymTable.lookup_local
+        curtable = self.non_local
+        while curtable:
+            res = find(curtable, name)
+            if res:
+                return res
+            curtable = curtable.non_local
+        return find(self.builtins, name)
+
     def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
         """Getattribute from symtable
 

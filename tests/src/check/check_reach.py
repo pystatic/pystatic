@@ -100,4 +100,9 @@ while True:
         b = 1  # E This code is unreachable
     b = 1  # E This code is unreachable
 
-
+c = False
+if c:
+    a = 1  # E This code is unreachable
+c = True
+if c:
+    a = 1
