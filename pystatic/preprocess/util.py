@@ -20,7 +20,7 @@ def omit_inst_typetype(node: ast.AST, consultant: SupportGetAttribute,
     :param allow_tuple: allow analyse inside tuple node or not
     """
     try:
-        res = TypeTypeGetter(consultant, allow_tuple).accept(node)
+        res = typetype_getter.accept(node, consultant, allow_tuple)
         if not res:
             return None
         assert isinstance(res, TypeType)
@@ -30,12 +30,11 @@ def omit_inst_typetype(node: ast.AST, consultant: SupportGetAttribute,
 
 
 class TypeTypeGetter(NoGenVisitor):
-    __slots__ = ['consultant', 'allow_tuple']
-
-    def __init__(self, consultant: SupportGetAttribute,
-                 allow_tuple: bool) -> None:
+    def accept(self, node: ast.AST, consultant: SupportGetAttribute,
+               allow_tuple: bool):
         self.consultant = consultant
         self.allow_tuple = allow_tuple
+        return self.visit(node)
 
     def visit_Name(self, node: ast.Name) -> Optional[TypeIns]:
         name_option = self.consultant.getattribute(node.id, node)
@@ -76,6 +75,9 @@ class TypeTypeGetter(NoGenVisitor):
 
         else:
             return None
+
+
+typetype_getter = TypeTypeGetter()
 
 
 def analyse_import_stmt(prepinfo: 'PrepInfo', node: ImportNode,

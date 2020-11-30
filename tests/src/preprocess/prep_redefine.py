@@ -57,3 +57,26 @@ def h():  # E 'h' doesn't match its definition(h defined as a class at line 58)
 
 class h:
     pass
+
+from typing import overload
+
+def foo(a: int, b: str) -> str:
+    pass
+
+@overload
+def foo(a: int, b: str) -> str:
+    ...
+
+@overload
+def foo(a: int, b: int) -> int:
+    ...
+
+def good(a: int):
+    ...
+
+def good(a: str): # E 'good' has already defined(good previously defined at line 74)
+    ...
+
+@overload
+def good(a: float):
+    ...

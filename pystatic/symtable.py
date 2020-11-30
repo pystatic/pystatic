@@ -21,8 +21,6 @@ OriginName = str
 ImportNode = Union[ast.Import, ast.ImportFrom]
 ImportItem = Tuple[AsName, OriginName, ImportNode]
 
-TypeDefNode = Union[str, ast.AST]
-
 
 class Entry:
     __slots__ = ['tp', 'defnode']
@@ -218,7 +216,7 @@ class SymTable:
         res_option = Option(any_ins)
         res = self.legb_lookup(name)
         if not res:
-            res_option.add_error(SymbolUndefined(node, name))
+            res_option.add_err(SymbolUndefined(node, name))
         else:
             res_option.set_value(res)
         return res_option
