@@ -1,12 +1,21 @@
-from typing import List, Union
+from typing import List, Union, Optional
 from typing import Tuple,Dict,Literal,List,Set
 # b:Dict[int,str] = {1:12}
 
 # c:Tuple[int,int,str]=(12,23,'a')
 # d:Tuple[int,int,str]=(12,23,1)
 
-a = 1
-b:Literal[1] =a 
+# a = 1
+# b:Literal[1] =a 
+t1 = "s"
+if random():
+    t1 = 1
+t2: Union[int, bool] = input()
+t3: Optional[int] = input()
+a: int = t1
+b: int = t2
+c: None = t3
+
 # test1:Literal['test']=1
 # f = 'test'
 # test1:Literal['test']=f
