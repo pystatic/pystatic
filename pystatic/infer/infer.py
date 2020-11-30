@@ -245,12 +245,14 @@ class InferVisitor(BaseVisitor):
                     IncompatibleReturnType(ret_node.value, annotation,
                                            ret_type))
 
-    def accept_condition_stmt_list(self, stmt_list: List[ast.stmt], stmt_type):
+    def accept_condition_stmt_list(self, stmt_list: List[ast.stmt],
+                                   stmt_type: ConditionStmtType, ignore_error=False):
         for stmt in stmt_list:
             if self.cond_infer.detect_break():
                 index = stmt_list.index(stmt)
-                self.err_maker.generate_code_unreachable_error(
-                    stmt_list[index:])
+                if not ignore_error:
+                    self.err_maker.generate_code_unreachable_error(
+                        stmt_list[index:])
                 break
             self.visit(stmt)
 
@@ -289,15 +291,43 @@ class InferVisitor(BaseVisitor):
         self.cond_infer.accept(node)
 
     def visit_For(self, node: ast.For):
+        error_format = False
         container = self.get_type(node.iter)
-        # print(container.bindlist)
-        # print(container.temp.placeholders)
-        self.get_element_type_in_container(container)
+        if not self.check_iterable(node.iter, container):
+            error_format = True
+        if not isinstance(node.target, ast.Name):
+            # TODO: raise error
+            pass
+        else:
+            name = node.target.id
+            if error_format:
+                bindlist = [any_ins]
+            else:
+                bindlist = self.get_element_type_in_container(container)
+            self.record_type(name, bindlist[0])
+            self.accept_condition_stmt_list(node.body, ConditionStmtType.LOOP)
+            self.accept_condition_stmt_list(node.orelse, ConditionStmtType.IF)
+            if len(bindlist) > 1:
+                for tp in bindlist[1:]:
+                    self.record_type(name, tp)
+                    self.accept_condition_stmt_list(node.body, ConditionStmtType.LOOP, True)
+                    self.accept_condition_stmt_list(node.orelse, ConditionStmtType.IF, True)
 
-    def get_element_type_in_container(self, container):
-        # print(container)
-        # print(container.bindlist)
-        pass
+    def get_element_type_in_container(self, container: TypeIns) -> List[TypeIns]:
+        name = container.temp.name
+        if name == 'Dict':
+            return [container.bindlist[0]]
+        else:
+            return container.bindlist
+
+    def check_iterable(self, node: ast.AST, container: TypeIns) -> bool:
+        # TODO: change to __iter__
+        if is_any(container):
+            return False
+        if container.bindlist is None:
+            self.err_maker.add_err(NonIterative(node, container))
+            return False
+        return True
 
 
 class InferStarter:

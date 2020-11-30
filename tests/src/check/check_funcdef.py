@@ -18,4 +18,12 @@ def f5() -> None:
     a = 1
 
 
-a: int = f4()
+from typing import Dict, Union, Tuple
+class A:
+    ...
+
+dic: Tuple[int, str, A]
+for s in dic:
+    a: A = s
+    break
+    f=1

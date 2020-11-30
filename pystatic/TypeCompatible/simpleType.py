@@ -326,7 +326,7 @@ class TypeCompatible:
 def type_consistent(tp1, tp2):
     # print(f"judge '{tp1}' and '{tp2}'")
     res = TypeCompatible().TypeCompatible(tp1, tp2)
-    # print(f"type compatible of '{tp1}' and '{tp2}' is {res}")
+    print(f"type compatible of '{tp1}' and '{tp2}' is {res}")
     return res
 
 
