@@ -1,14 +1,9 @@
 import ast
-from collections import deque
-from typing import Deque, Callable
-from pystatic.arg import Argument
-from pystatic.typesys import TypeIns
-from pystatic.predefined import TypeFuncIns, TypeVarTemp
-from pystatic.message import MessageBox
+from pystatic.predefined import TypeVarTemp
 from pystatic.exprparse import eval_expr
-from pystatic.preprocess.def_expr import (eval_func_type, eval_typedef_expr,
-                                          eval_argument_type, eval_return_type)
+from pystatic.preprocess.resolve_spt import resolve_typealias
 from pystatic.preprocess.util import omit_inst_typetype
+from pystatic.preprocess.resolve_util import eval_preptype
 from pystatic.preprocess.prepinfo import *
 
 
@@ -60,82 +55,47 @@ def judge_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeAlia
                     raise NotImplementedError()
     return None
 
-
-def resolve_local(local: 'prep_local'):
-    """Resolve local symbols' TypeIns"""
+def resolve_local(local: 'prep_local', shallow: bool):
+    """Resolve local symbols' TypeIns
+    
+    :param shallow: if set True, local's current stage must be LOCAL_NORMAL. 
+    This function will judge the type of the local symbol(typevar or typealias)
+    and won't visit node inside subscript node.
+    """
     assert isinstance(local, prep_local)
-    defnode = local.defnode
     prepinfo = local.def_prepinfo
 
-    if (typevar := judge_typevar(prepinfo, local.defnode)):
-        local.value = typevar
-    elif (typealias := judge_typealias(prepinfo, local.defnode)):
-        local.value = typealias
+    if shallow:
+        assert local.stage == LOCAL_NORMAL
+        if (typevar := judge_typevar(prepinfo, local.defnode)):
+            local.value = typevar
+            local.type = LOCAL_TYPEVAR
+            return
+        elif (typealias := judge_typealias(prepinfo, local.defnode)):
+            local.value = typealias
+            local.type = LOCAL_TYPEALIAS
+            return
+
+    assert not local.type == LOCAL_TYPEVAR
+    if local.type == LOCAL_TYPEALIAS:
+        resolve_typealias(local)
+        return
+
+    typenode = local.typenode
+    if not typenode:
+        local.stage = PREP_COMPLETE
+        return
+
+    eval_res = eval_preptype(typenode, local.def_prepinfo, False, shallow)
+    typeins = eval_res.option_ins.value
+    if isinstance(typeins, TypeType):
+        local.value = typeins.get_default_ins()
     else:
-        tpins_option = eval_typedef_expr(defnode, local.def_prepinfo, False)
-        local.value = tpins_option.value
-
-
-def resolve_func(func: 'prep_func'):
-    """Resolve local function's TypeIns"""
-    def add_func_def(node: ast.FunctionDef):
-        nonlocal func
-        func_option = eval_func_type(node, func.def_prepinfo)
-        func_ins = func_option.value
-        assert isinstance(func_ins, TypeFuncIns)
-
-        assert not func.value
-        func.value = func_ins
-        return func_ins
-
-    def add_func_overload(func_ins: TypeFuncIns, argument: Argument,
-                          ret: TypeIns, node: ast.FunctionDef):
-        func_ins.add_overload(argument, ret)
-
-    symid = func.def_prepinfo.glob_symid
-    resolve_func_template(func, add_func_def, add_func_overload, MessageBox(symid))
-
-
-TAddFunDef = Callable[[ast.FunctionDef], TypeFuncIns]
-TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef],
-                           None]
-
-
-def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
-                         add_func_overload: TAddFunOverload,
-                         mbox: 'MessageBox'):
-    """Template to resolve functions"""
-    prepinfo = func.def_prepinfo
-    def get_arg_ret(node: ast.FunctionDef):
-        """Get the argument and return type of the function"""
-        nonlocal prepinfo
-        argument_option = eval_argument_type(node.args, prepinfo)
-        return_option = eval_return_type(node.returns, prepinfo)
-        argument_option.dump_to_box(mbox)
-        return_option.dump_to_box(mbox)
-        return argument_option.value, return_option.value
-
-    overload_list = []
-    not_overload = None  # function def that's not decorated by overload
-    for astnode in func.defnodes:
-        is_overload = False
-        for decs in astnode.decorator_list:
-            if isinstance(decs, ast.Name) and decs.id == 'overload':
-                # TODO: add warning here if defined is already true before
-                is_overload = True
-                break
-        if is_overload:
-            overload_list.append((astnode, *get_arg_ret(astnode)))
-        else:
-            not_overload = astnode
-
-    # TODO: name collision check
-    if len(overload_list) > 0:
-        func_ins = add_func_def(overload_list[0][0])
-
-        for node, argument, ret_ins in overload_list[1:]:
-            add_func_overload(func_ins, argument, ret_ins, node)
-
+        local.value = typeins
+    if shallow and eval_res.generic:
+        local.stage = PREP_NULL
     else:
-        assert not_overload
-        add_func_def(not_overload)
+        local.stage = PREP_COMPLETE
+
+    if not shallow:
+        eval_res.option_ins.dump_to_box(local.def_prepinfo.mbox)

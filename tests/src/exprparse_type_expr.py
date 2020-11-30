@@ -1,4 +1,4 @@
-from typing import Union, Optional, Tuple, Type
+from typing import Literal, Union, Optional, Tuple, Type
 
 
 class A:
@@ -10,3 +10,4 @@ b: Optional[A] = None
 c: Optional[Type[A]] = None
 d: Tuple[int, ...] = (1, 2)
 e: Tuple[int, str] = (1, "s")
+f: Literal['test'] = 'test'

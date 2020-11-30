@@ -28,6 +28,7 @@ def cmdline_parse():
     parser.add_argument('--shell',
                         action='store_true',
                         help='run pystatic shell')
+    parser.add_argument('--test-typeshed', action='store_true')
     parse_res = parser.parse_args()
     return parse_res
 

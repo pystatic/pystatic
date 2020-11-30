@@ -35,13 +35,23 @@ def eval_expr(node: Optional[ast.AST],
 class ExprParser(NoGenVisitor):
     def __init__(self, consultant: SupportGetAttribute, explicit: bool,
                  annotation: bool) -> None:
+        """
+        :param annotation: whether regard str as type annotation
+        """
         self.consultant = consultant
         self.explicit = explicit
         self.annotation = annotation
         self.errors = []
+        self.in_subs = False
+        self.container = None
 
-        self.in_subs = False  # under a subscription node?
-        self.container = []
+    def accept(self, node) -> Option[TypeIns]:
+        self.errors = []
+        tpins = self.visit(node)
+        assert isinstance(tpins, TypeIns)
+        res_option = Option(tpins)
+        res_option.add_err_list(self.errors)
+        return res_option
 
     @contextlib.contextmanager
     def register_container(self, container: list):
@@ -61,7 +71,7 @@ class ExprParser(NoGenVisitor):
         yield
         self.in_subs = old_in_subs
 
-    def add_error(self, errlist: Optional[List[ErrorCode]]):
+    def add_err(self, errlist: Optional[List[ErrorCode]]):
         if errlist:
             self.errors.extend(errlist)
 
@@ -101,20 +111,12 @@ class ExprParser(NoGenVisitor):
             applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
         return applyargs
 
-    def accept(self, node: ast.AST) -> Option[TypeIns]:
-        self.errors = []
-        tpins = self.visit(node)
-        assert isinstance(tpins, TypeIns)
-        res_option = Option(tpins)
-        res_option.add_error_list(self.errors)
-        return res_option
-
     def visit_Name(self, node: ast.Name) -> TypeIns:
         name_option = self.consultant.getattribute(node.id, node)
         assert isinstance(name_option, Option)
         assert isinstance(name_option.value, TypeIns)
 
-        self.add_error(name_option.errors)
+        self.add_err(name_option.errors)
 
         self.add_to_container(name_option.value, node)
         return name_option.value
@@ -150,7 +152,7 @@ class ExprParser(NoGenVisitor):
             assert isinstance(res, TypeIns)
         attr_option = res.getattribute(node.attr, node)
 
-        self.add_error(attr_option.errors)
+        self.add_err(attr_option.errors)
 
         self.add_to_container(attr_option.value, node)
         return attr_option.value
@@ -162,7 +164,7 @@ class ExprParser(NoGenVisitor):
         applyargs = self.generate_applyargs(node)
         call_option = left_ins.call(applyargs)
 
-        self.add_error(call_option.errors)
+        self.add_err(call_option.errors)
 
         self.add_to_container(call_option.value, node)
         return call_option.value
@@ -175,7 +177,7 @@ class ExprParser(NoGenVisitor):
         assert op, f"{node.op} is not supported now"
         res_option = operand_ins.unaryop_mgf(op, node)
 
-        self.add_error(res_option.errors)
+        self.add_err(res_option.errors)
 
         self.add_to_container(res_option.value, node)
         return res_option.value
@@ -190,7 +192,7 @@ class ExprParser(NoGenVisitor):
         assert op, f"{node.op} is not supported now"
         res_option = left_ins.binop_mgf(right_ins, op, node)
 
-        self.add_error(res_option.errors)
+        self.add_err(res_option.errors)
 
         self.add_to_container(res_option.value, node)
         return res_option.value
@@ -200,13 +202,18 @@ class ExprParser(NoGenVisitor):
             left_ins = self.visit(node.value)
             assert isinstance(left_ins, TypeIns)
 
+        old_annotation = self.annotation
+        if left_ins.temp == literal_temp:
+            self.annotation = False
+
         container = []
         with self.register_container(container):
             items = self.visit(node.slice)
             assert isinstance(items, (list, tuple, TypeIns))
-
         assert len(container) == 1
         res_option = left_ins.getitem(container[0])
+
+        self.annotation = old_annotation
 
         self.add_to_container(res_option.value, node)
         return res_option.value

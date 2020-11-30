@@ -21,8 +21,6 @@ OriginName = str
 ImportNode = Union[ast.Import, ast.ImportFrom]
 ImportItem = Tuple[AsName, OriginName, ImportNode]
 
-TypeDefNode = Union[str, ast.AST]
-
 
 class Entry:
     __slots__ = ['tp', 'defnode']
@@ -199,6 +197,16 @@ class SymTable:
     def legb_lookup(self, name):
         return self._legb_lookup(name, SymTable.lookup_local)
 
+    def egb_lookup(self, name: str):
+        find = SymTable.lookup_local
+        curtable = self.non_local
+        while curtable:
+            res = find(curtable, name)
+            if res:
+                return res
+            curtable = curtable.non_local
+        return find(self.builtins, name)
+
     def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
         """Getattribute from symtable
 
@@ -208,7 +216,7 @@ class SymTable:
         res_option = Option(any_ins)
         res = self.legb_lookup(name)
         if not res:
-            res_option.add_error(SymbolUndefined(node, name))
+            res_option.add_err(SymbolUndefined(node, name))
         else:
             res_option.set_value(res)
         return res_option

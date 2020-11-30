@@ -1,4 +1,5 @@
 import ast
+from copy import Error
 from typing import Optional, List, TYPE_CHECKING
 from pystatic.errorcode import ErrorCode, CodeUnreachable, Level
 from pystatic.option import Option
@@ -12,7 +13,6 @@ class Message(object):
 
     from_node: generate an error message for the position implied by the node
     """
-
     def __init__(self, lineno: int, end_lineno: Optional[int], col_offset: int,
                  end_col_offset: Optional[int], msg: str):
         self.lineno = lineno

@@ -169,7 +169,8 @@ class TypeTypeAnnTemp(TypeTemp):
 
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
         if not bindlist or len(bindlist) != 1:
-            raise NotImplementedError()  # TODO: warning here
+            # FIXME: add error here
+            return Option(any_ins)
 
         if not isinstance(bindlist[0], TypeIns):
             raise NotImplementedError()
@@ -228,14 +229,14 @@ class TypeNoneTemp(TypeTemp):
                     node: ast.UnaryOp) -> Option['TypeIns']:
         none_ins = self._cached_ins
         res_option = Option(none_ins)
-        res_option.add_error(NoAttribute(node, none_ins, 'None'))
+        res_option.add_err(NoAttribute(node, none_ins, 'None'))
         return res_option
 
     def binop_mgf(self, bindlist: BindList, other: 'TypeIns', op: str,
                   node: ast.BinOp) -> Option['TypeIns']:
         none_ins = self._cached_ins
         res_option = Option(none_ins)
-        res_option.add_error(NoAttribute(node, none_ins, 'None'))
+        res_option.add_err(NoAttribute(node, none_ins, 'None'))
         return res_option
 
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
@@ -405,6 +406,21 @@ class TypeLiteralTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
+    def getitem_typetype(self, bindlist: Optional[BindList],
+                         itemarg: Optional[GetItemArg]) -> Option['TypeType']:
+        if not itemarg:
+            # TODO warning here
+            return Option(any_ins)
+
+        constant = itemarg.ins
+        if isinstance(constant, (bool, bytes, str, int, float, complex)):
+            return Option(TypeLiteralIns(constant))
+        elif isinstance(constant, TypeLiteralIns):
+            return Option(constant)
+        else:
+            # TODO: warning here
+            return Option(any_ins)
+
     def arity(self) -> int:
         return 1
 
@@ -492,7 +508,7 @@ class TypeModuleIns(TypeIns):
             return self.consultant.getattribute(name, node)
         else:
             res_option = Option(any_ins)
-            res_option.add_error(SymbolUndefined(node, name))
+            res_option.add_err(SymbolUndefined(node, name))
             return res_option
 
 

@@ -9,7 +9,7 @@ from pystatic.predefined import TypeLiteralIns, TypeIns
 from pystatic.errorcode import *
 from pystatic.config import Config
 from pystatic.staticinfer import cmp_by_op
-from pystatic.infer.recorder import SymbolRecorder
+from pystatic.infer.recorder import SymbolRecorder, StoredType
 from pystatic.visitor import BaseVisitor
 from pystatic.reach import Reach, cal_neg, is_true
 from pystatic.TypeCompatible.simpleType import type_consistent
@@ -33,7 +33,7 @@ class Condition:
     def __init__(self, stmt_type: ConditionStmtType, reach: Reach):
         self.stmt_type = stmt_type
         self.reach = reach
-        self.dirty_map: Dict[str, TypeIns] = {}
+        self.dirty_map: Dict[str, StoredType] = {}
 
 
 class ConditionInfer(BaseVisitor):
@@ -51,16 +51,16 @@ class ConditionInfer(BaseVisitor):
         ]
         self.break_flag = BreakFlag.NORMAL
         self.break_node: Optional[ast.stmt] = None
+        self.isinstance_cond = False
+        self.temp_type: Dict[str, StoredType] = {}
 
     @property
     def cur_condition(self):
         return self.reach_stack[-1]
 
-    def save_type(self, name: str):
-        tp = self.recorder.get_comment_type(name)
-        if name in self.cur_condition.dirty_map:
-            return
-        self.cur_condition.dirty_map[name] = tp
+    def save_type(self, name: str, is_permanent=True):
+        tp = self.recorder.get_run_time_type(name)
+        self.cur_condition.dirty_map[name] = StoredType(tp, is_permanent)
 
     def accept(self, node: ast.stmt):
         self.visit(node)
@@ -70,10 +70,18 @@ class ConditionInfer(BaseVisitor):
         return reach in (Reach.ALWAYS_FALSE, Reach.TYPE_FALSE)
 
     def pop(self):
-        if self.cur_condition.reach == Reach.UNKNOWN:
-            self.recorder.clean_dirty(self.cur_condition.dirty_map)
+        self.recover_type()
         self.reach_stack.pop()
         assert len(self.reach_stack) != 0
+
+    def recover_type(self):
+        if self.cur_condition.reach == Reach.UNKNOWN \
+                or self.isinstance_cond:
+            if self.isinstance_cond:
+                self.isinstance_cond = False
+                self.cur_condition.dirty_map.update(self.temp_type)
+                self.temp_type.clear()
+            self.recorder.recover_type(self.cur_condition.dirty_map)
 
     def flip(self):
         self.reach_stack[-1].stmt_type = ConditionStmtType.IF
@@ -151,25 +159,39 @@ class ConditionInfer(BaseVisitor):
     def infer_value_of_call(self, test: ast.Call) -> Reach:
         if isinstance(test.func, ast.Name):
             name = test.func.id
-            args = test.args
             if name == "isinstance":
-                # option = eval_expr(test, self.recorder)
-                # if self.err_maker.exsit_error(option):
-                #     self.err_maker.dump_option(option)
-                first_type = self.err_maker.dump_option(
-                    eval_expr(args[0], self.recorder))
-                second_type = self.err_maker.dump_option(
-                    eval_expr(args[1], self.recorder))
-                if type_consistent(
-                        first_type,
-                        self.err_maker.dump_option(second_type.call(None))):
-                    return Reach.ALWAYS_TRUE
-                else:
-                    return Reach.ALWAYS_FALSE
-                # TODO
+                return self.visit_isinstance(test)
             elif name == "issubclass":
-                # TODO
+                return self.visit_issubclass(test)
+        return Reach.UNKNOWN
+
+    def visit_isinstance(self, node: ast.Call) -> Reach:
+        args = node.args
+        first_type = self.err_maker.dump_option(
+            eval_expr(args[0], self.recorder))
+        second_typetype = self.err_maker.dump_option(
+            eval_expr(args[1], self.recorder))
+        option = second_typetype.call(None)
+        name = args[0].id
+        if self.err_maker.exsit_error(option):
+            assert 'TODO'
+        second_type = option.value
+        if type_consistent(first_type, second_type):
+            if isinstance(args[0], ast.Name):
+                pre_type = self.recorder.get_run_time_type(name)
+                self.temp_type[name] = StoredType(pre_type, False)
+                self.recorder.record_type(name, second_type)
+                self.isinstance_cond = True
+            if first_type.temp.name == 'Union':
                 return Reach.UNKNOWN
+            else:
+                return Reach.ALWAYS_TRUE
+        else:
+            return Reach.ALWAYS_FALSE
+
+    def visit_issubclass(self, node: ast.Call) -> Reach:
+        # TODO
+        return Reach.UNKNOWN
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
         option: Option = eval_expr(test, self.recorder)
