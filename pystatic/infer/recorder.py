@@ -48,7 +48,6 @@ class ModuleScope(Scope):
 
 class SymbolRecorder:
     """record the appeared symbol"""
-
     def __init__(self, module):
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))

@@ -1,4 +1,5 @@
 import ast
+from pystatic.target import FunctionTarget
 from typing import Callable
 from pystatic.predefined import TypeFuncIns, TypeIns
 from pystatic.message import MessageBox
@@ -14,7 +15,7 @@ def resolve_func(func: 'prep_func'):
         nonlocal func
         def_symtable = func.def_prepinfo.symtable
         module_symid = def_symtable.glob_symid
-        fun_name = node.name
+        fun_name = func.name
         new_symtable = def_symtable.new_symtable(fun_name, TableScope.FUNC)
         return TypeFuncIns(fun_name, module_symid, new_symtable, argument, ret)
 
@@ -29,6 +30,7 @@ def resolve_func(func: 'prep_func'):
 TAddFunDef = Callable[[Argument, TypeIns, ast.FunctionDef], TypeFuncIns]
 TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef],
                            None]
+FunTuple = Tuple[Argument, TypeIns, ast.FunctionDef]
 
 
 def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
@@ -45,8 +47,9 @@ def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
         return_option.dump_to_box(mbox)
         return argument_option.value, return_option.value
 
-    overload_list = []
-    not_overload = None  # function def that's not decorated by overload
+    overload_list: List[FunTuple] = []
+    not_overload: Optional[
+        FunTuple] = None  # function def that's not decorated by overload
     for astnode in func.defnodes:
         is_overload = False
         for decs in astnode.decorator_list:
@@ -56,7 +59,12 @@ def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
         if is_overload:
             overload_list.append((*get_arg_ret(astnode), astnode))
         else:
-            not_overload = (*get_arg_ret(astnode), astnode)
+            if not_overload:
+                overload_list.append((*get_arg_ret(astnode), astnode))
+                mbox.add_err(
+                    SymbolRedefine(astnode, func.name, not_overload[-1]))
+            else:
+                not_overload = (*get_arg_ret(astnode), astnode)
 
     len_overload = len(overload_list)
     if len_overload > 0:

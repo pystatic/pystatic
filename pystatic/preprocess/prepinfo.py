@@ -366,6 +366,7 @@ class prep_func:
         self.def_prepinfo = def_prepinfo
         self.value: Optional[TypeFuncIns] = None
         self.stage = PREP_NULL
+        self.name = defnode.name
 
     def add_defnode(self, defnode: ast.FunctionDef):
         assert isinstance(defnode, ast.FunctionDef)
