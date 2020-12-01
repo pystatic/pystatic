@@ -211,11 +211,16 @@ class ExprParser(NoGenVisitor):
             items = self.visit(node.slice)
             assert isinstance(items, (list, tuple, TypeIns))
         assert len(container) == 1
-        res_option = left_ins.getitem(container[0])
+        if isinstance(container[0].value, (list, tuple)):
+            itemargs = GetItemArgs(container[0].value, node)
+        else:
+            itemargs = GetItemArgs([container[0]], node)
+        res_option = left_ins.getitem(itemargs, node)
 
         self.annotation = old_annotation
 
         self.add_to_container(res_option.value, node)
+        self.add_err(res_option.errors)
         return res_option.value
 
     def visit_List(self, node: ast.List):

@@ -26,6 +26,14 @@ def parse_file_error(file_path):
     return msg_list
 
 
+def check_error_msg(mbox, true_msg_list):
+    test_msg_list = mbox.to_message()
+    assert len(test_msg_list) == len(true_msg_list)
+    for true_msg, test_msg in zip(true_msg_list, test_msg_list):
+        assert test_msg.lineno == true_msg.lineno
+        assert test_msg.msg == true_msg.msg
+
+
 def get_manager_path(config: dict,
                      symid: str,
                      cwd: Optional[str] = None) -> Tuple['Manager', str]:

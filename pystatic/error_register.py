@@ -7,6 +7,10 @@ NO_ATTRIBUTE = "Type '{}' has no attribute '{}'"
 UNSUPPORTED_OPERAND = "Unsupported operand types for '{}'"
 CODE_UNREACHABLE = "This code is unreachable"
 NON_ITERATIVE = "type '{}' is non-iterative"
+INDICE_PARAM_NOT_CLASS = "Expect a class type"
+NOT_SUBSCRIPTABLE = "type '{}' is not subscriptable"
+INDICE_ARGUMENT_NUMBER_MISMATCH = "receive {} but require {} arguments"
+
 # tuple
 NEED_MORE_VALUES_TO_UNPACK = "Need more values to unpack"
 TOO_MORE_VALUES_TO_UNPACK = "Too more values to unpack"
