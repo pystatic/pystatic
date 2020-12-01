@@ -46,7 +46,8 @@ class MessageBox(object):
         self.error.append(err)
 
     def to_message(self):
-        return [Message.from_node(*err.make()) for err in self.error]
+        msg_list = [Message.from_node(*err.make()) for err in self.error]
+        return sorted(msg_list)
 
     def clear(self):
         self.error = []
