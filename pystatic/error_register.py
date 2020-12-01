@@ -21,3 +21,6 @@ TOO_MORE_ARGUMENT_FOR_FUNC = "Too more arguments for '{}'"
 # Manager
 FILE_NOT_FOUND = "{} not found"
 MODULE_NOT_FOUND = "{} not found"
+
+# Class
+DUPLICATE_BASECLASS = "duplicate baseclass is not allowed"

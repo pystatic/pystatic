@@ -3,7 +3,7 @@ import sys
 
 sys.path.extend(['.', '..'])
 
-from ..util import get_manager_path
+from ..util import get_manager_path, parse_file_error
 
 from pystatic.typesys import TypeAnyTemp, TypeIns, TypeType
 from pystatic.predefined import TypeModuleIns, TypeFuncIns
@@ -58,3 +58,17 @@ def test_class():
         self_arg, TypeType
     )  # normal method's first argument should be the instance of the Type
     assert self_foo1.argument.args[0].ann.temp == A_type.temp
+
+
+def test_duplicate_class():
+    symid = 'preprocess.prep_duplicate_cls'
+    manager, file_path = get_manager_path({}, symid)
+    manager.preprocess()
+
+    true_msg_list = parse_file_error(file_path)
+    mbox = manager.get_mbox_by_symid(symid)
+    test_msg_list = mbox.to_message()
+    assert len(true_msg_list) == len(test_msg_list)
+    for true_msg, test_msg in zip(true_msg_list, test_msg_list):
+        assert test_msg.lineno == true_msg.lineno
+        assert test_msg.msg == true_msg.msg
