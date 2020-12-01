@@ -31,7 +31,8 @@ file_list = ['check_assign',
              'check_tuple',
              'check_funcdef',
              'check_reach',
-             'check_specialfunc']
+             'check_specialfunc',
+             'check_for']
 
 
 def test_check():

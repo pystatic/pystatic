@@ -79,6 +79,7 @@ class VarTypeCollide(ErrorCode):
     """Name has been defined as a class or function but used on the left of an
     assignment statement.
     """
+
     def __init__(self, previlege_node: Optional[Union[ast.ClassDef,
                                                       ast.FunctionDef]],
                  name: str, varnode: Optional[ast.AST]) -> None:
@@ -232,6 +233,17 @@ class CodeUnreachable(ErrorCode):
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, CODE_UNREACHABLE
+
+
+class NonIterative(ErrorCode):
+    def __init__(self, node: Optional[ast.AST], fake_iter: 'TypeIns'):
+        super().__init__()
+        self.node = node
+        self.iter = fake_iter
+        self.level = Level.WARN
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, NON_ITERATIVE.format(self.iter)
 
 
 # Errors that have nothing to do with type inconsistency

@@ -4,7 +4,7 @@ from typing import List, Dict, Set, Union
 from pystatic.errorcode import SymbolUndefined, ErrorCode
 from pystatic.typesys import TypeIns, TypeType, any_type
 from pystatic.predefined import (TypeFuncIns, TypeModuleIns, TypeUnionTemp,
-                                 TypeLiteralIns, builtins_symtable)
+                                 TypeLiteralIns, builtins_symtable, none_ins)
 from pystatic.option import Option
 from pystatic.symtable import SymTable
 from pystatic.TypeCompatible.simpleType import type_consistent
@@ -33,7 +33,7 @@ class FuncScope(Scope):
         super().__init__(tp)
         self.type_map = args
         self.ret_annotation = ret_annotation
-        self.ret_type: Set[TypeIns] = set()
+        self.ret_types: Set[TypeIns] = set()
 
 
 class ClassScope(Scope):
@@ -81,7 +81,7 @@ class SymbolRecorder:
     def add_ret(self, ret_type: TypeIns):
         cur_scope = self.cur_scope
         assert isinstance(cur_scope, FuncScope)
-        cur_scope.ret_type.add(ret_type)
+        cur_scope.ret_types.add(ret_type)
 
     def get_ret_annotation(self):
         cur_scope = self.cur_scope
@@ -91,9 +91,24 @@ class SymbolRecorder:
     def get_ret_type(self):
         cur_scope = self.cur_scope
         assert isinstance(cur_scope, FuncScope)
-        ret = cur_scope.ret_type
-        cur_scope.ret_type = set()
+        ret = cur_scope.ret_types
         return ret
+
+    def clear_ret_val(self):
+        self.cur_scope.ret_types = set()
+
+    def reset_ret_val(self):
+        cur_scope = self.cur_scope
+        assert isinstance(cur_scope, FuncScope)
+        ret_list = list(self.get_ret_type())
+        num = len(ret_list)
+        if num == 0:
+            cur_scope.tp.overloads[0].ret_type = none_ins
+        elif num == 1:
+            cur_scope.tp.overloads[0].ret_type = ret_list[0]
+        else:
+            union_type = make_union_type(ret_list)
+            cur_scope.tp.overloads[0].ret_type = union_type
 
     def record_type(self, name: str, tp: TypeIns):
         self.cur_scope.set_type(name, tp)

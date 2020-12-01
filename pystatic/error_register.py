@@ -6,6 +6,7 @@ VAR_TYPE_COLLIDE = "'{}' doesn't match its definition"
 NO_ATTRIBUTE = "Type '{}' has no attribute '{}'"
 UNSUPPORTED_OPERAND = "Unsupported operand types for '{}'"
 CODE_UNREACHABLE = "This code is unreachable"
+NON_ITERATIVE = "type '{}' is non-iterative"
 # tuple
 NEED_MORE_VALUES_TO_UNPACK = "Need more values to unpack"
 TOO_MORE_VALUES_TO_UNPACK = "Too more values to unpack"
