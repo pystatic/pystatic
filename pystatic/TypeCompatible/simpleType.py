@@ -151,12 +151,12 @@ class TypeCompatible:
                        state: compatibleState) -> bool:
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-
+        
         tempb = b.temp
         if tempa.name == 'Any' or tempb.name == 'Any':
             return True
         elif tempa.name == 'None':
-            if tempb.name == 'None ':
+            if tempb.name == 'None':
                 return True
             else:
                 return False  # None与其它类型的比较都返回False
@@ -218,6 +218,8 @@ class TypeCompatible:
         return False
 
     def NoneCom(self, a: TypeIns, b: TypeIns) -> bool:
+        if a.temp.name =='None' and b.temp.name == 'None':
+            return True
         return False
 
     def CollectionsTypeCom(self, a: TypeIns, b: TypeIns,
