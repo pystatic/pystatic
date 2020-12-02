@@ -293,6 +293,19 @@ class TypeTupleTemp(TypeClassTemp):
     def arity(self) -> int:
         return INFINITE_ARITY
 
+    def getitem_typetype(self, bindlist: BindList, itemarg: GetItemArgs,
+                         node: Optional[ast.AST]) -> Option['TypeType']:
+        res_option = super().getitem_typetype(bindlist, itemarg, node)
+        try:
+            if res_option.value.bindlist[0] == ellipsis_ins:
+                res_option.add_err(
+                    IndiceGeneralError(
+                        "'...' allowed only as the second of two arguments",
+                        node))
+            return res_option
+        except IndexError:
+            return res_option
+
     def get_default_ins(self) -> Option['TypeIns']:
         return Option(self._cached_ins)
 

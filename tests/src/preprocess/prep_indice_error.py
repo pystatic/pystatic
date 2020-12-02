@@ -15,4 +15,4 @@ l: Tuple[int, int, float]
 m: List['int']
 n: List[1]  # E Expect a class type
 o: Dict[[int], float]  # E Expect a class type
-# p: Tuple[...]
+p: Tuple[...]  # E '...' allowed only as the second of two arguments

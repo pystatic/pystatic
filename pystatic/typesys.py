@@ -311,7 +311,9 @@ class TypeTemp(ABC):
         if not isinstance(value, TypeIns):
             res_option.add_err(IndiceParamNotClass(node))
         elif not isinstance(value, TypeType):
-            res_option.add_err(IndiceParamNotClass(node))
+            from pystatic.predefined import ellipsis_ins
+            if value != ellipsis_ins:
+                res_option.add_err(IndiceParamNotClass(node))
             res_bindlist.append(value)
         else:
             res_bindlist.append(value.get_default_ins())
