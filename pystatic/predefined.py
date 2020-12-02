@@ -299,10 +299,6 @@ class TypeTupleTemp(TypeClassTemp):
     def get_default_typetype(self) -> 'TypeType':
         return self._cached_typetype
 
-    def getitem_typetype(self, bindlist: BindList, itemarg: GetItemArgs,
-                         node: Optional[ast.AST]) -> Option['TypeType']:
-        return super().getitem_typetype(bindlist, itemarg, node)
-
 
 class TypeSetTemp(TypeClassTemp):
     def __init__(self) -> None:
@@ -361,6 +357,9 @@ class TypeCallableTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
+    def arity(self) -> int:
+        return 2
+
     def getitem_typetype(self,
                          bindlist: BindList,
                          itemarg: GetItemArgs,
@@ -373,7 +372,6 @@ class TypeCallableTemp(TypeTemp):
                                                      node):
             res_option.value = TypeType(self, bindlist)
             return res_option
-        self._getitem_typetype_check_arity(itemarg, res_option, node)
 
         items = itemarg.items
         callable_err = "Parameter list doesn't match Callable's structure"
