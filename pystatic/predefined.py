@@ -461,16 +461,18 @@ class TypeLiteralTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
+    def arity(self) -> int:
+        return 1
+
     def getitem_typetype(self,
                          bindlist: BindList,
                          itemarg: GetItemArgs,
                          node: Optional[ast.AST] = None) -> Option['TypeType']:
-        res = TypeLiteralIns(None)
-        res_option = Option(res)
+        res_option = Option(any_ins)
 
         if not self._getitem_typetype_check_bindlist(bindlist, res_option,
                                                      node):
-            res_option.value = TypeLiteralIns(bindlist)
+            res_option.value = TypeType(self, bindlist)
             return res_option
 
         items = itemarg.items
@@ -480,20 +482,22 @@ class TypeLiteralTemp(TypeTemp):
         constant_node = items[0].node
 
         if isinstance(constant, TypeLiteralIns):
-            res = constant
-            res_option.value = res
+            res_option.value = TypeType(self, constant.bindlist)
         elif isinstance(constant, (list, tuple, TypeIns)):
             res_option.add_err(
                 IndiceGeneralError("Literal's indice should be literal value",
                                    constant_node))
             res_option.value = any_ins
         else:
-            res = TypeLiteralIns(constant)
+            res = TypeType(self, [constant])
             res_option.value = res
         return res_option
 
-    def arity(self) -> int:
-        return 1
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        if bindlist:
+            return Option(TypeLiteralIns(bindlist[0]))
+        else:
+            return Option(any_ins)
 
 
 class TypeLiteralIns(TypeIns):
