@@ -1,4 +1,4 @@
-from typing import Callable, Literal, List, Dict, Tuple
+from typing import Callable, Generic, Literal, List, Dict, Tuple, TypeVar
 
 a: Literal[int] = 3  # E Literal's indice should be literal value
 b: Literal[3] = 3
@@ -16,3 +16,13 @@ m: List['int']
 n: List[1]  # E Expect a class type
 o: Dict[[int], float]  # E Expect a class type
 p: Tuple[...]  # E '...' allowed only as the second of two arguments
+
+T = TypeVar('T', int, float)
+class A(Generic[T]):
+    ...
+
+class B(Generic[T, int]):  # E Expect a TypeVar
+    ...
+
+class C(Generic[T, 1]):  # E Expect a TypeVar
+    ...

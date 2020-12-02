@@ -23,7 +23,9 @@ def resolve_cls(clsdef: 'prep_cls', shallow: bool):
     for base_node in clsdef.defnode.bases:
         base_res = eval_preptype(base_node, clsdef.prepinfo, False, shallow)
         res_type = base_res.option_ins.value
+        base_res.option_ins.dump_to_box(mbox)
         assert isinstance(res_type, TypeType)
+
         if res_type:
             res_ins = res_type.get_default_ins()
             is_new = True

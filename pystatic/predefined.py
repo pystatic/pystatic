@@ -436,16 +436,11 @@ class TypeGenericTemp(TypeTemp):
         for item in items:
             value = item.value
             node = item.node
-            if not isinstance(value, TypeIns):
-                res_option.add_err(IndiceParamNotClass(node))
-            elif not isinstance(value, TypeType):
-                res_option.add_err(IndiceParamNotClass(node))
+            if not isinstance(value, TypeVarIns):
+                res_option.add_err(IndiceGeneralError("Expect a TypeVar",
+                                                      node))
             else:
-                if not isinstance(value, TypeVarIns):
-                    res_option.add_err(
-                        IndiceGeneralError("Expect a TypeVar", node))
-                else:
-                    res_bindlist.append(value)
+                res_bindlist.append(value)
         return res_option
 
 
