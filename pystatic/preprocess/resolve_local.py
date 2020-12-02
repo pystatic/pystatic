@@ -86,7 +86,7 @@ def resolve_local(local: 'prep_local', shallow: bool):
         local.stage = PREP_COMPLETE
         return
 
-    eval_res = eval_preptype(typenode, local.def_prepinfo, False, shallow)
+    eval_res = eval_preptype(typenode, local.def_prepinfo, True, shallow)
     typeins = eval_res.option_ins.value
     if isinstance(typeins, TypeType):
         local.value = typeins.get_default_ins()
