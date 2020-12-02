@@ -7,6 +7,10 @@ NO_ATTRIBUTE = "Type '{}' has no attribute '{}'"
 UNSUPPORTED_OPERAND = "Unsupported operand types for '{}'"
 CODE_UNREACHABLE = "This code is unreachable"
 NON_ITERATIVE = "type '{}' is non-iterative"
+INDICE_PARAM_NOT_CLASS = "Expect a class type"
+NOT_SUBSCRIPTABLE = "type '{}' is not subscriptable"
+INDICE_ARGUMENT_NUMBER_MISMATCH = "receive {} but require {} argument(s)"
+
 # tuple
 NEED_MORE_VALUES_TO_UNPACK = "Need more values to unpack"
 TOO_MORE_VALUES_TO_UNPACK = "Too more values to unpack"
@@ -21,3 +25,6 @@ TOO_MORE_ARGUMENT_FOR_FUNC = "Too more arguments for '{}'"
 # Manager
 FILE_NOT_FOUND = "{} not found"
 MODULE_NOT_FOUND = "{} not found"
+
+# Class
+DUPLICATE_BASECLASS = "duplicate baseclass is not allowed"

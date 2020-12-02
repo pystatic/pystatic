@@ -1,5 +1,4 @@
 import ast
-from pystatic.option import Option
 from enum import Enum
 from typing import Tuple, Optional, TYPE_CHECKING, Union
 from pystatic.error_register import *
@@ -21,7 +20,7 @@ class ErrorCode:
         pass
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        pass
+        ...
 
     @staticmethod
     def concat_msg(review: str, detail: str):
@@ -75,11 +74,54 @@ class SymbolRedefine(ErrorCode):
             return self.node, review
 
 
+class IndiceParamNotClass(ErrorCode):
+    def __init__(self, node: Optional[ast.AST]) -> None:
+        super().__init__()
+        self.node = node
+        self.level = Level.ERROR
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, INDICE_PARAM_NOT_CLASS
+
+
+class IndiceParamNumberMismatch(ErrorCode):
+    def __init__(self, receive: int, arity: int, node: Optional[ast.AST]):
+        self.receive = receive
+        self.arity = arity
+        self.node = node
+        self.level = Level.ERROR
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, INDICE_ARGUMENT_NUMBER_MISMATCH.format(
+            self.receive, self.arity)
+
+
+class IndiceGeneralError(ErrorCode):
+    def __init__(self, msg: str, node: Optional[ast.AST]):
+        super().__init__()
+        self.msg = msg
+        self.node = node
+        self.level = Level.ERROR
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, self.msg
+
+
+class NotSubscriptable(ErrorCode):
+    def __init__(self, inable_type: 'TypeIns',
+                 node: Optional[ast.AST]) -> None:
+        super().__init__()
+        self.node = node
+        self.inable_type = inable_type
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, NOT_SUBSCRIPTABLE.format(self.inable_type)
+
+
 class VarTypeCollide(ErrorCode):
     """Name has been defined as a class or function but used on the left of an
     assignment statement.
     """
-
     def __init__(self, previlege_node: Optional[Union[ast.ClassDef,
                                                       ast.FunctionDef]],
                  name: str, varnode: Optional[ast.AST]) -> None:
@@ -244,6 +286,17 @@ class NonIterative(ErrorCode):
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, NON_ITERATIVE.format(self.iter)
+
+
+# Class related
+class DuplicateBaseclass(ErrorCode):
+    def __init__(self, node: Optional[ast.AST]) -> None:
+        super().__init__()
+        self.node = node
+        self.level = Level.ERROR
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, DUPLICATE_BASECLASS
 
 
 # Errors that have nothing to do with type inconsistency
