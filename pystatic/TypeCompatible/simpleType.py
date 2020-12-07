@@ -1,9 +1,11 @@
 import ast
 import enum
-from pystatic.predefined import TypeLiteralIns
 from typing import Callable, Tuple, Optional, Type, TypeVar, Union
-from pystatic.typesys import TypeIns, TypeTemp, TypeClassTemp, TypeType
-from pystatic.predefined import TypeOptionalTemp, TypeTupleTemp, TypeCallableTemp
+from pystatic.typesys import TypeAnyTemp,TypeIns, TypeTemp, TypeClassTemp, TypeType
+from pystatic.predefined import TypeOptionalTemp,TypeCallableTemp,TypeNoneTemp, TypeUnionTemp, TypeVarTemp
+from pystatic.predefined import TypeFuncTemp, TypeListTemp, TypeTupleTemp, TypeSetTemp, TypeDictTemp
+from pystatic.predefined import TypeLiteralIns, TypeLiteralTemp
+from pystatic.predefined import int_temp,float_temp,str_temp,complex_temp,byte_temp,bool_temp
 
 
 class compatibleState(enum.IntEnum):
@@ -11,77 +13,75 @@ class compatibleState(enum.IntEnum):
     COVARIANT = 1
     CONTRAVARIANT = 2
 
-
 class TypeCompatible:
     def __init__(self) -> None:
-        self.baseTypestr = ['int', 'float', 'str', 'complex', 'bytes', 'bool']
-        self.collectionTypestr = ['Tuple', 'Set', 'List', 'Dict']
-        self.specialTypestr = [
-            'Callable', 'Literal', 'Any', 'None', 'Union', 'Optional'
+        self.baseType = [int_temp, float_temp, str_temp, complex_temp, byte_temp, bool_temp]
+        self.collectionType = [TypeTupleTemp, TypeSetTemp, TypeListTemp, TypeDictTemp]
+        self.specialType = [
+           TypeCallableTemp, TypeAnyTemp, TypeNoneTemp, TypeUnionTemp, TypeOptionalTemp,TypeLiteralTemp
         ]
 
-    def TypeCompatible(self, a: TypeIns, b: TypeIns) -> bool:
-        #print(a,b,a.temp.name,b.temp.name)
-        #print(type(a),type(b))
+    def baseclassify(self, temp:TypeTemp, mylist):
+        for item in mylist: 
+            if temp == item :
+                return True
+        return False
 
+    def classify(self, temp:TypeTemp, mylist):
+        for item in mylist:
+            if isinstance(temp, item):
+                return True
+        return False
+
+    def TypeCompatible(self, a: TypeIns, b: TypeIns) -> bool:
+        print(a,b,a.temp.name,b.temp.name)
+        print(type(a),type(b),type(a.temp),type(b.temp)) 
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        valuetype = type(a)
-      
-        if tempa.name in self.baseTypestr:
-            #print(f" '{tempa.name}'  In  baseType")
+        if self.baseclassify(tempa, self.baseType):
             return self.BaseTypeCom(a, b, \
                                     compatibleState.COVARIANT)
-        elif tempa.name in self.specialTypestr:
-            #print(f" '{tempa.name}' In specialTyperStr")
+        elif self.classify(tempa, self.specialType):
             return self.SpecialTypeCom(a, b, \
                                        compatibleState.COVARIANT)
-
-        elif tempa.name in self.collectionTypestr:
-            #print(f" '{tempa.name}' In collection")
+        elif self.classify(tempa, self.collectionType):
+            print(f" '{tempa.name}' In collection")
             return self.CollectionsTypeCom(a, b,
                                            compatibleState.COVARIANT)
-
         elif isinstance(a, TypeType) or isinstance(b, TypeType):
             if isinstance(a, TypeType) and isinstance(b, TypeType):
                 return self.TypeTypeCom(a, b, compatibleState.COVARIANT) or self.TypeTypeCom(a, b,
                                                                                              compatibleState.CONTRAVARIANT)
             else:
                 return False
-
-        elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
-            #print(f" '{tempa.name}' In TypeClassTemp")
+        elif isinstance(tempa, TypeClassTemp):
             return self.SpecificClassTypeCom(a, b,\
-                 compatibleState.CONTRAVARIANT)  
+                    compatibleState.CONTRAVARIANT)  
         return False
 
     def TypeCompatibleStrict(self, a: TypeIns, b: TypeIns) -> bool:
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        #print(a,b,tempa.name,tempb.name)
-
-        if tempa.name in self.baseTypestr:
-            return self.BaseTypeCom(a, b, compatibleState.COVARIANT)
-
-        elif tempa.name in self.specialTypestr:
-            return self.SpecialTypeCom(a, b,
-                                       compatibleState.COVARIANT)
-
-        elif tempa.name in self.collectionTypestr:
+        if self.baseclassify(tempa, self.baseType):
+            return self.BaseTypeCom(a, b, \
+                                    compatibleState.INVARIANT)
+        elif self.classify(tempa, self.specialType):
+            return self.SpecialTypeCom(a, b, \
+                                       compatibleState.INVARIANT)
+        elif self.baseclassify(tempa, self.baseType):
             return self.CollectionsTypeCom(a, b,
-                                           compatibleState.COVARIANT)
-
+                                           compatibleState.INVARIANT)
         elif isinstance(a, TypeType) or isinstance(b, TypeType):
             if isinstance(a, TypeType) and isinstance(b, TypeType):
-                return self.TypeTypeCom(a, b, compatibleState.COVARIANT) or self.TypeTypeCom(a, b,
-                                                                                             compatibleState.CONTRAVARIANT)
+                return self.TypeTypeCom(a, b, compatibleState.INVARIANT) or self.TypeTypeCom(a, b,
+                                                                                             compatibleState.INTRAVARIANT)
             else:
                 return False
-
-        elif (str(type(tempa))[-15:-2] == 'TypeClassTemp'):
-            return self.SpecificClassTypeCom(
-                a, b, compatibleState.CONTRAVARIANT)  # 此处语法有待丰富
-
+        elif isinstance(tempa, TypeVarTemp):
+            return False 
+        elif isinstance(tempa, TypeClassTemp):
+            return self.SpecificClassTypeCom(a, b,\
+                    compatibleState.INVARIANT)  
         return False
 
     def TypeTypeCom(self, a: TypeType, b: TypeType, state: compatibleState):
@@ -89,102 +89,88 @@ class TypeCompatible:
 
     def BaseTypeCom(self, a: TypeIns, b: TypeIns,
                     state: compatibleState) -> bool:
-        #print("In BaseTypeCom")
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        #print(tempa.name, tempb.name)
-        if tempb.name == 'Literal':
+        if isinstance(tempb, TypeLiteralTemp):
+            assert(isinstance(b, TypeLiteralIns))
             b = b.get_value_type()
             tempb = b.temp
-
-        if tempa.name in self.baseTypestr and tempb.name in self.baseTypestr:
-            #print("In Base2Base")
+        if self.baseclassify(tempa, self.baseType) and self.baseclassify(tempb, self.baseType):
             return self.Base2BaseTypeCom(a, b)
-
-        elif tempa.name in self.baseTypestr and tempb.name in self.specialTypestr:
-            #print("Base2Special")
-            return self.Base2SpeTypeCom(a, b,
+        elif self.baseclassify(tempa, self.baseType) and self.classify(tempb, self.specialType):
+            return self.Base2SpecialTypeCom(a, b,
                                         compatibleState.COVARIANT)
-        elif tempa.name in self.baseTypestr and str(type(tempb))[-15:-2] == 'TypeClassTemp':
-            #print("Base2Specific")
-            return self.base_speci_com(a, b,
+        elif self.baseclassify(tempa, self.baseType) and str(type(tempb))[-15:-2] == 'TypeClassTemp':
+            return self.Base2specificTypeCom(a, b,
                                        compatibleState.COVARIANT)
         return False  
 
-    def base_speci_com(self, a: TypeIns, b: TypeIns, state: compatibleState):
-        #print("In base_speci_com")
+    def Base2specificTypeCom(self, a: TypeIns, b: TypeIns, state: compatibleState):
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        return self.specific_fa_com(tempa, tempb)
+        assert(isinstance(tempb, TypeClassTemp))
+        return self.inheritance_check(tempa, tempb)
 
     def Base2BaseTypeCom(self, a, b) -> bool:
-        namea = a.temp.name
-        nameb = b.temp.name
-        if namea == nameb:
+        tempa = a.temp
+        tempb = b.temp
+        if tempa == tempb:
             return True
-        elif namea == 'int':
-            if nameb == 'bool':
+        elif tempa == int_temp:
+            if tempb == bool_temp:
                 return True
-        elif namea == 'float':
-            if nameb == 'int':
+        elif tempa == float_temp:
+            if tempb == int_temp:
                 return True
-        elif namea == 'complex':
-            if nameb == 'int' or nameb == 'float':
+        elif tempa == complex_temp:
+            if tempb == int_temp or tempb == float_temp:
                 return True
         return False
 
-    def Base2SpeTypeCom(self, a: TypeIns, b: TypeIns,
+    def Base2SpecialTypeCom(self, a: TypeIns, b: TypeIns,
                         state: compatibleState) -> bool:
-        #print("In Base2SpeTypeCom")
-        nameb = b.temp.name
-        if nameb in self.specialTypestr:
-            if nameb == 'Any':
-                return True
-            elif nameb == 'Optional':
-                return self.OptionalRightCom(b, a)
-            elif nameb == 'None':
-                return self.NoneCom(b, a)
-            elif nameb == 'Union':
-                return self.UnionRightCom(b, a)
+        tempb: TypeTemp = b.temp
+        assert(self.classify(tempb, self.specialType))
+        if isinstance(tempb, TypeAnyTemp):
+            return False
+        elif isinstance(tempb, TypeOptionalTemp):
+            return self.OptionalRightCom(b, a)
+        elif isinstance(tempb, TypeNoneTemp):
+            return self.NoneCom(b, a)
+        elif isinstance(tempb, TypeUnionTemp):
+            return self.UnionRightCom(b, a)
+        elif isinstance(tempb, TypeLiteralTemp):
+            return self.Literal_com(b,a)
 
     def SpecialTypeCom(self, a: TypeIns, b: TypeIns,
                        state: compatibleState) -> bool:
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        
-        tempb = b.temp
-        if tempa.name == 'Any' or tempb.name == 'Any':
-            return True
-        elif tempa.name == 'None':
-            if tempb.name == 'None':
-                return True
-            else:
-                return False  # None与其它类型的比较都返回False
-
-        if tempb.name == 'Literal' and tempa.name != 'Literal':  # Literal只能存放None 和简单类型
+        if isinstance(tempb, TypeLiteralTemp) and isinstance(tempa, TypeLiteralTemp): 
+            assert(isinstance(b, TypeLiteralIns))
             b = b.get_value_type()
-           
-        if tempa.name == 'Literal': 
+        if isinstance(tempa, TypeAnyTemp) or tempb == TypeAnyTemp: 
+            return True
+        elif isinstance(tempa, TypeNoneTemp):
+                return self.NoneCom(a,b) 
+        elif isinstance(tempa, TypeLiteralTemp):
+            assert(isinstance(tempa, TypeLiteralTemp))
             return self.Literal_com(a, b)
-
-        elif tempa.name == 'Optional':
+        elif isinstance(tempa, TypeOptionalTemp):
             return self.OptionalLeftCom(a, b)
-
-
-        elif tempa.name == 'Union':
+        elif isinstance(tempa, TypeUnionTemp): 
             return self.UnionLeftCom(a, b)
-
-        elif tempa.name == 'Callable':
+        elif isinstance(tempa, TypeCallableTemp):
             return self.CallableCom(a, b)
         else:
-            return True
+            return False
 
     def AnyCom(self, a: TypeTemp, b: Union[TypeTemp, str]) -> bool:
         return True
 
     def UnionLeftCom(self, a: TypeIns, b: TypeIns) -> bool:
-       
         tempb = b.temp
+        assert(a.bindlist != None)
         for index in range(len(a.bindlist)):
             typeinsi = a.bindlist[index]
             if self.TypeCompatible(typeinsi, b):
@@ -192,8 +178,8 @@ class TypeCompatible:
         return False
 
     def UnionRightCom(self, a: TypeIns, b: TypeIns) -> bool:
-       
         tempb = b.temp
+        assert(a.bindlist != None)
         for index in range(len(a.bindlist)):
             typeinsi = a.bindlist[index]
             if not self.TypeCompatible(typeinsi, b):
@@ -201,24 +187,19 @@ class TypeCompatible:
         return True
 
     def OptionalLeftCom(self, a: TypeIns, b: TypeIns) -> bool:
-        #print("OptionalLeftCom")
         type1 = a.bindlist[0]
-        type1Ins = type1.get_default_ins()
-        if self.TypeCompatible(type1Ins, b):
+        if self.TypeCompatible(type1, b):
             return True
-        elif b.temp.name == 'None':
+        elif isinstance(b.temp ,TypeNoneTemp):
             return True
         return False
-
-    def OptionalLeftCom(self, a: TypeIns, b: TypeIns) -> bool:
-        return False
-    
 
     def CallableCom(self, a: TypeIns, b: Union[TypeIns, str]) -> bool:
         return False
 
     def NoneCom(self, a: TypeIns, b: TypeIns) -> bool:
-        if a.temp.name =='None' and b.temp.name == 'None':
+        print("NoneCom")
+        if isinstance(b.temp,TypeNoneTemp):
             return True
         return False
 
@@ -226,20 +207,19 @@ class TypeCompatible:
                            state: compatibleState) -> bool:
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-
-        if tempa.name == 'Set':
+        if  isinstance(tempa ,TypeSetTemp):
             return self.SetCom(a, b)
-        elif tempa.name == 'Tuple':
+        elif isinstance(tempa ,TypeTupleTemp) :
             return self.TupleCom(a, b, state)
-        elif tempa.name == 'Dict':
+        elif isinstance(tempa ,TypeDictTemp):
             return self.DictCom(a, b)
-        elif tempa.name == 'List':
+        elif isinstance(tempa ,TypeListTemp):
             return self.ListCom(a, b)
         else:
             return False
 
     def SetCom(self, a: TypeIns,
-               b: TypeIns) -> bool:  # 设定为Set的TypeTemp为TypeVar
+               b: TypeIns) -> bool: 
         if self.TypeCompatibleStrict(a.bindlist[0], b.bindlist[0]):
             return True
         else:
@@ -248,6 +228,8 @@ class TypeCompatible:
     def TupleCom(self, a: TypeIns, b: TypeIns,
                  state: compatibleState) -> bool:
         if state == compatibleState.COVARIANT:
+            assert(a.bindlist != None)
+            assert(b.bindlist != None)
             if len(a.bindlist) != len(b.bindlist):
                 return False
             for index in range(len(a.bindlist)):
@@ -256,6 +238,7 @@ class TypeCompatible:
                     return False
             return True
         elif state == compatibleState.INVARIANT:
+            assert(a.bindlist != None and b.bindlist != None)
             if len(a.bindlist) != len(b.bindlist):
                 return False
             for index in range(len(a.bindlist)):
@@ -276,21 +259,20 @@ class TypeCompatible:
             return False
 
     def ListCom(self, a: TypeIns, b: TypeIns) -> bool:
+        print(a.bindlist[0],b.bindlist[0])
         a = a.bindlist[0]
         b = b.bindlist[0]
         return self.TypeCompatible(a, b)
 
     def Literal_com(self, a: TypeLiteralIns, b: TypeLiteralIns) -> bool:
-        #print(a,b,a.temp.name,b.temp.name)
-        #print(type(a),type(b))
-        #print(type(a.value),type(b.value))
-        return type(a.value) == type(b.value) and a.value == b.value
+       return a.equiv(b)
 
     def SpecificClassTypeCom(self, a: Union[TypeIns, TypeType], b: Union[TypeIns, TypeType],
                              state: compatibleState) -> bool:
+        assert(isinstance(a.temp, TypeClassTemp))
         tempa: TypeClassTemp = a.temp
-        tempb: TypeClassTemp = b.temp
-        if tempa.name == tempb.name:
+        tempb: TypeClassTemp =  b.temp
+        if a.equiv(b):
             return True
         elif state == compatibleState.INVARIANT:
             return False
@@ -300,23 +282,26 @@ class TypeCompatible:
                     return True
             return False
         elif state == compatibleState.CONTRAVARIANT:
-            if str(type(tempb))[-15:-2] == 'TypeClassTemp':
-                return self.specific_fa_com(tempa, tempb)
+            if isinstance(tempb, TypeClassTemp):
+                return self.inheritance_check(tempa, tempb)
             else:
                 return False
         else:
             return False
 
-    def specific_fa_com(self, tempa: TypeClassTemp, tempb: TypeClassTemp):
+    def inheritance_check(self, tempa: TypeClassTemp, tempb: TypeTemp):
         if tempa == tempb:
             return True
         for index in range(len(tempb.baseclass)):
             if tempb.baseclass[index].temp.name == tempa.name:
                 return True
             else:
-                return self.specific_fa_com(tempa, tempb.baseclass[index].temp)
+                return self.inheritance_check(tempa, tempb.baseclass[index].temp)
         return False
 
+    def TypeVarCom(self, a:TypeIns,b:TypeIns,state: compatibleState):
+        for i in range(len(a.constraints)):
+            return True
 
 def type_consistent(tp1, tp2):
     print(f"judge '{tp1}' and '{tp2}'")
@@ -324,10 +309,8 @@ def type_consistent(tp1, tp2):
     print(f"type compatible of '{tp1}' and '{tp2}' is {res}")
     return res
 
-
 def is_any(tp):
     return str(tp) == "Any"
-
-
+    
 def is_none(tp):
     return str(tp) == "None"
