@@ -9,9 +9,7 @@ from pystatic.visitor import BaseVisitor
 from pystatic.message import MessageBox
 from pystatic.symtable import TableScope
 from pystatic.arg import Argument
-from pystatic.preprocess.resolve_func import (resolve_func_template,
-                                              eval_argument_type,
-                                              eval_return_type)
+from pystatic.preprocess.resolve_func import (resolve_func_template)
 from pystatic.preprocess.resolve_util import eval_preptype
 from pystatic.preprocess.prepinfo import *
 
@@ -19,14 +17,26 @@ from pystatic.preprocess.prepinfo import *
 def resolve_cls(clsdef: 'prep_cls', shallow: bool):
     # resolve super classes
     clstemp = clsdef.clstemp
+    mbox = clsdef.def_prepinfo.mbox
     clstemp.baseclass = []
     is_generic = True
     for base_node in clsdef.defnode.bases:
         base_res = eval_preptype(base_node, clsdef.prepinfo, False, shallow)
         res_type = base_res.option_ins.value
+        base_res.option_ins.dump_to_box(mbox)
         assert isinstance(res_type, TypeType)
+
         if res_type:
-            clstemp.baseclass.append(res_type.get_default_ins())
+            res_ins = res_type.get_default_ins()
+            is_new = True
+            for old_ins in clstemp.baseclass:
+                if res_ins.temp == old_ins.temp:
+                    is_new = False
+                    if not shallow:
+                        mbox.add_err(DuplicateBaseclass(base_node))
+                    break
+            if is_new:
+                clstemp.baseclass.append(res_type.get_default_ins())
         is_generic = is_generic or base_res.generic
 
     if not shallow:
@@ -66,7 +76,7 @@ class _TypeVarVisitor(BaseVisitor):
     @contextlib.contextmanager
     def enter_generic(self):
         if self.met_gen:
-            # TODO: double Generic Error
+            # duplicate error has been added in resolve_cls
             yield
 
         else:

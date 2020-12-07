@@ -316,11 +316,18 @@ class PrepEnvironment:
         return self.target_prepinfo.get(target)
 
     def lookup(self, module_symid: 'SymId', name: str):
-        preinfo = self.symid_prepinfo.get(module_symid)
-        if preinfo:
-            res = preinfo.get_prep_def(name)
+        prepinfo = self.symid_prepinfo.get(module_symid)
+        if prepinfo:
+            res = prepinfo.get_prep_def(name)
             if res:
                 return res
+            else:
+                for symid in prepinfo.star_import:
+                    module_prepinfo = self.symid_prepinfo.get(symid)
+                    if module_prepinfo:
+                        res = module_prepinfo.get_prep_def(name)
+                        if res:
+                            return res
 
         module_ins = self.manager.get_module_ins(module_symid)
         if not module_ins:

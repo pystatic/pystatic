@@ -1,6 +1,5 @@
 import sys
 import os
-import inspect
 from typing import List, Optional, Type, Tuple, Final
 
 from pystatic.sitepkg import get_sitepkg
@@ -15,8 +14,6 @@ typeshed: Final[str] = 'faketypeshed'
 class Config:
     def __init__(self, config):
         def get(attr: str, require_type: Optional[Type] = None):
-            if require_type:
-                assert inspect.isclass(require_type)
             if isinstance(config, dict):
                 res = config.get(attr)
             else:
@@ -59,11 +56,8 @@ class Config:
             else:
                 self.typeshed = None
         
-        print('good')
         if get('test_typeshed', bool):
-            print('hello')
             self.typeshed = os.path.join(pystatic_dir, 'typeshed')
-            print(self.typeshed)
 
         # no_typeshed: if true, then typeshed is not automatically loaded.
         # default: False.

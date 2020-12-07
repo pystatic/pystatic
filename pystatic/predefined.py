@@ -77,8 +77,8 @@ class TypeVarTemp(TypeClassTemp):
             if not ins_ast:
                 return None
 
-            if isinstance(ins_ast.ins, TypeLiteralIns):
-                value = ins_ast.ins.value
+            if isinstance(ins_ast.value, TypeLiteralIns):
+                value = ins_ast.value.value
                 if isinstance(value, expect_type):
                     return value
                 else:
@@ -105,8 +105,8 @@ class TypeVarTemp(TypeClassTemp):
         if len(applyargs.args) > args_rear:
             default_ins.bound = None
             for rangenode in applyargs.args[args_rear:]:
-                assert isinstance(rangenode.ins, TypeType), "expect typetype"
-                rangeins = rangenode.ins.getins(ins_option)
+                assert isinstance(rangenode.value, TypeType), "expect typetype"
+                rangeins = rangenode.value.getins(ins_option)
                 default_ins.constraints.append(rangeins)
 
         cova = applyargs.kwargs.get('covariant')
@@ -124,7 +124,7 @@ class TypeVarTemp(TypeClassTemp):
         if bound_ins_ast:
             if default_ins.constraints:
                 raise NotImplementedError()
-            bound = bound_ins_ast.ins
+            bound = bound_ins_ast.value
             assert isinstance(bound, TypeType), "TODO"
             default_ins.bound = bound.get_default_ins()
 
@@ -220,7 +220,7 @@ class TypeNoneTemp(TypeTemp):
         # TODO: warning
         return Option(self._cached_ins)
 
-    def getitem(self, item: GetItemArg,
+    def getitem(self, item: GetItemArgs,
                 bindlist: BindList) -> Option['TypeIns']:
         # TODO: warning
         return Option(self._cached_ins)
@@ -242,8 +242,10 @@ class TypeNoneTemp(TypeTemp):
     def getins(self, bindlist: BindList) -> Option['TypeIns']:
         return Option(self._cached_ins)
 
-    def getitem_typetype(self, bindlist: Optional[BindList],
-                         item: Optional[GetItemArg]) -> Option['TypeType']:
+    def getitem_typetype(self,
+                         bindlist: Optional[BindList],
+                         item: Optional[GetItemArgs],
+                         node: Optional[ast.AST] = None) -> Option['TypeType']:
         return Option(self._cached_typetype)
 
     def get_default_ins(self) -> Option['TypeIns']:
@@ -290,6 +292,19 @@ class TypeTupleTemp(TypeClassTemp):
 
     def arity(self) -> int:
         return INFINITE_ARITY
+
+    def getitem_typetype(self, bindlist: BindList, itemarg: GetItemArgs,
+                         node: Optional[ast.AST]) -> Option['TypeType']:
+        res_option = super().getitem_typetype(bindlist, itemarg, node)
+        try:
+            if res_option.value.bindlist[0] == ellipsis_ins:
+                res_option.add_err(
+                    IndiceGeneralError(
+                        "'...' allowed only as the second of two arguments",
+                        node))
+            return res_option
+        except IndexError:
+            return res_option
 
     def get_default_ins(self) -> Option['TypeIns']:
         return Option(self._cached_ins)
@@ -355,6 +370,48 @@ class TypeCallableTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
+    def arity(self) -> int:
+        return 2
+
+    def getitem_typetype(self,
+                         bindlist: BindList,
+                         itemarg: GetItemArgs,
+                         node: Optional[ast.AST] = None) -> Option['TypeType']:
+        res_bindlist = []
+        res = TypeType(self, [ellipsis_ins, any_ins])
+        res_option = Option(res)
+
+        if not self._getitem_typetype_check_bindlist(bindlist, res_option,
+                                                     node):
+            res_option.value = TypeType(self, bindlist)
+            return res_option
+
+        items = itemarg.items
+        callable_err = "Parameter list doesn't match Callable's structure"
+
+        if len(items) != 2:
+            res_option.add_err(IndiceGeneralError(callable_err, node))
+            return res_option
+        else:
+            arg_part = items[0]
+            ret_part = items[1]
+
+            if arg_part.value == ellipsis_ins:
+                res_bindlist.append(ellipsis_ins)
+            else:
+                if not isinstance(arg_part.value, (list, tuple)):
+                    res_option.add_err(IndiceGeneralError(callable_err, node))
+                    return res_option
+                arglist = []
+                for argitem in arg_part.value:
+                    self._getitem_typetype_accept_item(argitem, res_option,
+                                                       arglist)
+                res_bindlist.append(arglist)
+            self._getitem_typetype_accept_item(ret_part, res_option,
+                                               res_bindlist)
+            res.bindlist = res_bindlist
+            return res_option
+
 
 class TypeGenericTemp(TypeTemp):
     def __init__(self):
@@ -364,29 +421,27 @@ class TypeGenericTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
-    def getitem(self, item: GetItemArg,
-                bindlist: BindList) -> Option['TypeIns']:
-        res = TypeIns(generic_temp, None)
-        option_res = Option(res)
-        if isinstance(item.ins, (tuple, list)):
-            for subitem in item.ins:
-                if isinstance(subitem.ins, TypeVarIns):
-                    if not res.bindlist:
-                        assert isinstance(subitem.ins, TypeVarIns)
-                        res.bindlist = [subitem.ins]  # type: ignore
-                    else:
-                        res.bindlist.append(subitem.ins)
-                else:
-                    # TODO: add error here
-                    pass
-        else:
-            assert isinstance(item.ins, TypeIns)
-            if isinstance(item.ins, TypeVarIns):
-                res.bindlist = [item.ins]
+    def getitem_typetype(self, bindlist: BindList, itemarg: GetItemArgs,
+                         node: Optional[ast.AST]) -> Option['TypeType']:
+        res_bindlist = []
+        res = TypeType(self, res_bindlist)
+        res_option = Option(res)
+
+        if not self._getitem_typetype_check_bindlist(bindlist, res_option,
+                                                     node):
+            res_option.value = TypeType(self, bindlist)
+            return res_option
+
+        items = itemarg.items
+        for item in items:
+            value = item.value
+            node = item.node
+            if not isinstance(value, TypeVarIns):
+                res_option.add_err(IndiceGeneralError("Expect a TypeVar",
+                                                      node))
             else:
-                # option_res.add_err()  # TODO: add error here
-                pass
-        return option_res
+                res_bindlist.append(value)
+        return res_option
 
 
 class TypeProtocolTemp(TypeTemp):
@@ -406,23 +461,43 @@ class TypeLiteralTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
-    def getitem_typetype(self, bindlist: Optional[BindList],
-                         itemarg: Optional[GetItemArg]) -> Option['TypeType']:
-        if not itemarg:
-            # TODO warning here
-            return Option(any_ins)
-
-        constant = itemarg.ins
-        if isinstance(constant, (bool, bytes, str, int, float, complex)):
-            return Option(TypeLiteralIns(constant))
-        elif isinstance(constant, TypeLiteralIns):
-            return Option(constant)
-        else:
-            # TODO: warning here
-            return Option(any_ins)
-
     def arity(self) -> int:
         return 1
+
+    def getitem_typetype(self,
+                         bindlist: BindList,
+                         itemarg: GetItemArgs,
+                         node: Optional[ast.AST] = None) -> Option['TypeType']:
+        res_option = Option(any_ins)
+
+        if not self._getitem_typetype_check_bindlist(bindlist, res_option,
+                                                     node):
+            res_option.value = TypeType(self, bindlist)
+            return res_option
+
+        items = itemarg.items
+        if len(items) != 1:
+            res_option.add_err(IndiceParamNumberMismatch(len(items), 1, node))
+        constant = items[0].value
+        constant_node = items[0].node
+
+        if isinstance(constant, TypeLiteralIns):
+            res_option.value = TypeType(self, constant.bindlist)
+        elif isinstance(constant, (list, tuple, TypeIns)):
+            res_option.add_err(
+                IndiceGeneralError("Literal's indice should be literal value",
+                                   constant_node))
+            res_option.value = any_ins
+        else:
+            res = TypeType(self, [constant])
+            res_option.value = res
+        return res_option
+
+    def getins(self, bindlist: BindList) -> Option['TypeIns']:
+        if bindlist:
+            return Option(TypeLiteralIns(bindlist[0]))
+        else:
+            return Option(any_ins)
 
 
 class TypeLiteralIns(TypeIns):

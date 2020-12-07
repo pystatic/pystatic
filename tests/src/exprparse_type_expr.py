@@ -11,3 +11,4 @@ c: Optional[Type[A]] = None
 d: Tuple[int, ...] = (1, 2)
 e: Tuple[int, str] = (1, "s")
 f: Literal['test'] = 'test'
+g: Tuple[Literal[1], int] = (1, 1)

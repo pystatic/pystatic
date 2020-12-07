@@ -1,7 +1,6 @@
 """Data structures and helper functions used in exprparse"""
 import ast
-from typing import (Generic, TYPE_CHECKING, List, Dict, Tuple, Union, TypeVar,
-                    Any, Sequence)
+from typing import (Generic, TYPE_CHECKING, List, Dict, Tuple, TypeVar, Any)
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
@@ -11,15 +10,22 @@ T = TypeVar('T', bound=Any)
 
 
 class WithAst(Generic[T]):
-    __slots__ = ['ins', 'node']
+    __slots__ = ['value', 'node']
 
-    def __init__(self, tpins: 'T', node: ast.AST) -> None:
-        self.ins = tpins
+    def __init__(self, value: 'T', node: ast.AST) -> None:
+        self.value = value
         self.node = node
 
 
 InsWithAst = WithAst['TypeIns']
-GetItemArg = WithAst[Union[Tuple['GetItemArg'], List['GetItemArg'], 'TypeIns']]
+
+
+class GetItemArgs:
+    __slots__ = ['items', 'node']
+
+    def __init__(self, items: List[WithAst], node: ast.AST) -> None:
+        self.items = items
+        self.node = node
 
 
 class ApplyArgs:
