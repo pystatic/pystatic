@@ -1,13 +1,12 @@
 from enum import Enum, auto
-from pystatic.errorcode import SymbolUndefined
 from typing import Dict, List, TYPE_CHECKING, Tuple, Type, List
 from pystatic.symtable import SymTable, TableScope, Entry
-from pystatic.arg import Argument
-from pystatic.symid import SymId
 from pystatic.typesys import *
+from pystatic.errorcode import *
 
 if TYPE_CHECKING:
-    from pystatic.evalutil import InsWithAst
+    from pystatic.evalutil import InsWithAst, GetItemArgs
+    from pystatic.arg import Argument
 
 
 class TpVarKind(Enum):
@@ -220,7 +219,7 @@ class TypeNoneTemp(TypeTemp):
         # TODO: warning
         return Option(self._cached_ins)
 
-    def getitem(self, item: GetItemArgs,
+    def getitem(self, item: 'GetItemArgs',
                 bindlist: BindList) -> Option['TypeIns']:
         # TODO: warning
         return Option(self._cached_ins)
@@ -244,7 +243,7 @@ class TypeNoneTemp(TypeTemp):
 
     def getitem_typetype(self,
                          bindlist: Optional[BindList],
-                         item: Optional[GetItemArgs],
+                         item: Optional['GetItemArgs'],
                          node: Optional[ast.AST] = None) -> Option['TypeType']:
         return Option(self._cached_typetype)
 
@@ -253,24 +252,6 @@ class TypeNoneTemp(TypeTemp):
 
     def get_default_typetype(self) -> 'TypeType':
         return self._cached_typetype
-
-
-class TypeFuncTemp(TypeTemp):
-    def __init__(self):
-        super().__init__('function')
-
-    @property
-    def module_symid(self) -> str:
-        return 'builtins'
-
-
-class TypeModuleTemp(TypeTemp):
-    def __init__(self) -> None:
-        super().__init__('module')
-
-    @property
-    def module_symid(self) -> str:
-        return 'builtins'
 
 
 class TypeListTemp(TypeClassTemp):
@@ -293,7 +274,7 @@ class TypeTupleTemp(TypeClassTemp):
     def arity(self) -> int:
         return INFINITE_ARITY
 
-    def getitem_typetype(self, bindlist: BindList, itemarg: GetItemArgs,
+    def getitem_typetype(self, bindlist: BindList, itemarg: 'GetItemArgs',
                          node: Optional[ast.AST]) -> Option['TypeType']:
         res_option = super().getitem_typetype(bindlist, itemarg, node)
         try:
@@ -375,7 +356,7 @@ class TypeCallableTemp(TypeTemp):
 
     def getitem_typetype(self,
                          bindlist: BindList,
-                         itemarg: GetItemArgs,
+                         itemarg: 'GetItemArgs',
                          node: Optional[ast.AST] = None) -> Option['TypeType']:
         res_bindlist = []
         res = TypeType(self, [ellipsis_ins, any_ins])
@@ -421,7 +402,7 @@ class TypeGenericTemp(TypeTemp):
     def module_symid(self) -> str:
         return 'typing'
 
-    def getitem_typetype(self, bindlist: BindList, itemarg: GetItemArgs,
+    def getitem_typetype(self, bindlist: BindList, itemarg: 'GetItemArgs',
                          node: Optional[ast.AST]) -> Option['TypeType']:
         res_bindlist = []
         res = TypeType(self, res_bindlist)
@@ -466,7 +447,7 @@ class TypeLiteralTemp(TypeTemp):
 
     def getitem_typetype(self,
                          bindlist: BindList,
-                         itemarg: GetItemArgs,
+                         itemarg: 'GetItemArgs',
                          node: Optional[ast.AST] = None) -> Option['TypeType']:
         res_option = Option(any_ins)
 
@@ -602,60 +583,8 @@ class TypePackageIns(TypeModuleIns):
         self._inner_symtable.add_entry(name, Entry(module_ins))
 
 
-class OverloadItem:
-    __slots__ = ['argument', 'ret_type']
-
-    def __init__(self, argument: 'Argument', ret_type: 'TypeIns') -> None:
-        self.argument = argument
-        self.ret_type = ret_type
-
-
-class TypeFuncIns(TypeIns):
-    def __init__(self, funname: str, module_symid: str,
-                 inner_symtable: 'SymTable', argument: 'Argument',
-                 ret: TypeIns) -> None:
-        super().__init__(func_temp, None)
-        self.overloads: List[OverloadItem] = [OverloadItem(argument, ret)]
-        self.funname = funname
-        self.module_symid = module_symid
-
-        self._inner_symtable = inner_symtable
-
-    def add_overload(self, argument: 'Argument', ret: TypeIns):
-        self.overloads.append(OverloadItem(argument, ret))
-
-    def get_inner_symtable(self) -> 'SymTable':
-        return self._inner_symtable
-
-    def str_expr(self,
-                 bindlist: BindList,
-                 context: Optional[TypeContext] = None) -> str:
-        if len(self.overloads) == 1:
-            fun_fmt = "{}{} -> {}"
-        else:
-            fun_fmt = "@overload {}{} -> {}"
-        lst = [
-            fun_fmt.format(self.funname, item.argument, item.ret_type)
-            for item in self.overloads
-        ]
-        return '\n'.join(lst)
-
-    def get_func_def(self) -> Tuple['Argument', 'TypeIns']:
-        return self.overloads[0].argument, self.overloads[0].ret_type
-
-    def get_func_name(self):
-        return self.funname
-
-    def call(self, applyargs: 'ApplyArgs') -> Option['TypeIns']:
-        # TODO: deal with arguments
-        assert self.overloads
-        return Option(self.overloads[0].ret_type)
-
-
 typevar_temp, typevar_type, _ = _add_spt_to_symtable(TypeVarTemp,
                                                      typing_symtable)
-func_temp = TypeFuncTemp()
-module_temp = TypeModuleTemp()
 
 _invariant_tpvar = TypeVarIns('_invariant_tpvar',
                               bound=any_ins,

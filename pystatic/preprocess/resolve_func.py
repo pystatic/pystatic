@@ -1,9 +1,9 @@
 import ast
-from pystatic.target import FunctionTarget
 from typing import Callable
 from pystatic.predefined import TypeFuncIns, TypeIns
 from pystatic.message import MessageBox
 from pystatic.arg import Argument, Arg
+from pystatic.typesys import any_ins
 from pystatic.preprocess.resolve_util import eval_expr_ann
 from pystatic.preprocess.prepinfo import *
 
@@ -101,7 +101,7 @@ def eval_argument_type(node: ast.arguments,
     def resolve_arg_type(node: ast.arg) -> Arg:
         """Generate an Arg instance according to an ast.arg node"""
         nonlocal mbox, prepinfo
-        new_arg = Arg(node.arg)
+        new_arg = Arg(node.arg, any_ins)
         if node.annotation:
             ann_option = eval_expr_ann(node.annotation, prepinfo)
             ann_option.dump_to_box(mbox)

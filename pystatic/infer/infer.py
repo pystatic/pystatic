@@ -20,13 +20,14 @@ from pystatic.TypeCompatible.simpleType import TypeCompatible, is_any, is_none, 
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
+    from pystatic.symid import SymId
 
 logger = logging.getLogger(__name__)
 
 
 class InferVisitor(BaseVisitor):
     def __init__(self, node: ast.AST, module: TypeModuleIns, mbox: MessageBox,
-                 symid: SymId, config: Config, manager: 'Manager'):
+                 symid: 'SymId', config: Config, manager: 'Manager'):
         self.root = node
         self.mbox = mbox
         self.symid = symid
@@ -245,8 +246,10 @@ class InferVisitor(BaseVisitor):
                     IncompatibleReturnType(ret_node.value, annotation,
                                            ret_type))
 
-    def accept_condition_stmt_list(self, stmt_list: List[ast.stmt],
-                                   stmt_type: ConditionStmtType, ignore_error=False):
+    def accept_condition_stmt_list(self,
+                                   stmt_list: List[ast.stmt],
+                                   stmt_type: ConditionStmtType,
+                                   ignore_error=False):
         for stmt in stmt_list:
             if self.cond_infer.detect_break():
                 index = stmt_list.index(stmt)
@@ -310,10 +313,14 @@ class InferVisitor(BaseVisitor):
             if len(bindlist) > 1:
                 for tp in bindlist[1:]:
                     self.record_type(name, tp)
-                    self.accept_condition_stmt_list(node.body, ConditionStmtType.LOOP, True)
-                    self.accept_condition_stmt_list(node.orelse, ConditionStmtType.IF, True)
+                    self.accept_condition_stmt_list(node.body,
+                                                    ConditionStmtType.LOOP,
+                                                    True)
+                    self.accept_condition_stmt_list(node.orelse,
+                                                    ConditionStmtType.IF, True)
 
-    def get_element_type_in_container(self, container: TypeIns) -> List[TypeIns]:
+    def get_element_type_in_container(self,
+                                      container: TypeIns) -> List[TypeIns]:
         name = container.temp.name
         if name == 'Dict':
             return [container.bindlist[0]]

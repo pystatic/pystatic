@@ -1,14 +1,12 @@
 import copy
-from pystatic.typesys import TypeIns, any_ins
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pystatic.typesys import TypeIns
 
 
 class Arg(object):
-    def __init__(self,
-                 name,
-                 ann: TypeIns = any_ins,
-                 default=None,
-                 valid=False):
+    def __init__(self, name, ann: 'TypeIns', default=None, valid=False):
         """
         valid: whether this argument has default value
         """
@@ -18,6 +16,7 @@ class Arg(object):
         self.valid = valid
 
     def __str__(self):
+        from pystatic.predefined import any_ins
         result = self.name
         if self.ann != any_ins:
             result += ': ' + str(self.ann)
