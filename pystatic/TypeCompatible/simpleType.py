@@ -146,9 +146,7 @@ class TypeCompatible:
                        state: compatibleState) -> bool:
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
-        if isinstance(tempb, TypeLiteralTemp) and isinstance(tempa, TypeLiteralTemp): 
-            assert(isinstance(b, TypeLiteralIns))
-            b = b.get_value_type()
+        
         if isinstance(tempa, TypeAnyTemp) or tempb == TypeAnyTemp: 
             return True
         elif isinstance(tempa, TypeNoneTemp):
