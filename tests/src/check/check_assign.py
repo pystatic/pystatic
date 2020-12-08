@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Literal
 
 
 class A:
@@ -27,3 +27,5 @@ c = A()
 
 t3: int = "s"  # E Incompatible type in assignment(expression has type 'Literal['s']', variable has type 'int')
 t4: int = t3  # ok
+
+d: Literal[1] = 1
