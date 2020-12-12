@@ -8,10 +8,12 @@ from pystatic.preprocess.resolve_util import eval_expr_ann
 from pystatic.preprocess.prepinfo import *
 
 
-def resolve_func(func: 'prep_func'):
+def resolve_func(func: "prep_func"):
     """Resolve local function's TypeIns"""
-    def add_func_def(argument: Argument, ret: TypeIns,
-                     node: ast.FunctionDef) -> TypeFuncIns:
+
+    def add_func_def(
+        argument: Argument, ret: TypeIns, node: ast.FunctionDef
+    ) -> TypeFuncIns:
         nonlocal func
         def_symtable = func.def_prepinfo.symtable
         module_symid = def_symtable.glob_symid
@@ -19,8 +21,9 @@ def resolve_func(func: 'prep_func'):
         new_symtable = def_symtable.new_symtable(fun_name, TableScope.FUNC)
         return TypeFuncIns(fun_name, module_symid, new_symtable, argument, ret)
 
-    def add_func_overload(func_ins: TypeFuncIns, argument: Argument,
-                          ret: TypeIns, node: ast.FunctionDef):
+    def add_func_overload(
+        func_ins: TypeFuncIns, argument: Argument, ret: TypeIns, node: ast.FunctionDef
+    ):
         func_ins.add_overload(argument, ret)
 
     mbox = func.def_prepinfo.mbox
@@ -28,14 +31,16 @@ def resolve_func(func: 'prep_func'):
 
 
 TAddFunDef = Callable[[Argument, TypeIns, ast.FunctionDef], TypeFuncIns]
-TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef],
-                           None]
+TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef], None]
 FunTuple = Tuple[Argument, TypeIns, ast.FunctionDef]
 
 
-def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
-                          add_func_overload: TAddFunOverload,
-                          mbox: 'MessageBox'):
+def resolve_func_template(
+    func: "prep_func",
+    add_func_def: TAddFunDef,
+    add_func_overload: TAddFunOverload,
+    mbox: "MessageBox",
+):
     prepinfo = func.def_prepinfo
 
     def get_arg_ret(node: ast.FunctionDef):
@@ -49,11 +54,12 @@ def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
 
     overload_list: List[FunTuple] = []
     not_overload: Optional[
-        FunTuple] = None  # function def that's not decorated by overload
+        FunTuple
+    ] = None  # function def that's not decorated by overload
     for astnode in func.defnodes:
         is_overload = False
         for decs in astnode.decorator_list:
-            if getattr(decs, 'id', None) == 'overload':
+            if getattr(decs, "id", None) == "overload":
                 is_overload = True
                 break
         if is_overload:
@@ -61,8 +67,7 @@ def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
         else:
             if not_overload:
                 overload_list.append((*get_arg_ret(astnode), astnode))
-                mbox.add_err(
-                    SymbolRedefine(astnode, func.name, not_overload[-1]))
+                mbox.add_err(SymbolRedefine(astnode, func.name, not_overload[-1]))
             else:
                 not_overload = (*get_arg_ret(astnode), astnode)
 
@@ -85,8 +90,7 @@ def resolve_func_template(func: 'prep_func', add_func_def: TAddFunDef,
     func.value = func_ins
 
 
-def eval_argument_type(node: ast.arguments,
-                       prepinfo: PrepInfo) -> Option[Argument]:
+def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Option[Argument]:
     """Gernerate an Argument instance according to an ast.arguments node"""
     mbox = prepinfo.mbox
     new_args = Argument()
@@ -109,8 +113,7 @@ def eval_argument_type(node: ast.arguments,
         return new_arg
 
     # parse a list of args
-    def add_to_list(target_list: List[Arg], order_list: List[Arg],
-                    args: List[ast.arg]):
+    def add_to_list(target_list: List[Arg], order_list: List[Arg], args: List[ast.arg]):
         nonlocal res_option
         for arg in args:
             newarg = resolve_arg_type(arg)
@@ -125,13 +128,13 @@ def eval_argument_type(node: ast.arguments,
     # *args exists
     if node.vararg:
         vararg = resolve_arg_type(node.vararg)
-        vararg.name = '*' + vararg.name
+        vararg.name = "*" + vararg.name
         new_args.vararg = vararg
 
     # **kwargs exists
     if node.kwarg:
         kwarg = resolve_arg_type(node.kwarg)
-        kwarg.name = '**' + kwarg.name
+        kwarg.name = "**" + kwarg.name
         new_args.kwarg = kwarg
 
     for arg, value in zip(reversed(order_arg), reversed(node.defaults)):

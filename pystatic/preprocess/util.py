@@ -2,7 +2,7 @@ import ast
 from typing import Optional, TYPE_CHECKING, List
 from pystatic.exprparse import SupportGetAttribute
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.predefined import (TypeModuleIns, TypePackageIns, TypeClassTemp)
+from pystatic.predefined import TypeModuleIns, TypePackageIns, TypeClassTemp
 from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
 from pystatic.option import Option
 from pystatic.symtable import ImportNode, SymTable
@@ -13,8 +13,9 @@ if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 
-def omit_inst_typetype(node: ast.AST, consultant: SupportGetAttribute,
-                       allow_tuple: bool) -> Optional[TypeType]:
+def omit_inst_typetype(
+    node: ast.AST, consultant: SupportGetAttribute, allow_tuple: bool
+) -> Optional[TypeType]:
     """Get typetype a node represents while omitting instantiate args
 
     :param allow_tuple: allow analyse inside tuple node or not
@@ -30,8 +31,7 @@ def omit_inst_typetype(node: ast.AST, consultant: SupportGetAttribute,
 
 
 class TypeTypeGetter(NoGenVisitor):
-    def accept(self, node: ast.AST, consultant: SupportGetAttribute,
-               allow_tuple: bool):
+    def accept(self, node: ast.AST, consultant: SupportGetAttribute, allow_tuple: bool):
         self.consultant = consultant
         self.allow_tuple = allow_tuple
         return self.visit(node)
@@ -80,8 +80,9 @@ class TypeTypeGetter(NoGenVisitor):
 typetype_getter = TypeTypeGetter()
 
 
-def analyse_import_stmt(prepinfo: 'PrepInfo', node: ImportNode,
-                        symid: SymId) -> List[prep_impt]:
+def analyse_import_stmt(
+    prepinfo: "PrepInfo", node: ImportNode, symid: SymId
+) -> List[prep_impt]:
     """Extract import information stored in import ast node."""
     info_list: List[prep_impt] = []
     pkg_symid = symid_parent(symid)
@@ -89,12 +90,11 @@ def analyse_import_stmt(prepinfo: 'PrepInfo', node: ImportNode,
         for alias in node.names:
             module_symid = alias.name
             as_name = alias.asname or module_symid
-            info_list.append(
-                prep_impt(module_symid, '', as_name, prepinfo, node))
+            info_list.append(prep_impt(module_symid, "", as_name, prepinfo, node))
 
     elif isinstance(node, ast.ImportFrom):
-        imp_name = '.' * node.level
-        imp_name += node.module or ''
+        imp_name = "." * node.level
+        imp_name += node.module or ""
         module_symid = rel2abssymid(pkg_symid, imp_name)
         imported = []
         for alias in node.names:
@@ -102,7 +102,8 @@ def analyse_import_stmt(prepinfo: 'PrepInfo', node: ImportNode,
             as_name = alias.asname or attr_name
             imported.append((as_name, attr_name))
             info_list.append(
-                prep_impt(module_symid, attr_name, as_name, prepinfo, node))
+                prep_impt(module_symid, attr_name, as_name, prepinfo, node)
+            )
 
     else:
         raise TypeError("node doesn't stand for an import statement")
@@ -110,8 +111,9 @@ def analyse_import_stmt(prepinfo: 'PrepInfo', node: ImportNode,
     return info_list
 
 
-def update_symtable_import_cache(symtable: 'SymTable', entry: 'prep_impt',
-                                 manager: 'Manager') -> Optional[TypeIns]:
+def update_symtable_import_cache(
+    symtable: "SymTable", entry: "prep_impt", manager: "Manager"
+) -> Optional[TypeIns]:
     symid = entry.symid
 
     symidlist = absolute_symidlist(symtable.glob_symid, symid)
@@ -135,7 +137,7 @@ def update_symtable_import_cache(symtable: 'SymTable', entry: 'prep_impt',
         if not isinstance(cur_ins, TypePackageIns):
             return None
 
-        cur_symid += f'.{symidlist[i]}'
+        cur_symid += f".{symidlist[i]}"
         if symidlist[i] not in cur_ins.submodule:
             module_ins = manager.get_module_ins(cur_symid)
             if not module_ins:
@@ -162,7 +164,7 @@ def update_symtable_import_cache(symtable: 'SymTable', entry: 'prep_impt',
     # to fruit's submodule list
     if isinstance(cur_ins, TypePackageIns):
         if not entry.is_import_module():
-            cur_symid += f'.{entry.origin_name}'
+            cur_symid += f".{entry.origin_name}"
             module_ins = manager.get_module_ins(cur_symid)
 
             if module_ins:
@@ -170,6 +172,6 @@ def update_symtable_import_cache(symtable: 'SymTable', entry: 'prep_impt',
     return cur_ins
 
 
-def add_baseclass(temp: TypeClassTemp, basecls: 'TypeIns'):
+def add_baseclass(temp: TypeClassTemp, basecls: "TypeIns"):
     if basecls not in temp.baseclass:
         temp.baseclass.append(basecls)

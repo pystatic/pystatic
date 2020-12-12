@@ -7,7 +7,7 @@ from pystatic.preprocess.resolve_util import eval_preptype
 from pystatic.preprocess.prepinfo import *
 
 
-def judge_typevar(prepinfo: 'PrepInfo', node: AssignNode):
+def judge_typevar(prepinfo: "PrepInfo", node: AssignNode):
     def get_name(node: ast.AST) -> Optional[str]:
         if isinstance(node, ast.Name):
             return node.id
@@ -31,7 +31,8 @@ def judge_typevar(prepinfo: 'PrepInfo', node: AssignNode):
             return typevar
     return None
 
-def judge_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeAlias]:
+
+def judge_typealias(prepinfo: "PrepInfo", node: AssignNode) -> Optional[TypeAlias]:
     if isinstance(node, ast.AnnAssign):
         # assignment with type annotation is not a type alias.
         return None
@@ -46,7 +47,7 @@ def judge_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeAlia
                     return None
                 else:
                     target = node.targets[0]
-            
+
                 if isinstance(target, ast.Name):
                     typealias = TypeAlias(target.id, typetype)
                     prepinfo.add_type_alias(target.id, typealias, node)
@@ -55,10 +56,11 @@ def judge_typealias(prepinfo: 'PrepInfo', node: AssignNode) -> Optional[TypeAlia
                     raise NotImplementedError()
     return None
 
-def resolve_local(local: 'prep_local', shallow: bool):
+
+def resolve_local(local: "prep_local", shallow: bool):
     """Resolve local symbols' TypeIns
-    
-    :param shallow: if set True, local's current stage must be LOCAL_NORMAL. 
+
+    :param shallow: if set True, local's current stage must be LOCAL_NORMAL.
     This function will judge the type of the local symbol(typevar or typealias)
     and won't visit node inside subscript node.
     """
@@ -67,11 +69,11 @@ def resolve_local(local: 'prep_local', shallow: bool):
 
     if shallow:
         assert local.stage == LOCAL_NORMAL
-        if (typevar := judge_typevar(prepinfo, local.defnode)):
+        if (typevar := judge_typevar(prepinfo, local.defnode)) :
             local.value = typevar
             local.type = LOCAL_TYPEVAR
             return
-        elif (typealias := judge_typealias(prepinfo, local.defnode)):
+        elif (typealias := judge_typealias(prepinfo, local.defnode)) :
             local.value = typealias
             local.type = LOCAL_TYPEALIAS
             return

@@ -9,9 +9,9 @@ from pystatic.predefined import TypeVarIns, typevar_type, typevar_temp
 from pystatic.preprocess.prepinfo import *
 
 
-def resolve_typevar(prepinfo: 'PrepInfo'):
+def resolve_typevar(prepinfo: "PrepInfo"):
     assert prepinfo
-    queue: Deque['PrepInfo'] = deque()
+    queue: Deque["PrepInfo"] = deque()
     queue.append(prepinfo)
     while len(queue) > 0:
         cur_prepinfo = queue.popleft()
@@ -26,7 +26,7 @@ def resolve_typevar(prepinfo: 'PrepInfo'):
             typevar_def.stage = PREP_COMPLETE
 
 
-def resolve_typealias(typealias_def: 'prep_local'):
+def resolve_typealias(typealias_def: "prep_local"):
     assert typealias_def.type == LOCAL_TYPEALIAS
     typealias = typealias_def.value
     assign_node = typealias_def.defnode.value
@@ -34,18 +34,16 @@ def resolve_typealias(typealias_def: 'prep_local'):
     assert assign_node, "TypeAlias definition shouldn't be empty"
     assert not isinstance(assign_node, ast.Constant)
     # TODO: add warning
-    typetype = eval_expr(assign_node,
-                         typealias_def.def_prepinfo,
-                         annotation=True).value
+    typetype = eval_expr(assign_node, typealias_def.def_prepinfo, annotation=True).value
     assert isinstance(typetype, TypeType)
     typealias.bindlist = typetype.bindlist
 
 
-def fill_typevar(node: ast.AST, typevar: 'TypeVarIns', prepinfo: 'PrepInfo'):
+def fill_typevar(node: ast.AST, typevar: "TypeVarIns", prepinfo: "PrepInfo"):
     return TypeVarFiller(typevar, prepinfo).accept(node)
 
 
-def copy_typevar(src: 'TypeVarIns', dst: 'TypeVarIns'):
+def copy_typevar(src: "TypeVarIns", dst: "TypeVarIns"):
     assert src.temp is typevar_temp
     assert dst.temp is typevar_temp
     dst.bindlist = src.bindlist
@@ -55,7 +53,7 @@ def copy_typevar(src: 'TypeVarIns', dst: 'TypeVarIns'):
 
 
 class TypeVarFiller(ExprParser):
-    def __init__(self, typevar: 'TypeVarIns', prepinfo: 'PrepInfo') -> None:
+    def __init__(self, typevar: "TypeVarIns", prepinfo: "PrepInfo") -> None:
         super().__init__(prepinfo, False, False)
         self.typevar = typevar
         self.outermost = True

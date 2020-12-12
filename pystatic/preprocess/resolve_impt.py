@@ -4,8 +4,8 @@ from pystatic.preprocess.util import update_symtable_import_cache
 from pystatic.preprocess.prepinfo import *
 
 
-def resolve_import(prepinfo: 'PrepInfo', env: 'PrepEnvironment'):
-    queue: Deque['PrepInfo'] = deque()
+def resolve_import(prepinfo: "PrepInfo", env: "PrepEnvironment"):
+    queue: Deque["PrepInfo"] = deque()
     queue.append(prepinfo)
 
     while len(queue):
@@ -36,8 +36,7 @@ def resolve_import(prepinfo: 'PrepInfo', env: 'PrepEnvironment'):
             queue.append(clsdef.prepinfo)
 
 
-def _resolve_import_chain(prepinfo: 'PrepInfo', name: str,
-                          env: 'PrepEnvironment'):
+def _resolve_import_chain(prepinfo: "PrepInfo", name: str, env: "PrepEnvironment"):
     """Resolve type from an import chaine"""
     impt_entry = prepinfo.impt[name]
     cur_state = (impt_entry.symid, impt_entry.origin_name)

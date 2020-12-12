@@ -9,12 +9,12 @@ from pystatic.visitor import BaseVisitor
 from pystatic.message import MessageBox
 from pystatic.symtable import TableScope
 from pystatic.arg import Argument
-from pystatic.preprocess.resolve_func import (resolve_func_template)
+from pystatic.preprocess.resolve_func import resolve_func_template
 from pystatic.preprocess.resolve_util import eval_preptype
 from pystatic.preprocess.prepinfo import *
 
 
-def resolve_cls(clsdef: 'prep_cls', shallow: bool):
+def resolve_cls(clsdef: "prep_cls", shallow: bool):
     # resolve super classes
     clstemp = clsdef.clstemp
     mbox = clsdef.def_prepinfo.mbox
@@ -46,7 +46,7 @@ def resolve_cls(clsdef: 'prep_cls', shallow: bool):
         clsdef.stage = PREP_COMPLETE
 
 
-def resolve_cls_placeholder(clsdef: 'prep_cls', mbox: 'MessageBox'):
+def resolve_cls_placeholder(clsdef: "prep_cls", mbox: "MessageBox"):
     """Resolve placeholders of a class"""
     clstemp = clsdef.clstemp
     visitor = _TypeVarVisitor(clsdef.prepinfo, mbox)
@@ -61,10 +61,11 @@ class _TypeVarVisitor(BaseVisitor):
 
     Used to generate correct placeholders.
     """
-    def __init__(self, prepinfo: 'PrepInfo', mbox: 'MessageBox') -> None:
+
+    def __init__(self, prepinfo: "PrepInfo", mbox: "MessageBox") -> None:
         self.prepinfo = prepinfo
-        self.typevars: List['TypeVarIns'] = []
-        self.generic_tpvars: List['TypeVarIns'] = []
+        self.typevars: List["TypeVarIns"] = []
+        self.generic_tpvars: List["TypeVarIns"] = []
         self.mbox = mbox
         self.in_gen = False
 
@@ -87,7 +88,7 @@ class _TypeVarVisitor(BaseVisitor):
             yield
             self.in_gen = old_in_gen
 
-    def get_typevar_list(self) -> List['TypeVarIns']:
+    def get_typevar_list(self) -> List["TypeVarIns"]:
         if self.met_gen:
             for gen in self.typevars:
                 if gen not in self.generic_tpvars:
@@ -134,11 +135,12 @@ class _TypeVarVisitor(BaseVisitor):
         return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(prepinfo: 'PrepInfo', env: 'PrepEnvironment',
-                       mbox: 'MessageBox'):
+def resolve_cls_method(
+    prepinfo: "PrepInfo", env: "PrepEnvironment", mbox: "MessageBox"
+):
     # TODO: symid here is not set correctly
     manager = env.manager
-    queue: Deque['PrepInfo'] = deque()
+    queue: Deque["PrepInfo"] = deque()
     queue.append(prepinfo)
 
     while len(queue):
@@ -150,16 +152,17 @@ def resolve_cls_method(prepinfo: 'PrepInfo', env: 'PrepEnvironment',
                 # that get around manager, which may be problematic
                 env.add_target_prepinfo(
                     blk_target,
-                    PrepMethodInfo(clsdef.clstemp, cur_prepinfo,
-                                   cur_prepinfo.mbox, env))
+                    PrepMethodInfo(
+                        clsdef.clstemp, cur_prepinfo, cur_prepinfo.mbox, env
+                    ),
+                )
                 manager.q_preprocess.append(blk_target)
 
             for subclsdef in clsdef.prepinfo.cls.values():
                 queue.append(subclsdef.prepinfo)
 
 
-def _resolve_cls_method(clsdef: 'prep_cls',
-                        mbox: 'MessageBox') -> List[MethodTarget]:
+def _resolve_cls_method(clsdef: "prep_cls", mbox: "MessageBox") -> List[MethodTarget]:
     targets = []  # method targets that need to be preprocessed
     clstemp = clsdef.clstemp
     symid = clstemp.name
@@ -171,15 +174,16 @@ def _resolve_cls_method(clsdef: 'prep_cls',
         is_staticmethod = False
         for dec_node in node.decorator_list:
             if isinstance(dec_node, ast.Name):
-                if dec_node.id == 'classmethod':
+                if dec_node.id == "classmethod":
                     is_classmethod = True
 
-                elif dec_node.id == 'staticmethod':
+                elif dec_node.id == "staticmethod":
                     is_staticmethod = True
         return is_classmethod, is_staticmethod
 
-    def modify_argument(argument: Argument, is_classmethod: bool,
-                        is_staticmethod: bool):
+    def modify_argument(
+        argument: Argument, is_classmethod: bool, is_staticmethod: bool
+    ):
         if is_classmethod:
             argument.args[0].ann = clstemp.get_default_typetype()
         elif not is_staticmethod:
@@ -187,26 +191,26 @@ def _resolve_cls_method(clsdef: 'prep_cls',
             default_ins_option.dump_to_box(mbox)
             argument.args[0].ann = default_ins_option.value
 
-    def add_func_def(argument: Argument, ret: TypeIns,
-                     node: ast.FunctionDef) -> TypeFuncIns:
+    def add_func_def(
+        argument: Argument, ret: TypeIns, node: ast.FunctionDef
+    ) -> TypeFuncIns:
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(argument, is_classmethod, is_staticmethod)
 
         name = node.name
         inner_symtable = symtable.new_symtable(name, TableScope.FUNC)
-        func_ins = TypeFuncIns(name, symtable.glob_symid, inner_symtable,
-                               argument, ret)
+        func_ins = TypeFuncIns(name, symtable.glob_symid, inner_symtable, argument, ret)
         # get attribute because of assignment of self
         if not is_staticmethod:
             symtb = func_ins.get_inner_symtable()
-            method_symid = '.'.join([symid, name])
-            targets.append(
-                MethodTarget(method_symid, symtb, clstemp, node, mbox))
+            method_symid = ".".join([symid, name])
+            targets.append(MethodTarget(method_symid, symtb, clstemp, node, mbox))
 
         return func_ins
 
-    def add_func_overload(ins: TypeFuncIns, args: Argument, ret: TypeIns,
-                          node: ast.FunctionDef):
+    def add_func_overload(
+        ins: TypeFuncIns, args: Argument, ret: TypeIns, node: ast.FunctionDef
+    ):
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(args, is_classmethod, is_staticmethod)
         ins.add_overload(args, ret)

@@ -4,23 +4,23 @@ from pystatic.preprocess.prepinfo import PrepDef
 
 
 class _Node:
-    __slots__ = ['prepdef', 'dependency', 'indeg']
+    __slots__ = ["prepdef", "dependency", "indeg"]
 
-    def __init__(self, prepdef: 'PrepDef') -> None:
+    def __init__(self, prepdef: "PrepDef") -> None:
         self.prepdef = prepdef
-        self.dependency: Set['_Node'] = set()
+        self.dependency: Set["_Node"] = set()
         self.indeg: int = 0
 
-    def add_dependency(self, node: '_Node'):
+    def add_dependency(self, node: "_Node"):
         self.dependency.add(node)
 
 
 class DependencyGraph:
     def __init__(self) -> None:
-        self._nodes: List['_Node'] = []
-        self._mapping: Dict['PrepDef', _Node] = {}
+        self._nodes: List["_Node"] = []
+        self._mapping: Dict["PrepDef", _Node] = {}
 
-    def lookup(self, prepdef: 'PrepDef'):
+    def lookup(self, prepdef: "PrepDef"):
         if prepdef not in self._mapping:
             newnode = _Node(prepdef)
             self._nodes.append(newnode)
@@ -35,8 +35,8 @@ class DependencyGraph:
     def add_prepdef(self, prepdef: PrepDef):
         self.lookup(prepdef)
 
-    def toposort(self) -> List['PrepDef']:
-        que: Deque['_Node'] = deque()
+    def toposort(self) -> List["PrepDef"]:
+        que: Deque["_Node"] = deque()
         for node in self._nodes:
             node.indeg = 0
         for node in self._nodes:
@@ -58,7 +58,6 @@ class DependencyGraph:
 
         for node in self._nodes:
             if node.indeg != 0:
-                raise NotImplementedError(
-                    "resolve dependency error not implemented")
+                raise NotImplementedError("resolve dependency error not implemented")
 
         return res

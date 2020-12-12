@@ -4,9 +4,11 @@ from pystatic.preprocess.resolve_cls import resolve_cls_placeholder
 from pystatic.preprocess.resolve_spt import resolve_typevar
 from typing import TYPE_CHECKING, List, Deque
 from pystatic.target import BlockTarget, FunctionTarget, MethodTarget, Stage, Target
-from pystatic.preprocess.definition import (get_definition,
-                                            get_definition_in_method,
-                                            get_definition_in_function)
+from pystatic.preprocess.definition import (
+    get_definition,
+    get_definition_in_method,
+    get_definition_in_function,
+)
 from pystatic.preprocess.dependency import toposort_prepdef
 from pystatic.preprocess.resolve import resolve, resolve_import, resolve_cls_method
 from pystatic.preprocess.prepinfo import *
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
     from pystatic.manager import Manager
 
 
-def dump_to_symtable(prepinfo: 'PrepInfo'):
+def dump_to_symtable(prepinfo: "PrepInfo"):
     queue: Deque[PrepInfo] = deque()
     queue.append(prepinfo)
 
@@ -26,8 +28,9 @@ def dump_to_symtable(prepinfo: 'PrepInfo'):
         for clsdef in cur_prepinfo.cls.values():
             queue.append(clsdef.prepinfo)
 
+
 class Preprocessor:
-    def __init__(self, manager: 'Manager') -> None:
+    def __init__(self, manager: "Manager") -> None:
         self.env = PrepEnvironment(manager)
 
     def process(self):
@@ -50,7 +53,9 @@ class Preprocessor:
                     get_definition(current, self.env)
 
             prepinfo_list = [
-                prepinfo for target in to_check if (prepinfo := self.env.get_target_prepinfo(target))
+                prepinfo
+                for target in to_check
+                if (prepinfo := self.env.get_target_prepinfo(target))
             ]
             assert len(prepinfo_list) == len(to_check)
 
@@ -71,7 +76,6 @@ class Preprocessor:
                 dump_to_symtable(prepinfo)
 
             for target in to_check:
-                if isinstance(target, Target) and manager.is_on_check(
-                        target.symid):
+                if isinstance(target, Target) and manager.is_on_check(target.symid):
                     manager.update_stage(target, Stage.Infer)
         self.env.clear()

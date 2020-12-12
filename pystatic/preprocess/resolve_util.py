@@ -4,8 +4,9 @@ from pystatic.option import Option
 from pystatic.exprparse import ExprParser, SupportGetAttribute, eval_expr
 
 
-def eval_preptype(node: ast.AST, consultant: SupportGetAttribute,
-                  annotation: bool, shallow: bool):
+def eval_preptype(
+    node: ast.AST, consultant: SupportGetAttribute, annotation: bool, shallow: bool
+):
     return PrepTypeEvaluator(consultant, annotation, shallow).accept(node)
 
 
@@ -24,8 +25,9 @@ class PrepTypeEvalResult:
 
 
 class PrepTypeEvaluator(ExprParser):
-    def __init__(self, consultant: SupportGetAttribute, annotation: bool,
-                 shallow: bool) -> None:
+    def __init__(
+        self, consultant: SupportGetAttribute, annotation: bool, shallow: bool
+    ) -> None:
         super().__init__(consultant, False, annotation)
         self.shallow = shallow
         self.generic = False

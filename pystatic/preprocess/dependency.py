@@ -24,8 +24,8 @@ def toposort_prepdef(prepinfo_list: List[PrepInfo]):
     return graph.toposort()
 
 
-def create_cls_dependency(graph: 'DependencyGraph', cls: prep_cls):
-    queue: Deque['prep_cls'] = deque()
+def create_cls_dependency(graph: "DependencyGraph", cls: prep_cls):
+    queue: Deque["prep_cls"] = deque()
     queue.append(cls)
 
     while len(queue):
@@ -52,7 +52,7 @@ def create_cls_dependency(graph: 'DependencyGraph', cls: prep_cls):
             queue.append(subclsdef)
 
 
-def create_func_dependency(graph: 'DependencyGraph', func: prep_func):
+def create_func_dependency(graph: "DependencyGraph", func: prep_func):
     node_list = func.defnodes
     graph.add_prepdef(func)
     for node in node_list:
@@ -65,7 +65,7 @@ def create_func_dependency(graph: 'DependencyGraph', func: prep_func):
             graph.add_dependency(func, ret_def)
 
 
-def create_local_dependency(graph: 'DependencyGraph', local: prep_local):
+def create_local_dependency(graph: "DependencyGraph", local: prep_local):
     node = local.defnode
     assert isinstance(node, (ast.Assign, ast.AnnAssign))
     graph.add_prepdef(local)
@@ -86,10 +86,11 @@ class _FirstPrepDefVisitor(NoGenVisitor):
     If the inherited class has already defined in symtable, then it won't
     return the TypeTemp of that class.
     """
-    def __init__(self, prepinfo: Optional['PrepInfo']) -> None:
+
+    def __init__(self, prepinfo: Optional["PrepInfo"]) -> None:
         self.prepinfo = prepinfo
 
-    def set_prepinfo(self, prepinfo: 'PrepInfo'):
+    def set_prepinfo(self, prepinfo: "PrepInfo"):
         self.prepinfo = prepinfo
 
     def clear_prepinfo(self):
