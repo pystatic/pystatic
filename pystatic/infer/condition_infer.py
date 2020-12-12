@@ -1,9 +1,8 @@
 import ast
-from typing import Dict, Union, List
+from typing import Dict, List
 from enum import Enum
 from pystatic.exprparse import eval_expr
 from pystatic.option import Option
-from pystatic.visitor import val_unparse, VisitException
 from pystatic.message import ErrorMaker
 from pystatic.predefined import TypeLiteralIns, TypeIns
 from pystatic.errorcode import *
@@ -37,10 +36,9 @@ class Condition:
 
 
 class ConditionInfer(BaseVisitor):
-    def __init__(self,
-                 recorder: SymbolRecorder,
-                 err_maker: ErrorMaker,
-                 config: Config) -> None:
+    def __init__(
+        self, recorder: SymbolRecorder, err_maker: ErrorMaker, config: Config
+    ) -> None:
         super().__init__()
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}
@@ -75,8 +73,7 @@ class ConditionInfer(BaseVisitor):
         assert len(self.reach_stack) != 0
 
     def recover_type(self):
-        if self.cur_condition.reach == Reach.UNKNOWN \
-                or self.isinstance_cond:
+        if self.cur_condition.reach == Reach.UNKNOWN or self.isinstance_cond:
             if self.isinstance_cond:
                 self.isinstance_cond = False
                 self.cur_condition.dirty_map.update(self.temp_type)
@@ -108,11 +105,10 @@ class ConditionInfer(BaseVisitor):
 
     def mark_node(self, node: ast.stmt, reach: Reach):
         self.reach_map[node] = reach
-        setattr(node, 'reach', reach)
+        setattr(node, "reach", reach)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.reach_stack.append(
-            Condition(ConditionStmtType.FUNC, Reach.ALWAYS_TRUE))
+        self.reach_stack.append(Condition(ConditionStmtType.FUNC, Reach.ALWAYS_TRUE))
 
     def visit_While(self, node: ast.While):
         reach = self.infer_value_of_condition(node.test)
@@ -137,7 +133,7 @@ class ConditionInfer(BaseVisitor):
         self.break_node = node
 
     def infer_value_of_condition(self, test: ast.expr) -> Reach:
-        if hasattr(test, 'reach'):
+        if hasattr(test, "reach"):
             res = test.reach
             assert res != Reach.UNKNOWN
             return res
@@ -167,14 +163,12 @@ class ConditionInfer(BaseVisitor):
 
     def visit_isinstance(self, node: ast.Call) -> Reach:
         args = node.args
-        first_type = self.err_maker.dump_option(
-            eval_expr(args[0], self.recorder))
-        second_typetype = self.err_maker.dump_option(
-            eval_expr(args[1], self.recorder))
-        option = second_typetype.call(None)
+        first_type = self.err_maker.dump_option(eval_expr(args[0], self.recorder))
+        second_typetype = self.err_maker.dump_option(eval_expr(args[1], self.recorder))
+        option = second_typetype.call(None, node)
         name = args[0].id
         if self.err_maker.exsit_error(option):
-            assert 'TODO'
+            assert "TODO"
         second_type = option.value
         if type_consistent(first_type, second_type):
             if isinstance(args[0], ast.Name):
@@ -182,7 +176,7 @@ class ConditionInfer(BaseVisitor):
                 self.temp_type[name] = StoredType(pre_type, False)
                 self.recorder.record_type(name, second_type)
                 self.isinstance_cond = True
-            if first_type.temp.name == 'Union':
+            if first_type.temp.name == "Union":
                 return Reach.UNKNOWN
             else:
                 return Reach.ALWAYS_TRUE
@@ -270,7 +264,9 @@ class ConditionInfer(BaseVisitor):
             left = cmpa
         return Reach.ALWAYS_TRUE
 
-    def get_value_of_compare(self, left: ast.expr, right: ast.expr, op: ast.cmpop) -> Reach:
+    def get_value_of_compare(
+        self, left: ast.expr, right: ast.expr, op: ast.cmpop
+    ) -> Reach:
         # TODO: modify after eval_expr suppose compare
         option: Option = eval_expr(left, self.recorder)
         left_tp = self.err_maker.dump_option(option)

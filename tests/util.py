@@ -1,5 +1,6 @@
 import sys
-sys.path.extend(['.', '..'])
+
+sys.path.extend([".", ".."])
 
 import os
 from collections import namedtuple
@@ -8,6 +9,21 @@ from pystatic.config import Config
 from typing import Optional, Tuple
 
 MsgWithLine = namedtuple("MsgWithLine", ["lineno", "msg"])
+
+
+def error_assert(symid: str):
+    """Assert based on error annotation in the file"""
+    manager, path = get_manager_path({}, symid)
+    manager.preprocess()
+    manager.infer()
+
+    true_msg_list = parse_file_error(path)
+    mbox = manager.get_mbox_by_symid(symid)
+    test_msg_list = mbox.to_message()
+    assert len(true_msg_list) == len(test_msg_list)
+    for true_msg, test_msg in zip(true_msg_list, test_msg_list):
+        assert test_msg.lineno == true_msg.lineno
+        assert test_msg.msg == true_msg.msg
 
 
 def parse_file_error(file_path):
@@ -20,7 +36,7 @@ def parse_file_error(file_path):
         line = line.strip()
         index = line.find("# E")
         if index != -1:
-            msg = line[index + 4:]
+            msg = line[index + 4 :]
             msg_list.append(MsgWithLine(lineno, msg))
         lineno += 1
     return msg_list
@@ -34,14 +50,14 @@ def check_error_msg(mbox, true_msg_list):
         assert test_msg.msg == true_msg.msg
 
 
-def get_manager_path(config: dict,
-                     symid: str,
-                     cwd: Optional[str] = None) -> Tuple['Manager', str]:
+def get_manager_path(
+    config: dict, symid: str, cwd: Optional[str] = None
+) -> Tuple["Manager", str]:
     if not cwd:
         # default root path for checked files is tests/src/
-        cwd = os.path.join(os.path.dirname(__file__), 'src')
-    filepath = os.path.join(cwd, *(symid.split('.'))) + '.py'
-    config['cwd'] = cwd
+        cwd = os.path.join(os.path.dirname(__file__), "src")
+    filepath = os.path.join(cwd, *(symid.split("."))) + ".py"
+    config["cwd"] = cwd
     manager = Manager(Config(config))
     manager.add_check_file(filepath)
     return manager, filepath

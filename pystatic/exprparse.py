@@ -11,19 +11,21 @@ from pystatic.predefined import *
 
 
 class SupportGetAttribute(Protocol):
-    def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
+    def getattribute(self, name: str, node: ast.AST) -> Option["TypeIns"]:
         ...
 
 
-def eval_expr(node: Optional[ast.AST],
-              attr_consultant: SupportGetAttribute,
-              explicit=False,
-              annotation=False):
+def eval_expr(
+    node: Optional[ast.AST],
+    attr_consultant: SupportGetAttribute,
+    explicit=False,
+    annotation=False,
+):
     """
-    :param explicit: If True, tuples like (1, 2) will return 
-    Tuple[Literal[1], Literal[2]], else return Tuple[int]
+    @param explicit: If True, tuples like (1, 2) will return
+    Tuple[Literal[1], Literal[2]], else return Tuple[int].
 
-    :param annotation: If True, strings inside this node is treated
+    @param annotation: If True, strings inside this node is treated
     as forward-reference other than Literal string.
     """
     if not node:
@@ -33,10 +35,11 @@ def eval_expr(node: Optional[ast.AST],
 
 
 class ExprParser(NoGenVisitor):
-    def __init__(self, consultant: SupportGetAttribute, explicit: bool,
-                 annotation: bool) -> None:
+    def __init__(
+        self, consultant: SupportGetAttribute, explicit: bool, annotation: bool
+    ) -> None:
         """
-        :param annotation: whether regard str as type annotation
+        @param annotation: whether regard str as type annotation
         """
         self.consultant = consultant
         self.explicit = explicit
@@ -80,8 +83,9 @@ class ExprParser(NoGenVisitor):
         if self.in_subs:
             self.container.append(WithAst(item, node))
 
-    def get_type_from_astlist(self, typeins: Optional[TypeIns],
-                              astlist: Sequence[Optional[ast.AST]]) -> TypeIns:
+    def get_type_from_astlist(
+        self, typeins: Optional[TypeIns], astlist: Sequence[Optional[ast.AST]]
+    ) -> TypeIns:
         """Get type from a ast node list"""
         for node in astlist:
             if node:
@@ -111,6 +115,9 @@ class ExprParser(NoGenVisitor):
             applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
         return applyargs
 
+    def visit_Expr(self, node: ast.Expr):
+        return self.visit(node.value)
+
     def visit_Name(self, node: ast.Name) -> TypeIns:
         name_option = self.consultant.getattribute(node.id, node)
         assert isinstance(name_option, Option)
@@ -129,9 +136,10 @@ class ExprParser(NoGenVisitor):
             res = ellipsis_ins
         elif self.annotation and isinstance(node.value, str):
             try:
-                astnode = ast.parse(node.value, mode='eval')
-                res_option = eval_expr(astnode.body, self.consultant,
-                                       self.explicit, True)
+                astnode = ast.parse(node.value, mode="eval")
+                res_option = eval_expr(
+                    astnode.body, self.consultant, self.explicit, True
+                )
                 # TODO: add warning here
                 res = res_option.value
             except SyntaxError:
@@ -162,7 +170,7 @@ class ExprParser(NoGenVisitor):
         assert isinstance(left_ins, TypeIns)
 
         applyargs = self.generate_applyargs(node)
-        call_option = left_ins.call(applyargs)
+        call_option = left_ins.call(applyargs, node)
 
         self.add_err(call_option.errors)
 

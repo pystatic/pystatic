@@ -1,13 +1,11 @@
 import ast
 import copy
 from abc import ABC, abstractmethod
-from http.client import REQUEST_URI_TOO_LONG
 from typing import Any, Optional, List, Final, Dict, TYPE_CHECKING
 from pystatic.option import Option
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
-    from pystatic.predefined import TypeVarIns
     from pystatic.symtable import SymTable
     from pystatic.evalutil import ApplyArgs, GetItemArgs, WithAst
     from pystatic.arg import Argument
@@ -37,8 +35,10 @@ class TypeIns:
     def getattr(self, name: str, node: Optional[ast.AST]) -> Option["TypeIns"]:
         return self.getattribute(name, node)
 
-    def call(self, applyargs: "ApplyArgs") -> Option["TypeIns"]:
-        return self.temp.call(applyargs, self)
+    def call(
+        self, applyargs: "ApplyArgs", node: Optional[ast.Call]
+    ) -> Option["TypeIns"]:
+        return self.temp.call(applyargs, self, node)
 
     def getitem(
         self, item: "GetItemArgs", node: Optional[ast.AST] = None
@@ -136,7 +136,9 @@ class TypeType(TypeIns):
     ) -> Option["TypeIns"]:
         return self.temp.getitem_typetype(self.bindlist, item, node)
 
-    def call(self, applyargs: "ApplyArgs") -> Option["TypeIns"]:
+    def call(
+        self, applyargs: "ApplyArgs", node: Optional[ast.Call]
+    ) -> Option["TypeIns"]:
         return self.temp.init_ins(applyargs, self.bindlist)
 
     def get_inner_symtable(self):
@@ -220,7 +222,7 @@ class TypeTemp(ABC):
 
         else:
             applyargs = ApplyArgs()
-            return func.call(applyargs)
+            return func.call(applyargs, node)
 
     def binop_mgf(
         self, bindlist: BindList, other: "TypeIns", op: str, node: ast.BinOp
@@ -236,7 +238,7 @@ class TypeTemp(ABC):
         else:
             applyargs = ApplyArgs()
             applyargs.add_arg(other, node)
-            return func.call(applyargs)
+            return func.call(applyargs, node)
 
     # some helper methods
     def get_inner_typedef(self, name: str) -> Optional["TypeTemp"]:
@@ -563,7 +565,7 @@ class TypeFuncIns(TypeIns):
     def get_func_name(self):
         return self.funname
 
-    def call(self, applyargs: "ApplyArgs") -> Option["TypeIns"]:
+    def call(self, applyargs: "ApplyArgs", node: ast.AST) -> Option["TypeIns"]:
         # TODO: deal with arguments
         assert self.overloads
         return Option(self.overloads[0].ret_type)
