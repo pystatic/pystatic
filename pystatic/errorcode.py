@@ -29,8 +29,9 @@ class ErrorCode:
 
 
 class IncompatibleTypeInAssign(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], expect_type: 'TypeIns',
-                 expr_type: 'TypeIns'):
+    def __init__(
+        self, node: Optional[ast.AST], expect_type: "TypeIns", expr_type: "TypeIns"
+    ):
         super().__init__()
         self.node = node
         self.expect_type = expect_type
@@ -57,8 +58,9 @@ class SymbolUndefined(ErrorCode):
 
 
 class SymbolRedefine(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], name: str,
-                 old_node: Optional[ast.AST]) -> None:
+    def __init__(
+        self, node: Optional[ast.AST], name: str, old_node: Optional[ast.AST]
+    ) -> None:
         super().__init__()
         self.node = node
         self.name = name
@@ -68,7 +70,7 @@ class SymbolRedefine(ErrorCode):
     def make(self) -> Tuple[Optional[ast.AST], str]:
         review = SYMBOL_REDEFINE.format(self.name)
         if self.old_node:
-            detail = f'{self.name} previously defined at line {self.old_node.lineno}'
+            detail = f"{self.name} previously defined at line {self.old_node.lineno}"
             return self.node, self.concat_msg(review, detail)
         else:
             return self.node, review
@@ -93,7 +95,8 @@ class IndiceParamNumberMismatch(ErrorCode):
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         return self.node, INDICE_ARGUMENT_NUMBER_MISMATCH.format(
-            self.receive, self.arity)
+            self.receive, self.arity
+        )
 
 
 class IndiceGeneralError(ErrorCode):
@@ -108,8 +111,7 @@ class IndiceGeneralError(ErrorCode):
 
 
 class NotSubscriptable(ErrorCode):
-    def __init__(self, inable_type: 'TypeIns',
-                 node: Optional[ast.AST]) -> None:
+    def __init__(self, inable_type: "TypeIns", node: Optional[ast.AST]) -> None:
         super().__init__()
         self.node = node
         self.inable_type = inable_type
@@ -118,13 +120,27 @@ class NotSubscriptable(ErrorCode):
         return self.node, NOT_SUBSCRIPTABLE.format(self.inable_type)
 
 
+class NotCallable(ErrorCode):
+    def __init__(self, inable_type: "TypeIns", node: Optional[ast.AST]):
+        super().__init__()
+        self.node = node
+        self.inable_type = inable_type
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, NOT_CALLABLE.format(self.inable_type)
+
+
 class VarTypeCollide(ErrorCode):
     """Name has been defined as a class or function but used on the left of an
     assignment statement.
     """
-    def __init__(self, previlege_node: Optional[Union[ast.ClassDef,
-                                                      ast.FunctionDef]],
-                 name: str, varnode: Optional[ast.AST]) -> None:
+
+    def __init__(
+        self,
+        previlege_node: Optional[Union[ast.ClassDef, ast.FunctionDef]],
+        name: str,
+        varnode: Optional[ast.AST],
+    ) -> None:
         super().__init__()
         self.previledge_node = previlege_node
         self.node = varnode
@@ -135,18 +151,19 @@ class VarTypeCollide(ErrorCode):
         review = VAR_TYPE_COLLIDE.format(self.name)
         if self.previledge_node:
             if isinstance(self.previledge_node, ast.ClassDef):
-                detail = f'{self.name} defined as a class at line {self.previledge_node.lineno}'
+                detail = f"{self.name} defined as a class at line {self.previledge_node.lineno}"
             else:
                 assert isinstance(self.previledge_node, ast.FunctionDef)
-                detail = f'{self.name} defined as a function at line {self.previledge_node.lineno}'
+                detail = f"{self.name} defined as a function at line {self.previledge_node.lineno}"
             return self.node, self.concat_msg(review, detail)
         else:
             return self.node, review
 
 
 class IncompatibleReturnType(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], expect_type: 'TypeIns',
-                 ret_type: 'TypeIns'):
+    def __init__(
+        self, node: Optional[ast.AST], expect_type: "TypeIns", ret_type: "TypeIns"
+    ):
         super().__init__()
         self.node = node
         self.expect_type = expect_type
@@ -160,8 +177,9 @@ class IncompatibleReturnType(ErrorCode):
 
 
 class IncompatibleArgument(ErrorCode):
-    def __init__(self, node: ast.AST, func_name: str, annotation: 'TypeIns',
-                 real_type: 'TypeIns'):
+    def __init__(
+        self, node: ast.AST, func_name: str, annotation: "TypeIns", real_type: "TypeIns"
+    ):
         super().__init__()
         self.node = node
         self.func_name = func_name
@@ -198,8 +216,7 @@ class TooMoreArgument(ErrorCode):
 
 
 class TooMoreValuesToUnpack(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], expected_num: int,
-                 got_num: int):
+    def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
         super().__init__()
         self.node = node
         self.expected_num = expected_num
@@ -213,8 +230,7 @@ class TooMoreValuesToUnpack(ErrorCode):
 
 
 class NeedMoreValuesToUnpack(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], expected_num: int,
-                 got_num: int):
+    def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
         super().__init__()
         self.node = node
         self.expected_num = expected_num
@@ -238,8 +254,7 @@ class ReturnValueExpected(ErrorCode):
 
 
 class NoAttribute(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], target_type: "TypeIns",
-                 attr_name: str):
+    def __init__(self, node: Optional[ast.AST], target_type: "TypeIns", attr_name: str):
         super().__init__()
         self.node = node
         self.target_type = target_type
@@ -252,8 +267,13 @@ class NoAttribute(ErrorCode):
 
 
 class UnsupportedBinOperand(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], operand: str,
-                 left_type: 'TypeIns', right_type: 'TypeIns'):
+    def __init__(
+        self,
+        node: Optional[ast.AST],
+        operand: str,
+        left_type: "TypeIns",
+        right_type: "TypeIns",
+    ):
         super().__init__()
         self.node = node
         self.operand = operand
@@ -278,7 +298,7 @@ class CodeUnreachable(ErrorCode):
 
 
 class NonIterative(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], fake_iter: 'TypeIns'):
+    def __init__(self, node: Optional[ast.AST], fake_iter: "TypeIns"):
         super().__init__()
         self.node = node
         self.iter = fake_iter
@@ -301,7 +321,7 @@ class DuplicateBaseclass(ErrorCode):
 
 # Errors that have nothing to do with type inconsistency
 class FileNotFound(ErrorCode):
-    def __init__(self, path: 'FilePath') -> None:
+    def __init__(self, path: "FilePath") -> None:
         super().__init__()
         self.path = path
         self.level = Level.ERROR
@@ -311,7 +331,7 @@ class FileNotFound(ErrorCode):
 
 
 class ModuleNotFound(ErrorCode):
-    def __init__(self, symid: 'SymId') -> None:
+    def __init__(self, symid: "SymId") -> None:
         super().__init__()
         self.symid = symid
         self.level = Level.ERROR

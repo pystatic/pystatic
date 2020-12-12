@@ -216,10 +216,6 @@ class TypeNoneTemp(TypeTemp):
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         return None
 
-    def call(self, applyargs: "ApplyArgs", bindlist: BindList) -> Option["TypeIns"]:
-        # TODO: warning
-        return Option(self._cached_ins)
-
     def getitem(self, item: "GetItemArgs", bindlist: BindList) -> Option["TypeIns"]:
         # TODO: warning
         return Option(self._cached_ins)

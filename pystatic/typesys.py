@@ -1,6 +1,7 @@
 import ast
 import copy
 from abc import ABC, abstractmethod
+from http.client import REQUEST_URI_TOO_LONG
 from typing import Any, Optional, List, Final, Dict, TYPE_CHECKING
 from pystatic.option import Option
 from pystatic.errorcode import *
@@ -37,7 +38,7 @@ class TypeIns:
         return self.getattribute(name, node)
 
     def call(self, applyargs: "ApplyArgs") -> Option["TypeIns"]:
-        return self.temp.call(applyargs, self.bindlist)
+        return self.temp.call(applyargs, self)
 
     def getitem(
         self, item: "GetItemArgs", node: Optional[ast.AST] = None
@@ -189,10 +190,14 @@ class TypeTemp(ABC):
     def getattr(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         return self.getattribute(name, bindlist)
 
-    def call(self, applyargs: "ApplyArgs", bindlist: BindList) -> Option["TypeIns"]:
-        call_option = Option(any_ins)
-        # TODO: add error for not callable
-        return call_option
+    def call(
+        self, applyargs: "ApplyArgs", typeins: "TypeIns", node: Optional[ast.AST]
+    ) -> Option["TypeIns"]:
+        res_option = Option(any_ins)
+        call_func = self.getattribute("__call__", typeins.bindlist)
+        if not call_func:
+            res_option.add_err(NotCallable(typeins, node))
+        return res_option
 
     def getitem(
         self, item: "GetItemArgs", bindlist: BindList, node: Optional[ast.AST]
@@ -458,7 +463,9 @@ class TypeAnyTemp(TypeTemp):
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         return self._cached_ins
 
-    def call(self, applyargs: "ApplyArgs", bindlist: BindList) -> Option["TypeIns"]:
+    def call(
+        self, applyargs: "ApplyArgs", typeins: "TypeIns", node: Optional[ast.AST]
+    ) -> Option["TypeIns"]:
         return Option(self._cached_ins)
 
     def getitem(
