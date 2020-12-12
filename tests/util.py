@@ -46,6 +46,9 @@ def parse_file_error(file_path):
     lineno = 1
     for line in lines:
         line = line.strip()
+        if line.startswith('#') and not line.startswith('# E'):
+            lineno += 1
+            continue
         index = line.find("# E")
         if index != -1:
             msg = line[index + 4 :]

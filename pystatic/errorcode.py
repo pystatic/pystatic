@@ -1,6 +1,6 @@
 import ast
 from enum import Enum
-from typing import Tuple, Optional, TYPE_CHECKING, Union
+from typing import Tuple, Optional, TYPE_CHECKING, Union, List
 from pystatic.error_register import *
 
 if TYPE_CHECKING:
@@ -178,41 +178,43 @@ class IncompatibleReturnType(ErrorCode):
 
 class IncompatibleArgument(ErrorCode):
     def __init__(
-        self, node: ast.AST, func_name: str, annotation: "TypeIns", real_type: "TypeIns"
+        self, node: ast.AST, param_name: str, param_type: "TypeIns", arg_type: "TypeIns"
     ):
         super().__init__()
         self.node = node
-        self.func_name = func_name
-        self.annotation = annotation
-        self.real_type = real_type
+        self.param_name = param_name
+        self.param_type = param_type
+        self.arg_type = arg_type
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = INCOMPATIBLE_ARGUMENT.format(self.func_name)
-        detail = f"argument has type '{self.real_type}', expected '{self.annotation}'"
+        review = INCOMPATIBLE_ARGUMENT.format(self.param_name)
+        detail = f"get '{self.arg_type}', expect '{self.param_type}'"
         return self.node, self.concat_msg(review, detail)
 
 
 class TooFewArgument(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], func_name: str):
+    def __init__(self, node: Optional[ast.AST], missing_names: List[str]):
         super().__init__()
         self.node = node
-        self.func_name = func_name
+        assert missing_names
+        self.missing_names = missing_names
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, TOO_FEW_ARGUMENT_FOR_FUNC.format(self.func_name)
+        review = TOO_FEW_ARGUMENTS
+        detail = f"missing " + ", ".join(self.missing_names)
+        return self.node, self.concat_msg(review, detail)
 
 
 class TooMoreArgument(ErrorCode):
-    def __init__(self, node: Optional[ast.AST], func_name: str):
+    def __init__(self, node: Optional[ast.AST]):
         super().__init__()
         self.node = node
-        self.func_name = func_name
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, TOO_MORE_ARGUMENT_FOR_FUNC.format(self.func_name)
+        return self.node, TOO_MORE_ARGUMENTS
 
 
 class TooMoreValuesToUnpack(ErrorCode):

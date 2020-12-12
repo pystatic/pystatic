@@ -1,12 +1,11 @@
 from enum import Enum, auto
-from typing import Dict, List, TYPE_CHECKING, Tuple, Type, List
+from typing import List, TYPE_CHECKING, Type, List
 from pystatic.symtable import SymTable, TableScope, Entry
 from pystatic.typesys import *
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.evalutil import InsWithAst, GetItemArgs
-    from pystatic.arg import Argument
 
 
 class TpVarKind(Enum):

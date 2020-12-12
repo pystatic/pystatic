@@ -193,7 +193,7 @@ class TypeTemp(ABC):
         return self.getattribute(name, bindlist)
 
     def call(
-        self, applyargs: "ApplyArgs", typeins: "TypeIns", node: Optional[ast.AST]
+        self, applyargs: "ApplyArgs", typeins: "TypeIns", node: Optional[ast.Call]
     ) -> Option["TypeIns"]:
         res_option = Option(any_ins)
         call_func = self.getattribute("__call__", typeins.bindlist)
@@ -466,7 +466,7 @@ class TypeAnyTemp(TypeTemp):
         return self._cached_ins
 
     def call(
-        self, applyargs: "ApplyArgs", typeins: "TypeIns", node: Optional[ast.AST]
+        self, applyargs: "ApplyArgs", typeins: "TypeIns", node: Optional[ast.Call]
     ) -> Option["TypeIns"]:
         return Option(self._cached_ins)
 
@@ -565,10 +565,17 @@ class TypeFuncIns(TypeIns):
     def get_func_name(self):
         return self.funname
 
-    def call(self, applyargs: "ApplyArgs", node: ast.AST) -> Option["TypeIns"]:
-        # TODO: deal with arguments
+    def call(
+        self, applyargs: "ApplyArgs", node: Optional[ast.Call]
+    ) -> Option["TypeIns"]:
+        # TODO: deal with overloads(find a best match)
+        from pystatic.arg import match_argument
+
         assert self.overloads
-        return Option(self.overloads[0].ret_type)
+        error_list = match_argument(self.overloads[0].argument, applyargs, node)
+        ret_option = Option(self.overloads[0].ret_type)
+        ret_option.add_err_list(error_list)
+        return ret_option
 
 
 func_temp = TypeFuncTemp()

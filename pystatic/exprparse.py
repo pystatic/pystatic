@@ -112,7 +112,7 @@ class ExprParser(NoGenVisitor):
             argins = self.visit(kwargnode.value)
             assert isinstance(argins, TypeIns)
             assert kwargnode.arg, "**kwargs is not supported now"
-            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode)
+            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode.value)
         return applyargs
 
     def visit_Expr(self, node: ast.Expr):

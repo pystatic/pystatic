@@ -325,8 +325,9 @@ class TypeCompatible:
             return True
 
 
-def type_consistent(tp1, tp2):
-    res = TypeCompatible().TypeCompatible(tp1, tp2)
+def type_consistent(left_ins, right_ins) -> bool:
+    """check left_ins = right_ins safety"""
+    res = TypeCompatible().TypeCompatible(left_ins, right_ins)
     return res
 
 
