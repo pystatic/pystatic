@@ -11,8 +11,13 @@ from typing import Optional, Tuple
 MsgWithLine = namedtuple("MsgWithLine", ["lineno", "msg"])
 
 
-def error_assert(symid: str):
-    """Assert based on error annotation in the file"""
+def error_assert(symid: str, precise: bool = True):
+    """Assert based on error annotation in the file
+
+    @param symid: symbol id of the target module.
+
+    @param precise: True for precise match, and False for just a subset.
+    """
     manager, path = get_manager_path({}, symid)
     manager.preprocess()
     manager.infer()
@@ -20,10 +25,17 @@ def error_assert(symid: str):
     true_msg_list = parse_file_error(path)
     mbox = manager.get_mbox_by_symid(symid)
     test_msg_list = mbox.to_message()
-    assert len(true_msg_list) == len(test_msg_list)
-    for true_msg, test_msg in zip(true_msg_list, test_msg_list):
-        assert test_msg.lineno == true_msg.lineno
-        assert test_msg.msg == true_msg.msg
+
+    if precise:
+        assert len(true_msg_list) == len(test_msg_list)
+        for true_msg, test_msg in zip(true_msg_list, test_msg_list):
+            assert test_msg.lineno == true_msg.lineno
+            assert test_msg.msg == true_msg.msg
+    else:
+        true_msg_list = [(true_msg.lineno, true_msg.msg) for true_msg in true_msg_list]
+        test_msg_list = [(test_msg.lineno, test_msg.msg) for test_msg in test_msg_list]
+        for true_msg in true_msg_list:
+            assert true_msg in test_msg_list
 
 
 def parse_file_error(file_path):

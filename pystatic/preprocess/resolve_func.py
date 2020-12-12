@@ -68,6 +68,7 @@ def resolve_func_template(
             if not_overload:
                 overload_list.append((*get_arg_ret(astnode), astnode))
                 mbox.add_err(SymbolRedefine(astnode, func.name, not_overload[-1]))
+                setattr(astnode, "reach", Reach.REDEFINE)
             else:
                 not_overload = (*get_arg_ret(astnode), astnode)
 

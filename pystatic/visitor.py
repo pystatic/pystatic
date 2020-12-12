@@ -10,6 +10,7 @@ class VisitException(Exception):
     Node points to the position where the process failed.
     Msg is used to describe why it failed(it can be omitted by set it to '').
     """
+
     def __init__(self, node: ast.AST, msg: str):
         super().__init__(msg)
         self.node = node
@@ -18,13 +19,12 @@ class VisitException(Exception):
 
 class BaseVisitor(object):
     def whether_visit(self, node):
-        if getattr(node, 'reach',
-                   Reach.UNKNOWN) not in (Reach.FUNC_REDEF, Reach.CLS_REDEF):
+        if getattr(node, "reach", Reach.UNKNOWN) != Reach.REDEFINE:
             return True
         return False
 
     def get_visit_func(self, node):
-        method = 'visit_' + node.__class__.__name__
+        method = "visit_" + node.__class__.__name__
         next_visitor = getattr(self, method, self.generic_visit)
         return next_visitor
 
@@ -67,15 +67,16 @@ class NoGenVisitor(BaseVisitor):
 
 class ValueUnParser(BaseVisitor):
     """Try to convert an ast to a python value"""
+
     def __init__(self, context: Optional[dict]) -> None:
         super().__init__()
         self.context = context
 
     def visit(self, node: ast.AST, *args, **kwargs):
-        method = 'visit_' + node.__class__.__name__
+        method = "visit_" + node.__class__.__name__
         next_visitor = getattr(self, method, None)
         if not next_visitor:
-            raise VisitException(node, '')
+            raise VisitException(node, "")
         return next_visitor(node, *args, **kwargs)
 
     def visit_Tuple(self, node: ast.Tuple):
@@ -88,7 +89,7 @@ class ValueUnParser(BaseVisitor):
         if self.context and node.id in self.context:
             return self.context[node.id]
         else:
-            raise VisitException(node, f'{node.id} not found')
+            raise VisitException(node, f"{node.id} not found")
 
     def visit_Constant(self, node: ast.Constant):
         return node.value
@@ -107,22 +108,22 @@ class LiterUnParser(BaseVisitor):
         super().__init__()
 
     def visit(self, node: ast.AST, *args, **kwargs):
-        method = 'visit_' + node.__class__.__name__
+        method = "visit_" + node.__class__.__name__
         next_visitor = getattr(self, method, None)
         if not next_visitor:
-            raise VisitException(node, f'{method} not implemented')
+            raise VisitException(node, f"{method} not implemented")
         return next_visitor(node, *args, **kwargs)
 
     def visit_Name(self, node: ast.Name):
         return node.id
 
     def visit_Ellipsis(self, node: ast.Ellipsis):
-        return '...'
+        return "..."
 
     def visit_Constant(self, node: ast.Constant):
         try:
             if node.value is Ellipsis:
-                return '...'
+                return "..."
             else:
                 return str(node.value)
         except ValueError:
@@ -132,47 +133,47 @@ class LiterUnParser(BaseVisitor):
         items = []
         for subnode in node.elts:
             items.append(self.visit(subnode))
-        return '(' + ','.join(items) + ')'
+        return "(" + ",".join(items) + ")"
 
     def visit_List(self, node: ast.List):
         items = []
         for subnode in node.elts:
             items.append(self.visit(subnode))
-        return '[' + ','.join(items) + ']'
+        return "[" + ",".join(items) + "]"
 
     def visit_Attribute(self, node: ast.Attribute):
         value = self.visit(node.value)
-        return value + '.' + node.attr
+        return value + "." + node.attr
 
     def visit_Subscript(self, node: ast.Subscript):
         value = self.visit(node.value)
         if isinstance(node.slice, ast.Tuple):
             slc = self.visit(node.slice)
-            assert (slc[0] == '(')
-            assert (slc[-1] == ')')
-            slc[0] = '['
-            slc[-1] = ']'
+            assert slc[0] == "("
+            assert slc[-1] == ")"
+            slc[0] = "["
+            slc[-1] = "]"
         else:
-            slc = '[' + self.visit(node.slice) + ']'
+            slc = "[" + self.visit(node.slice) + "]"
         return value + slc
 
     def visit_Slice(self, node: ast.Slice):
-        lower = ''
-        upper = ''
-        step = ''
+        lower = ""
+        upper = ""
+        step = ""
         if node.lower:
             lower = self.visit(node.lower)
         if node.upper:
             upper = self.visit(node.upper)
         if node.step:
             step = self.visit(node.step)
-        return ':'.join([lower, upper, step])
+        return ":".join([lower, upper, step])
 
     def visit_Index(self, node: ast.Index):
         # ast.Index is deprecated since python3.9
         if isinstance(node.value, ast.Tuple):
             res = self.visit(node.value)
-            assert res[0] == '(' and res[-1] == ')'
+            assert res[0] == "(" and res[-1] == ")"
             return res[1:-1]
         else:
             return self.visit(node.value)
@@ -181,7 +182,7 @@ class LiterUnParser(BaseVisitor):
         items = []
         for subnode in node.dims:
             items.append(self.visit(subnode))
-        return ','.join(items)
+        return ",".join(items)
 
 
 def liter_unparse(node: ast.AST):

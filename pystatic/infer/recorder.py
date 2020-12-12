@@ -1,10 +1,15 @@
 import ast
-from collections import namedtuple
 from typing import List, Dict, Set, Union
-from pystatic.errorcode import SymbolUndefined, ErrorCode
+from pystatic.errorcode import SymbolUndefined
 from pystatic.typesys import TypeIns, TypeType, any_type
-from pystatic.predefined import (TypeFuncIns, TypeModuleIns, TypeUnionTemp,
-                                 TypeLiteralIns, builtins_symtable, none_ins)
+from pystatic.predefined import (
+    TypeFuncIns,
+    TypeModuleIns,
+    TypeUnionTemp,
+    TypeLiteralIns,
+    builtins_symtable,
+    none_ins,
+)
 from pystatic.option import Option
 from pystatic.symtable import SymTable
 from pystatic.TypeCompatible.simpleType import type_consistent
@@ -28,8 +33,9 @@ class Scope:
 
 
 class FuncScope(Scope):
-    def __init__(self, tp: TypeFuncIns, args: Dict[str, TypeIns],
-                 ret_annotation: TypeIns):
+    def __init__(
+        self, tp: TypeFuncIns, args: Dict[str, TypeIns], ret_annotation: TypeIns
+    ):
         super().__init__(tp)
         self.type_map = args
         self.ret_annotation = ret_annotation
@@ -48,6 +54,7 @@ class ModuleScope(Scope):
 
 class SymbolRecorder:
     """record the appeared symbol"""
+
     def __init__(self, module):
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))
@@ -65,8 +72,7 @@ class SymbolRecorder:
     def leave_scope(self):
         self.stack.pop()
 
-    def enter_func(self, tp: TypeFuncIns, args: Dict[str, TypeIns],
-                   ret_annotation):
+    def enter_func(self, tp: TypeFuncIns, args: Dict[str, TypeIns], ret_annotation):
         self.stack.append(FuncScope(tp, args, ret_annotation))
 
     def leave_func(self):
@@ -163,7 +169,7 @@ def literal_to_normal_type(literal_ins: TypeLiteralIns):
 def make_union_type(type_list) -> TypeIns:
     bindlist: List[TypeIns] = []
     for tp in type_list:
-        if tp.temp.name == 'Union':
+        if tp.temp.name == "Union":
             bindlist.extend(tp.bindlist)
         elif isinstance(tp, TypeLiteralIns):
             bindlist.append(literal_to_normal_type(tp))

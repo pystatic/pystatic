@@ -1,4 +1,5 @@
 import ast
+from pystatic.reach import Reach
 from typing import Optional, TYPE_CHECKING, Dict, Union, List, Set, Final
 from pystatic.errorcode import *
 from pystatic.target import Target
@@ -65,17 +66,19 @@ class PrepInfo:
         return PrepInfo(symtable, self, self.env, self.mbox, False)
 
     def add_cls_def(self, node: ast.ClassDef, mbox: "MessageBox"):
-        # TODO: check name collision
         clsname = node.name
         if (old_def := self.cls.get(clsname)) :
             mbox.add_err(SymbolRedefine(node, clsname, old_def.defnode))
+            setattr(node, "reach", Reach.REDEFINE)
             return old_def.prepinfo
 
+        # definition priority: class > function > local symbol
         if (old_def := self.local.get(clsname)) :
             mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
             self.local.pop(clsname)
         elif (old_def := self.func.get(clsname)) :
             mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
+            setattr(old_def.defnode, "reach", Reach.REDEFINE)
             self.func.pop(clsname)
 
         if (clstemp := self.symtable.get_type_def(clsname)) :
@@ -101,6 +104,7 @@ class PrepInfo:
         else:
             if (old_def := self.cls.get(name)) :
                 mbox.add_err(VarTypeCollide(old_def.defnode, name, node))
+                setattr(node, "reach", Reach.REDEFINE)
                 return
             elif (old_def := self.local.get(name)) :
                 mbox.add_err(VarTypeCollide(node, name, old_def.defnode))

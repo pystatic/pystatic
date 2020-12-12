@@ -8,8 +8,7 @@ class Reach(enum.Enum):
     ALWAYS_TRUE = 3  # true on runtime
     ALWAYS_FALSE = 4  # false on runtime
     UNKNOWN = 5  # uncertain about its reachability
-    CLS_REDEF = 6
-    FUNC_REDEF = 7
+    REDEFINE = 6  # redefined classes and function won't be taken into consideration
 
 
 def cal_neg(res: Reach) -> Reach:
