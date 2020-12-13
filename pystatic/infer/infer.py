@@ -9,7 +9,7 @@ from pystatic.message import MessageBox, ErrorMaker
 from pystatic.arg import Argument
 from pystatic.errorcode import *
 from pystatic.exprparse import eval_expr
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.opmap import *
 from pystatic.config import Config
 from pystatic.visitor import BaseVisitor
@@ -160,20 +160,20 @@ class InferVisitor(BaseVisitor):
         ltype = self.get_type(node.target)
         rtype = self.get_type(node.value)
         func_name: str = binop_map[type(node.op)]
-        option: Option = ltype.getattribute(func_name, None)
+        option: Result = ltype.getattribute(func_name, None)
         operand = binop_char_map[type(node.op)]
         if self.err_maker.exsit_error(option):
             self.err_maker.add_err(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype)
             )
             return
-        func_type = self.err_maker.dump_option(option)
+        func_type = self.err_maker.dump_result(option)
         self.check_arg_of_operand_func(node.value, func_type, operand, ltype, rtype)
 
     def check_arg_of_operand_func(self, node, func_type, operand, ltype, rtype):
         apply_args = ApplyArgs()
         apply_args.add_arg(rtype, node)
-        option: Option = func_type.call(apply_args)
+        option: Result = func_type.call(apply_args)
         if self.err_maker.exsit_error(option):
             self.err_maker.add_err(UnsupportedBinOperand(node, operand, ltype, rtype))
 

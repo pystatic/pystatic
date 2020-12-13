@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 T = TypeVar('T', bound=Any, covariant=True)
 
 
-class Option(Generic[T]):
+class Result(Generic[T]):
     __slots__ = ['errors', 'value']
 
     def __init__(self, default):
@@ -27,7 +27,7 @@ class Option(Generic[T]):
     def set_value(self, value):
         self.value = value
 
-    def combine_error(self, other: 'Option'):
+    def combine_error(self, other: 'Result'):
         if other.errors:
             if not self.errors:
                 self.errors = other.errors

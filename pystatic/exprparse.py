@@ -5,13 +5,13 @@ from pystatic.errorcode import ErrorCode
 from pystatic.visitor import NoGenVisitor
 from pystatic.typesys import TypeIns, any_ins
 from pystatic.evalutil import ApplyArgs, WithAst, GetItemArgs
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.opmap import binop_map, unaryop_map
 from pystatic.predefined import *
 
 
 class SupportGetAttribute(Protocol):
-    def getattribute(self, name: str, node: ast.AST) -> Option["TypeIns"]:
+    def getattribute(self, name: str, node: ast.AST) -> Result["TypeIns"]:
         ...
 
 
@@ -22,6 +22,10 @@ def eval_expr(
     annotation=False,
 ):
     """
+    @param node: target ast node.
+
+    @param attr_consultant: instance with getattribute method.
+
     @param explicit: If True, tuples like (1, 2) will return
     Tuple[Literal[1], Literal[2]], else return Tuple[int].
 
@@ -29,7 +33,7 @@ def eval_expr(
     as forward-reference other than Literal string.
     """
     if not node:
-        return Option(none_ins)
+        return Result(none_ins)
     else:
         return ExprParser(attr_consultant, explicit, annotation).accept(node)
 
@@ -48,13 +52,13 @@ class ExprParser(NoGenVisitor):
         self.in_subs = False
         self.container = None
 
-    def accept(self, node) -> Option[TypeIns]:
+    def accept(self, node) -> Result[TypeIns]:
         self.errors = []
         tpins = self.visit(node)
         assert isinstance(tpins, TypeIns)
-        res_option = Option(tpins)
-        res_option.add_err_list(self.errors)
-        return res_option
+        result = Result(tpins)
+        result.add_err_list(self.errors)
+        return result
 
     @contextlib.contextmanager
     def register_container(self, container: list):
@@ -119,29 +123,29 @@ class ExprParser(NoGenVisitor):
         return self.visit(node.value)
 
     def visit_Name(self, node: ast.Name) -> TypeIns:
-        name_option = self.consultant.getattribute(node.id, node)
-        assert isinstance(name_option, Option)
-        assert isinstance(name_option.value, TypeIns)
+        name_result = self.consultant.getattribute(node.id, node)
+        assert isinstance(name_result, Result)
+        assert isinstance(name_result.value, TypeIns)
 
-        self.add_err(name_option.errors)
+        self.add_err(name_result.errors)
 
-        self.add_to_container(name_option.value, node)
-        return name_option.value
+        self.add_to_container(name_result.value, node)
+        return name_result.value
 
     def visit_Constant(self, node: ast.Constant) -> TypeIns:
         res = None
-        if node.value == None:
+        if node.value is None:
             res = none_ins
-        elif node.value == ...:
+        elif node.value is ...:
             res = ellipsis_ins
         elif self.annotation and isinstance(node.value, str):
             try:
                 astnode = ast.parse(node.value, mode="eval")
-                res_option = eval_expr(
+                result = eval_expr(
                     astnode.body, self.consultant, self.explicit, True
                 )
                 # TODO: add warning here
-                res = res_option.value
+                res = result.value
             except SyntaxError:
                 # TODO: add warning here
                 res = TypeLiteralIns(node.value)
@@ -158,24 +162,24 @@ class ExprParser(NoGenVisitor):
         with self.block_container():
             res = self.visit(node.value)
             assert isinstance(res, TypeIns)
-        attr_option = res.getattribute(node.attr, node)
+        attr_result = res.getattribute(node.attr, node)
 
-        self.add_err(attr_option.errors)
+        self.add_err(attr_result.errors)
 
-        self.add_to_container(attr_option.value, node)
-        return attr_option.value
+        self.add_to_container(attr_result.value, node)
+        return attr_result.value
 
     def visit_Call(self, node: ast.Call) -> TypeIns:
         left_ins = self.visit(node.func)
         assert isinstance(left_ins, TypeIns)
 
         applyargs = self.generate_applyargs(node)
-        call_option = left_ins.call(applyargs, node)
+        call_result = left_ins.call(applyargs, node)
 
-        self.add_err(call_option.errors)
+        self.add_err(call_result.errors)
 
-        self.add_to_container(call_option.value, node)
-        return call_option.value
+        self.add_to_container(call_result.value, node)
+        return call_result.value
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> TypeIns:
         operand_ins = self.visit(node.operand)
@@ -183,12 +187,12 @@ class ExprParser(NoGenVisitor):
 
         op = unaryop_map.get(type(node.op))
         assert op, f"{node.op} is not supported now"
-        res_option = operand_ins.unaryop_mgf(op, node)
+        result = operand_ins.unaryop_mgf(op, node)
 
-        self.add_err(res_option.errors)
+        self.add_err(result.errors)
 
-        self.add_to_container(res_option.value, node)
-        return res_option.value
+        self.add_to_container(result.value, node)
+        return result.value
 
     def visit_BinOp(self, node: ast.BinOp) -> TypeIns:
         left_ins = self.visit(node.left)
@@ -198,12 +202,12 @@ class ExprParser(NoGenVisitor):
 
         op = binop_map.get(type(node.op))
         assert op, f"{node.op} is not supported now"
-        res_option = left_ins.binop_mgf(right_ins, op, node)
+        result = left_ins.binop_mgf(right_ins, op, node)
 
-        self.add_err(res_option.errors)
+        self.add_err(result.errors)
 
-        self.add_to_container(res_option.value, node)
-        return res_option.value
+        self.add_to_container(result.value, node)
+        return result.value
 
     def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
         with self.block_container():
@@ -223,13 +227,13 @@ class ExprParser(NoGenVisitor):
             itemargs = GetItemArgs(container[0].value, node)
         else:
             itemargs = GetItemArgs([container[0]], node)
-        res_option = left_ins.getitem(itemargs, node)
+        result = left_ins.getitem(itemargs, node)
 
         self.annotation = old_annotation
 
-        self.add_to_container(res_option.value, node)
-        self.add_err(res_option.errors)
-        return res_option.value
+        self.add_to_container(result.value, node)
+        self.add_err(result.errors)
+        return result.value
 
     def visit_List(self, node: ast.List):
         if self.in_subs:

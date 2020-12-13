@@ -53,8 +53,8 @@ def cmdline_main():
             return
 
         for mod in cmd_res.module:
-            add_option = manager.add_check_file(mod)
-            add_option.dump_to_box(cmdline_mbox)
+            add_result = manager.add_check_file(mod)
+            add_result.dump_to_box(cmdline_mbox)
 
         manager.preprocess()
         manager.infer()

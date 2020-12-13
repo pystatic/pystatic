@@ -2,7 +2,7 @@ import ast
 import enum
 from pystatic.symid import SymId, symid2list
 from typing import (Dict, Optional, Union, List, TYPE_CHECKING, Tuple)
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
@@ -207,19 +207,19 @@ class SymTable:
             curtable = curtable.non_local
         return find(self.builtins, name)
 
-    def getattribute(self, name: str, node: ast.AST) -> Option['TypeIns']:
+    def getattribute(self, name: str, node: ast.AST) -> Result['TypeIns']:
         """Getattribute from symtable
 
         support the getattribute interface.
         """
         from pystatic.typesys import any_ins  # avoid import circle
-        res_option = Option(any_ins)
+        result = Result(any_ins)
         res = self.legb_lookup(name)
         if not res:
-            res_option.add_err(SymbolUndefined(node, name))
+            result.add_err(SymbolUndefined(node, name))
         else:
-            res_option.set_value(res)
-        return res_option
+            result.set_value(res)
+        return result
 
     def new_symtable(self, name: str, new_scope: 'TableScope') -> 'SymTable':
         builtins = self.builtins

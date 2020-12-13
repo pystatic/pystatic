@@ -46,11 +46,11 @@ def resolve_func_template(
     def get_arg_ret(node: ast.FunctionDef):
         """Get the argument and return type of the function"""
         nonlocal prepinfo
-        argument_option = eval_argument_type(node.args, prepinfo)
-        return_option = eval_return_type(node.returns, prepinfo)
-        argument_option.dump_to_box(mbox)
-        return_option.dump_to_box(mbox)
-        return argument_option.value, return_option.value
+        argument_result = eval_argument_type(node.args, prepinfo)
+        return_result = eval_return_type(node.returns, prepinfo)
+        argument_result.dump_to_box(mbox)
+        return_result.dump_to_box(mbox)
+        return argument_result.value, return_result.value
 
     overload_list: List[FunTuple] = []
     not_overload: Optional[
@@ -91,7 +91,7 @@ def resolve_func_template(
     func.value = func_ins
 
 
-def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Option[Argument]:
+def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argument]:
     """Gernerate an Argument instance according to an ast.arguments node"""
     mbox = prepinfo.mbox
     new_args = Argument()
@@ -101,21 +101,21 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Option[Argume
     order_arg: List[Arg] = []
     order_kwarg: List[Arg] = []
 
-    res_option = Option(new_args)
+    result = Result(new_args)
 
     def resolve_arg_type(node: ast.arg) -> Arg:
         """Generate an Arg instance according to an ast.arg node"""
         nonlocal mbox, prepinfo
         new_arg = Arg(node.arg, any_ins)
         if node.annotation:
-            ann_option = eval_expr_ann(node.annotation, prepinfo)
-            ann_option.dump_to_box(mbox)
-            new_arg.ann = ann_option.value
+            ann_result = eval_expr_ann(node.annotation, prepinfo)
+            ann_result.dump_to_box(mbox)
+            new_arg.ann = ann_result.value
         return new_arg
 
     # parse a list of args
     def add_to_list(target_list: List[Arg], order_list: List[Arg], args: List[ast.arg]):
-        nonlocal res_option
+        nonlocal result
         for arg in args:
             newarg = resolve_arg_type(arg)
             assert isinstance(newarg, Arg)
@@ -146,11 +146,11 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Option[Argume
         arg.valid = True
         arg.default = value  # TODO: add type check here(here value is a node represent an expression)
 
-    return res_option
+    return result
 
 
-def eval_return_type(node, prepinfo: PrepInfo) -> Option[TypeIns]:
+def eval_return_type(node, prepinfo: PrepInfo) -> Result[TypeIns]:
     if node:
         return eval_expr_ann(node, prepinfo)
     else:
-        return Option(any_ins)
+        return Result(any_ins)

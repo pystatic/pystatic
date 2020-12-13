@@ -10,7 +10,7 @@ from pystatic.predefined import (
     builtins_symtable,
     none_ins,
 )
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.symtable import SymTable
 from pystatic.TypeCompatible.simpleType import type_consistent
 
@@ -135,12 +135,12 @@ class SymbolRecorder:
         tp = table.egb_lookup(name)
         return tp
 
-    def getattribute(self, name: str, node: ast.AST) -> Option:
+    def getattribute(self, name: str, node: ast.AST) -> Result:
         tp = self.get_run_time_type(name)
         if tp:
-            return Option(tp)
+            return Result(tp)
         else:
-            option: Option = Option(any_type)
+            option: Result = Result(any_type)
             option.add_err(SymbolUndefined(node, name))
             return option
 

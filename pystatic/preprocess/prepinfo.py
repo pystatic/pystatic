@@ -7,7 +7,7 @@ from pystatic.symid import SymId, symid2list
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
 from pystatic.predefined import TypeVarIns, TypeFuncIns
 from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry, TableScope
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
@@ -230,26 +230,26 @@ class PrepInfo:
             else:
                 return None
 
-    def getattribute(self, name: str, node: ast.AST) -> Option["TypeIns"]:
+    def getattribute(self, name: str, node: ast.AST) -> Result["TypeIns"]:
         res = None
         if (res := self.cls.get(name)) :
-            return Option(res.clstemp.get_default_typetype())
+            return Result(res.clstemp.get_default_typetype())
         elif (res := self.impt.get(name)) :
-            return Option(res.getins())
+            return Result(res.getins())
         elif (res := self.local.get(name)) :
-            return Option(res.getins())
+            return Result(res.getins())
         else:
             for star_impt in self.star_import:
                 res = self.env.lookup(star_impt, name)
                 if res:
                     if isinstance(res, TypeIns):
-                        return Option(res)
+                        return Result(res)
                     else:
-                        return Option(res.getins())
+                        return Result(res.getins())
 
             res = self.symtable.legb_lookup(name)
             if res:
-                return Option(res)
+                return Result(res)
             elif self.enclosing:
                 assert self.enclosing is not self
                 return self.enclosing.getattribute(name, node)
@@ -260,8 +260,8 @@ class PrepInfo:
                         searched.add(module)
                         res = self.env.lookup(module, name)
                         if res:
-                            return Option(res)
-                return Option(any_ins)
+                            return Result(res)
+                return Result(any_ins)
 
     def dump(self):
         for name, local in self.local.items():

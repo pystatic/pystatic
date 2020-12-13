@@ -1,8 +1,7 @@
 import ast
-from copy import Error
 from typing import Optional, List, TYPE_CHECKING
 from pystatic.errorcode import ErrorCode, CodeUnreachable, Level
-from pystatic.option import Option
+from pystatic.result import Result
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
@@ -57,15 +56,15 @@ class ErrorMaker:
     def __init__(self, mbox: MessageBox):
         self.mbox = mbox
 
-    def dump_option(self, option: Option):
+    def dump_result(self, option: Result):
         option.dump_to_box(self.mbox)
         return option.value
 
     def add_err(self, err: ErrorCode):
         self.mbox.add_err(err)
 
-    def exsit_error(self, option: Option) -> bool:
-        return option.haserr()
+    def exsit_error(self, result: Result) -> bool:
+        return result.haserr()
 
     def generate_code_unreachable_error(self, code_frag: List[ast.stmt]):
         if len(code_frag) == 0:
@@ -76,9 +75,9 @@ class ErrorMaker:
         begin.end_col_offset = end.end_col_offset
         self.add_err(CodeUnreachable(begin))
 
-    def level_error_in_option(self, option: Option):
-        if option.errors:
-            for err in option.errors:
+    def level_error_in_result(self, result: Result):
+        if result.errors:
+            for err in result.errors:
                 if err.level == Level.ERROR:
                     return True
         return False

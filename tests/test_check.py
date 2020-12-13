@@ -41,8 +41,8 @@ def test_check():
         config = Config({'cwd': cwd})
         manager = Manager(config)
         file_path = os.path.join(cwd, 'src', 'check', f'{src}.py')
-        res_option = manager.add_check_file(file_path)
-        assert res_option.value
+        result = manager.add_check_file(file_path)
+        assert result.value
         manager.preprocess()
         manager.infer()
         mbox = manager.get_mbox(file_path)

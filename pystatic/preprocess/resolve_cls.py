@@ -107,18 +107,18 @@ class _TypeVarVisitor(BaseVisitor):
                 self.typevars.append(tpvarins)
 
     def visit_Name(self, node: ast.Name):
-        name_option = self.prepinfo.getattribute(node.id, node)
-        if isinstance(name_option.value, TypeVarIns):
-            self.add_tpvar(name_option.value)
-        name_option.dump_to_box(self.mbox)
-        return name_option.value
+        name_result = self.prepinfo.getattribute(node.id, node)
+        if isinstance(name_result.value, TypeVarIns):
+            self.add_tpvar(name_result.value)
+        name_result.dump_to_box(self.mbox)
+        return name_result.value
 
     def visit_Attribute(self, node: ast.Attribute):
         left_value = self.visit(node.value)
         assert isinstance(left_value, TypeIns)
-        res_option = left_value.getattribute(node.attr, node)
-        res_option.dump_to_box(self.mbox)
-        res = res_option.value
+        result = left_value.getattribute(node.attr, node)
+        result.dump_to_box(self.mbox)
+        res = result.value
         if isinstance(res, TypeVarIns):
             self.add_tpvar(res)
         return res
@@ -187,9 +187,9 @@ def _resolve_cls_method(clsdef: "prep_cls", mbox: "MessageBox") -> List[MethodTa
         if is_classmethod:
             argument.args[0].ann = clstemp.get_default_typetype()
         elif not is_staticmethod:
-            default_ins_option = clstemp.get_default_ins()
-            default_ins_option.dump_to_box(mbox)
-            argument.args[0].ann = default_ins_option.value
+            default_ins_result = clstemp.get_default_ins()
+            default_ins_result.dump_to_box(mbox)
+            argument.args[0].ann = default_ins_result.value
 
     def add_func_def(
         argument: Argument, ret: TypeIns, node: ast.FunctionDef

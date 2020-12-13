@@ -8,7 +8,7 @@ from pystatic.errorcode import *
 from pystatic.fsys import Filesys, FilePath, ModuleFindRes
 from pystatic.infer.infer import InferStarter
 from pystatic.message import MessageBox
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import TypePackageIns, builtins_symtable, typing_symtable
 from pystatic.symid import SymId, relpath2symid, symid2list
@@ -45,7 +45,7 @@ class Manager:
     def __add_check_symid(self, symid: 'SymId',
                           default_symtable: Optional['SymTable'],
                           to_check: bool, oldpath: Optional[FilePath],
-                          is_special: bool) -> Option[bool]:
+                          is_special: bool) -> Result[bool]:
         """
         default_symtable:
             if not None, then the symtable of the new target is set to it.
@@ -54,13 +54,13 @@ class Manager:
             if not None, then it is the path that find_module should return.
         """
         if symid in self.targets:
-            return Option(False)
+            return Result(False)
 
         find_res = self.fsys.find_module(symid)
-        add_option = Option(True)
+        add_result = Result(True)
         if not find_res:
-            add_option.value = False
-            add_option.add_err(ModuleNotFound(symid))
+            add_result.value = False
+            add_result.add_err(ModuleNotFound(symid))
 
         else:
             if default_symtable:
@@ -82,8 +82,8 @@ class Manager:
             if oldpath and os.path.normcase(oldpath) != os.path.normcase(
                     find_res.paths[0]):
                 # TODO: report name collision
-                add_option = Option(False)
-                return add_option
+                add_result = Result(False)
+                return add_result
 
             if find_res.res_type == ModuleFindRes.Module:
                 file_path = self.fsys.realpath(find_res.paths[0])
@@ -121,7 +121,7 @@ class Manager:
             elif find_res.res_type == ModuleFindRes.Namespace:
                 assert False, "Namespace package not supported yet"
 
-        return add_option
+        return add_result
 
     def __add_target(self, target: Target, to_check: bool):
         """Add target"""
@@ -180,13 +180,13 @@ class Manager:
     def add_check_file(self,
                        path: FilePath,
                        to_check: bool = True,
-                       recheck: bool = False) -> Option[bool]:
+                       recheck: bool = False) -> Result[bool]:
         path = self.fsys.realpath(path)
 
         if not os.path.exists(path):
-            add_option = Option(False)
-            add_option.add_err(FileNotFound(path))
-            return add_option
+            add_result = Result(False)
+            add_result.add_err(FileNotFound(path))
+            return add_result
         else:
             rt_path = crawl_path(os.path.dirname(path))
             self.fsys.add_userpath(rt_path)
@@ -197,7 +197,7 @@ class Manager:
 
     def add_check_symid(self,
                         symid: 'SymId',
-                        to_check: bool = True) -> Option[bool]:
+                        to_check: bool = True) -> Result[bool]:
         return self.__add_check_symid(symid, None, to_check, None, False)
 
     def add_check_target(self, target: 'BlockTarget', to_check: bool = True):
@@ -247,10 +247,10 @@ class Manager:
             varid_list = symid2list(var_symid)
             cur_ins = module_ins
             for subid in varid_list:
-                res_option = cur_ins.getattribute(subid, None)
-                if res_option.haserr():
+                result = cur_ins.getattribute(subid, None)
+                if result.haserr():
                     return None
-                cur_ins = res_option.value
+                cur_ins = result.value
             return cur_ins
 
     def eval_expr(self, module_symid: SymId, expr: str) -> Optional['TypeIns']:
@@ -259,15 +259,15 @@ class Manager:
             module_ins = self.get_module_ins(module_symid)
             if not module_ins:
                 return None
-            res_option = eval_expr(astnode.body, module_ins)  # type: ignore
-            if res_option.haserr():
+            result = eval_expr(astnode.body, module_ins)  # type: ignore
+            if result.haserr():
                 return None
             else:
-                return res_option.value
+                return result.value
         except SyntaxError as e:
             return None
 
-    def recheck(self, module_symid: SymId) -> Option[bool]:
+    def recheck(self, module_symid: SymId) -> Result[bool]:
         module_target = self.targets.get(module_symid)
         assert isinstance(module_target, Target)
         try:
@@ -275,9 +275,9 @@ class Manager:
             module_target.ast = new_ast
             module_target.clear()
             self.update_stage(module_target, Stage.Preprocess, False)
-            return Option(True)
+            return Result(True)
         except SyntaxError:
-            return Option(False)
+            return Result(False)
 
 
 def path2ast(path: FilePath) -> ast.AST:

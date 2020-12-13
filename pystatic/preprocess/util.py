@@ -4,7 +4,7 @@ from pystatic.exprparse import SupportGetAttribute
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.predefined import TypeModuleIns, TypePackageIns, TypeClassTemp
 from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.symtable import ImportNode, SymTable
 from pystatic.symid import SymId, rel2abssymid, symid_parent, absolute_symidlist
 from pystatic.preprocess.prepinfo import prep_impt, PrepInfo
@@ -37,9 +37,9 @@ class TypeTypeGetter(NoGenVisitor):
         return self.visit(node)
 
     def visit_Name(self, node: ast.Name) -> Optional[TypeIns]:
-        name_option = self.consultant.getattribute(node.id, node)
-        assert isinstance(name_option, Option)
-        res = name_option.value
+        name_result = self.consultant.getattribute(node.id, node)
+        assert isinstance(name_result, Result)
+        res = name_result.value
         if not isinstance(res, TypeType):
             return None
         return res
@@ -49,8 +49,8 @@ class TypeTypeGetter(NoGenVisitor):
         if not res:
             return None
         assert isinstance(res, TypeType)
-        attr_option = res.getattribute(node.attr, node)
-        attr_res = attr_option.value
+        attr_result = res.getattribute(node.attr, node)
+        attr_res = attr_result.value
         if not isinstance(attr_res, TypeType):
             return None
         return attr_res

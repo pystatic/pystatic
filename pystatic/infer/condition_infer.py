@@ -2,7 +2,7 @@ import ast
 from typing import Dict, List
 from enum import Enum
 from pystatic.exprparse import eval_expr
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.message import ErrorMaker
 from pystatic.predefined import TypeLiteralIns, TypeIns
 from pystatic.errorcode import *
@@ -163,8 +163,8 @@ class ConditionInfer(BaseVisitor):
 
     def visit_isinstance(self, node: ast.Call) -> Reach:
         args = node.args
-        first_type = self.err_maker.dump_option(eval_expr(args[0], self.recorder))
-        second_typetype = self.err_maker.dump_option(eval_expr(args[1], self.recorder))
+        first_type = self.err_maker.dump_result(eval_expr(args[0], self.recorder))
+        second_typetype = self.err_maker.dump_result(eval_expr(args[1], self.recorder))
         option = second_typetype.call(None, node)
         name = args[0].id
         if self.err_maker.exsit_error(option):
@@ -188,8 +188,8 @@ class ConditionInfer(BaseVisitor):
         return Reach.UNKNOWN
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
-        option: Option = eval_expr(test, self.recorder)
-        literal_ins: TypeLiteralIns = self.err_maker.dump_option(option)
+        option: Result = eval_expr(test, self.recorder)
+        literal_ins: TypeLiteralIns = self.err_maker.dump_result(option)
         if self.err_maker.exsit_error(option):
             return self.dispose_error_condition(option)
         if literal_ins.value:
@@ -242,8 +242,8 @@ class ConditionInfer(BaseVisitor):
     def infer_value_of_name_node(self, test: ast.Name) -> Reach:
         if test.id == "TYPE_CHECKING":
             return Reach.TYPE_TRUE
-        option: Option = eval_expr(test, self.recorder)
-        tp = self.err_maker.dump_option(option)
+        option: Result = eval_expr(test, self.recorder)
+        tp = self.err_maker.dump_result(option)
         if self.err_maker.exsit_error(option):
             return self.dispose_error_condition(option)
         if isinstance(tp, TypeLiteralIns):
@@ -268,12 +268,12 @@ class ConditionInfer(BaseVisitor):
         self, left: ast.expr, right: ast.expr, op: ast.cmpop
     ) -> Reach:
         # TODO: modify after eval_expr suppose compare
-        option: Option = eval_expr(left, self.recorder)
-        left_tp = self.err_maker.dump_option(option)
+        option: Result = eval_expr(left, self.recorder)
+        left_tp = self.err_maker.dump_result(option)
         if self.err_maker.exsit_error(option):
             return self.dispose_error_condition(option)
         option = eval_expr(right, self.recorder)
-        right_tp = self.err_maker.dump_option(option)
+        right_tp = self.err_maker.dump_result(option)
         if self.err_maker.exsit_error(option):
             return self.dispose_error_condition(option)
         if self.is_cmp_between_constant(left_tp, right_tp):
@@ -281,8 +281,8 @@ class ConditionInfer(BaseVisitor):
         else:
             return Reach.UNKNOWN
 
-    def dispose_error_condition(self, option: Option) -> Reach:
-        if self.err_maker.level_error_in_option(option):
+    def dispose_error_condition(self, option: Result) -> Reach:
+        if self.err_maker.level_error_in_result(option):
             return Reach.ALWAYS_FALSE
         else:
             return Reach.UNKNOWN

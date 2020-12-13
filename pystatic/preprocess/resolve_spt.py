@@ -87,9 +87,9 @@ class TypeVarFiller(ExprParser):
             self.outermost = False
             applyargs = self.generate_applyargs(node)
             self.outermost = True
-            call_option = typevar_type.call(applyargs, node)
-            assert isinstance(call_option.value, TypeVarIns)
-            copy_typevar(call_option.value, self.typevar)
+            call_result = typevar_type.call(applyargs, node)
+            assert isinstance(call_result.value, TypeVarIns)
+            copy_typevar(call_result.value, self.typevar)
             return self.typevar
         else:
             return super().visit_Call(node)

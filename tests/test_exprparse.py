@@ -75,8 +75,8 @@ def test_exprparse_type_expr():
     config = Config({"cwd": cwd})
     manager = Manager(config)
     file_path = os.path.join(cwd, "src", f"{src}.py")
-    res_option = manager.add_check_file(file_path)
-    assert res_option.value
+    result = manager.add_check_file(file_path)
+    assert result.value
     manager.preprocess()
 
     a = manager.get_sym_type(src, "a")
@@ -129,8 +129,8 @@ def test_exprparse():
     config = Config({"cwd": cwd})
     manager = Manager(config)
     file_path = os.path.join(cwd, "src", f"{src}.py")
-    res_option = manager.add_check_file(file_path)
-    assert res_option.value
+    result = manager.add_check_file(file_path)
+    assert result.value
     manager.preprocess()
 
     module_ins = manager.get_module_ins(src)

@@ -1,6 +1,6 @@
 import ast
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.exprparse import ExprParser, SupportGetAttribute, eval_expr
 
 
@@ -11,15 +11,15 @@ def eval_preptype(
 
 
 def eval_expr_ann(node: ast.AST, consultant: SupportGetAttribute):
-    res_option = eval_expr(node, consultant, False, True)
-    value = res_option.value
+    result = eval_expr(node, consultant, False, True)
+    value = result.value
     if isinstance(value, TypeType):
-        res_option.value = value.get_default_ins()
-    return res_option
+        result.value = value.get_default_ins()
+    return result
 
 
 class PrepTypeEvalResult:
-    def __init__(self, option_ins: Option[TypeIns], generic: bool) -> None:
+    def __init__(self, option_ins: Result[TypeIns], generic: bool) -> None:
         self.option_ins = option_ins
         self.generic = generic
 
@@ -33,8 +33,8 @@ class PrepTypeEvaluator(ExprParser):
         self.generic = False
 
     def accept(self, node: ast.AST):
-        res_option = super().accept(node)
-        return PrepTypeEvalResult(res_option, self.generic)
+        result = super().accept(node)
+        return PrepTypeEvalResult(result, self.generic)
 
     def visit_Subscript(self, node: ast.Subscript) -> TypeIns:
         self.generic = True

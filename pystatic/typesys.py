@@ -2,7 +2,7 @@ import ast
 import copy
 from abc import ABC, abstractmethod
 from typing import Any, Optional, List, Final, Dict, TYPE_CHECKING
-from pystatic.option import Option
+from pystatic.result import Result
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
@@ -22,8 +22,8 @@ class TypeIns:
         self.temp = temp
         self.bindlist = bindlist
 
-    def getattribute(self, name: str, node: Optional[ast.AST]) -> Option["TypeIns"]:
-        option_res = Option(any_ins)
+    def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
+        option_res = Result(any_ins)
         ins_res = self.temp.getattribute(name, self.bindlist)
 
         if not ins_res:
@@ -32,26 +32,26 @@ class TypeIns:
             option_res.set_value(ins_res)
         return option_res
 
-    def getattr(self, name: str, node: Optional[ast.AST]) -> Option["TypeIns"]:
+    def getattr(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
         return self.getattribute(name, node)
 
     def call(
         self, applyargs: "ApplyArgs", node: Optional[ast.Call]
-    ) -> Option["TypeIns"]:
+    ) -> Result["TypeIns"]:
         return self.temp.call(applyargs, self, node)
 
     def getitem(
         self, item: "GetItemArgs", node: Optional[ast.AST] = None
-    ) -> Option["TypeIns"]:
+    ) -> Result["TypeIns"]:
         # TODO: add error
         return self.temp.getitem(item, self.bindlist, node)
 
-    def unaryop_mgf(self, op: str, node: ast.UnaryOp) -> Option["TypeIns"]:
+    def unaryop_mgf(self, op: str, node: ast.UnaryOp) -> Result["TypeIns"]:
         return self.temp.unaryop_mgf(self.bindlist, op, node)
 
     def binop_mgf(
         self, other: "TypeIns", op: str, node: ast.BinOp
-    ) -> Option["TypeIns"]:
+    ) -> Result["TypeIns"]:
         return self.temp.binop_mgf(self.bindlist, other, op, node)
 
     def equiv(self, other):
@@ -102,26 +102,23 @@ class TypeType(TypeIns):
     def __init__(self, temp: "TypeTemp", bindlist: BindList):
         super().__init__(temp, bindlist)
 
-    def getins(self, typetype_option: Option["TypeIns"]) -> "TypeIns":
+    def getins(self, typetype_result: Result["TypeIns"]) -> "TypeIns":
         """Get TypeIns from TypeType
 
-        all errors will be stored in typetype_option.
+        all errors will be stored in typetype_result.
         """
-        ins_option = self.temp.getins(self.bindlist)
-        typetype_option.combine_error(ins_option)
+        ins_result = self.temp.getins(self.bindlist)
+        typetype_result.combine_error(ins_result)
 
-        return ins_option.value
+        return ins_result.value
 
     def get_default_ins(self) -> "TypeIns":
-        """Get TypeIns from TypeType
+        """Get TypeIns from TypeType"""
+        ins_result = self.temp.getins(self.bindlist)
+        return ins_result.value
 
-        all errors will be stored in typetype_option.
-        """
-        ins_option = self.temp.getins(self.bindlist)
-        return ins_option.value
-
-    def getattribute(self, name: str, node: Optional[ast.AST]) -> Option["TypeIns"]:
-        option_res = Option(any_ins)
+    def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
+        option_res = Result(any_ins)
         ins_res = self.temp.get_type_attribute(name, self.bindlist)
 
         if not ins_res:
@@ -133,12 +130,12 @@ class TypeType(TypeIns):
 
     def getitem(
         self, item: "GetItemArgs", node: Optional[ast.AST] = None
-    ) -> Option["TypeIns"]:
+    ) -> Result["TypeIns"]:
         return self.temp.getitem_typetype(self.bindlist, item, node)
 
     def call(
         self, applyargs: "ApplyArgs", node: Optional[ast.Call]
-    ) -> Option["TypeIns"]:
+    ) -> Result["TypeIns"]:
         return self.temp.init_ins(applyargs, self.bindlist)
 
     def get_inner_symtable(self):
@@ -189,29 +186,29 @@ class TypeTemp(ABC):
 
     def call(
         self, applyargs: "ApplyArgs", typeins: "TypeIns", node: Optional[ast.Call]
-    ) -> Option["TypeIns"]:
-        res_option = Option(any_ins)
+    ) -> Result["TypeIns"]:
+        result = Result(any_ins)
         call_func = self.getattribute("__call__", typeins.bindlist)
         if not call_func or call_func.temp != func_temp:
-            res_option.add_err(NotCallable(typeins, node))
+            result.add_err(NotCallable(typeins, node))
         else:
-            res_option = call_func.call(applyargs, node)
-        return res_option
+            result = call_func.call(applyargs, node)
+        return result
 
     def getitem(
         self, item: "GetItemArgs", bindlist: BindList, node: Optional[ast.AST]
-    ) -> Option["TypeIns"]:
-        option_res = Option(any_ins)
+    ) -> Result["TypeIns"]:
+        option_res = Result(any_ins)
         # TODO: add error
         return option_res
 
     # magic operation functions(mgf is short for magic function).
     def unaryop_mgf(
         self, bindlist: BindList, op: str, node: ast.UnaryOp
-    ) -> Option["TypeIns"]:
+    ) -> Result["TypeIns"]:
         from pystatic.evalutil import ApplyArgs
 
-        option_res = Option(any_ins)
+        option_res = Result(any_ins)
         func = self.getattribute(op, bindlist)
         if not func or not isinstance(func, TypeFuncIns):
             # TODO: add warning here
@@ -223,10 +220,10 @@ class TypeTemp(ABC):
 
     def binop_mgf(
         self, bindlist: BindList, other: "TypeIns", op: str, node: ast.BinOp
-    ) -> Option["TypeIns"]:
+    ) -> Result["TypeIns"]:
         from pystatic.evalutil import ApplyArgs
 
-        option_res = Option(any_ins)
+        option_res = Result(any_ins)
         func = self.getattribute(op, bindlist)
         if not func or not isinstance(func, TypeFuncIns):
             node.op
@@ -242,16 +239,14 @@ class TypeTemp(ABC):
     def get_inner_typedef(self, name: str) -> Optional["TypeTemp"]:
         return None
 
-    def _getitem_typetype_check_bindlist(
-        self, bindlist, res_option: Option, node
-    ) -> bool:
+    def _getitem_typetype_check_bindlist(self, bindlist, result: Result, node) -> bool:
         if bindlist is not None:
-            res_option.add_err(NotSubscriptable(TypeIns(self, bindlist), node))
+            result.add_err(NotSubscriptable(TypeIns(self, bindlist), node))
             return False
         return True
 
     def _getitem_typetype_check_arity(
-        self, itemarg: "GetItemArgs", res_option: Option, node
+        self, itemarg: "GetItemArgs", result: Result, node
     ) -> bool:
         items = itemarg.items
         len_items = len(items)
@@ -260,18 +255,18 @@ class TypeTemp(ABC):
         if arity == INFINITE_ARITY:
             return True
         elif arity != len_items:
-            res_option.add_err(IndiceParamNumberMismatch(len_items, arity, node))
+            result.add_err(IndiceParamNumberMismatch(len_items, arity, node))
             return False
         else:
             return True
 
     def _getitem_typetype_accept_item(
-        self, item: "WithAst", res_option: Option, res_bindlist: BindList
+        self, item: "WithAst", result: Result, res_bindlist: BindList
     ):
         value = item.value
         node = item.node
         if not isinstance(value, TypeIns):
-            res_option.add_err(IndiceParamNotClass(node))
+            result.add_err(IndiceParamNotClass(node))
         elif not isinstance(value, TypeType):
             from pystatic.predefined import (
                 ellipsis_ins,
@@ -285,22 +280,22 @@ class TypeTemp(ABC):
                 or value == none_ins
                 or isinstance(value, (TypeVarIns, TypeAlias))
             ):
-                res_option.add_err(IndiceParamNotClass(node))
+                result.add_err(IndiceParamNotClass(node))
             res_bindlist.append(value)
         else:
             res_bindlist.append(value.get_default_ins())
 
     def getitem_typetype(
         self, bindlist: BindList, itemarg: "GetItemArgs", node: Optional[ast.AST] = None
-    ) -> Option["TypeType"]:
+    ) -> Result["TypeType"]:
         """Mainly used for TypeType to generate correct TypeType"""
         res_bindlist = []
-        res_option = Option(TypeType(self, res_bindlist))
+        result = Result(TypeType(self, res_bindlist))
 
-        if not self._getitem_typetype_check_bindlist(bindlist, res_option, node):
-            res_option.value = TypeType(self, bindlist)
-            return res_option
-        self._getitem_typetype_check_arity(itemarg, res_option, node)
+        if not self._getitem_typetype_check_bindlist(bindlist, result, node):
+            result.value = TypeType(self, bindlist)
+            return result
+        self._getitem_typetype_check_arity(itemarg, result, node)
 
         if self.arity() == INFINITE_ARITY:
             len_items = len(itemarg.items)
@@ -308,29 +303,27 @@ class TypeTemp(ABC):
             len_items = min(self.arity(), len(itemarg.items))
         pad_cnt = max(self.arity() - len_items, 0)
         for i in range(len_items):
-            self._getitem_typetype_accept_item(
-                itemarg.items[i], res_option, res_bindlist
-            )
+            self._getitem_typetype_accept_item(itemarg.items[i], result, res_bindlist)
         res_bindlist.extend([any_ins] * pad_cnt)
-        return res_option
+        return result
 
     def get_default_typetype(self) -> "TypeType":
         return self._cached_typetype
 
-    def getins(self, bindlist: BindList) -> Option["TypeIns"]:
+    def getins(self, bindlist: BindList) -> Result["TypeIns"]:
         if self.arity == 0 or not bindlist:
-            return Option(self._cached_ins)
+            return Result(self._cached_ins)
         else:
-            return Option(TypeIns(self, bindlist))
+            return Result(TypeIns(self, bindlist))
 
-    def get_default_ins(self) -> Option["TypeIns"]:
-        return Option(self._cached_ins)
+    def get_default_ins(self) -> Result["TypeIns"]:
+        return Result(self._cached_ins)
 
     def get_type_attribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         """Get attribute that belong to the Type itself, mainly used for TypeType"""
         return self.getattribute(name, bindlist)
 
-    def init_ins(self, applyargs: "ApplyArgs", bindlist: BindList) -> Option["TypeIns"]:
+    def init_ins(self, applyargs: "ApplyArgs", bindlist: BindList) -> Result["TypeIns"]:
         """Initialize an instance
 
         used when __init__ method should be called.
@@ -465,34 +458,34 @@ class TypeAnyTemp(TypeTemp):
 
     def call(
         self, applyargs: "ApplyArgs", typeins: "TypeIns", node: Optional[ast.Call]
-    ) -> Option["TypeIns"]:
-        return Option(self._cached_ins)
+    ) -> Result["TypeIns"]:
+        return Result(self._cached_ins)
 
     def getitem(
         self, item: "GetItemArgs", bindlist: BindList, node: Optional[ast.AST] = None
-    ) -> Option["TypeIns"]:
-        return Option(self._cached_ins)
+    ) -> Result["TypeIns"]:
+        return Result(self._cached_ins)
 
     # magic operation functions
     def unaryop_mgf(
         self, bindlist: BindList, op: str, node: ast.UnaryOp
-    ) -> Option["TypeIns"]:
-        return Option(self._cached_ins)
+    ) -> Result["TypeIns"]:
+        return Result(self._cached_ins)
 
     def binop_mgf(
         self, bindlist: BindList, other: "TypeIns", op: str, node: ast.BinOp
-    ) -> Option["TypeIns"]:
-        return Option(self._cached_ins)
+    ) -> Result["TypeIns"]:
+        return Result(self._cached_ins)
 
     # some helper functions
-    def getins(self, bindlist: BindList) -> Option["TypeIns"]:
-        return Option(self._cached_ins)
+    def getins(self, bindlist: BindList) -> Result["TypeIns"]:
+        return Result(self._cached_ins)
 
     def getitem_typetype(
         self, bindlist: BindList, item: "GetItemArgs", node: Optional[ast.AST] = None
-    ) -> Option["TypeType"]:
+    ) -> Result["TypeType"]:
         # TODO: warning: if bindlist is non-empty, then report an error
-        return Option(self._cached_typetype)
+        return Result(self._cached_typetype)
 
     def get_default_typetype(self) -> "TypeType":
         return self._cached_typetype
@@ -565,15 +558,15 @@ class TypeFuncIns(TypeIns):
 
     def call(
         self, applyargs: "ApplyArgs", node: Optional[ast.AST]
-    ) -> Option["TypeIns"]:
+    ) -> Result["TypeIns"]:
         # TODO: deal with overloads(find a best match)
         from pystatic.arg import match_argument
 
         assert self.overloads
         error_list = match_argument(self.overloads[0].argument, applyargs, node)
-        ret_option = Option(self.overloads[0].ret_type)
-        ret_option.add_err_list(error_list)
-        return ret_option
+        ret_result = Result(self.overloads[0].ret_type)
+        ret_result.add_err_list(error_list)
+        return ret_result
 
 
 func_temp = TypeFuncTemp()
