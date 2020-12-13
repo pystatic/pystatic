@@ -17,7 +17,7 @@ class Level(Enum):
 
 class ErrorCode:
     def __init__(self):
-        pass
+        self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
         ...

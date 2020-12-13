@@ -6,14 +6,6 @@ from pystatic.visitor import val_unparse, VisitException
 if TYPE_CHECKING:
     from pystatic.config import Config
 
-
-def is_accessible(test: ast.expr, config: 'Config'):
-    res = static_infer(test, config)
-    if res != Reach.UNKNOWN:
-        setattr(test, 'reach', res)
-    return is_true(res)
-
-
 def static_infer(test: ast.expr, config: 'Config') -> Reach:
     if isinstance(test, ast.UnaryOp):
         res = static_infer(test.operand, config)

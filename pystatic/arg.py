@@ -58,7 +58,7 @@ def copy_argument(argument: Argument):
 
 
 def match_argument(
-    argument: Argument, applyargs: "ApplyArgs", callnode: Optional[ast.Call]
+    argument: Argument, applyargs: "ApplyArgs", callnode: Optional[ast.AST]
 ) -> List[ErrorCode]:
     from pystatic.TypeCompatible.simpleType import type_consistent
 

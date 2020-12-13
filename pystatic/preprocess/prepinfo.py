@@ -438,7 +438,7 @@ class prep_local:
             if node.type_comment:
                 try:
                     typenode = ast.parse(node.type_comment, mode="eval")
-                    return typenode.body
+                    return typenode.body  # type: ignore
                 except SyntaxError:
                     return None
         return None

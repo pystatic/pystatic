@@ -184,11 +184,6 @@ class TypeTemp(ABC):
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         return None
 
-    def setattr(self, name: str, attr_type: "TypeIns"):
-        assert (
-            False
-        ), "This function should be avoided because TypeClassTemp doesn't support it"
-
     def getattr(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         return self.getattribute(name, bindlist)
 
@@ -197,8 +192,10 @@ class TypeTemp(ABC):
     ) -> Option["TypeIns"]:
         res_option = Option(any_ins)
         call_func = self.getattribute("__call__", typeins.bindlist)
-        if not call_func:
+        if not call_func or call_func.temp != func_temp:
             res_option.add_err(NotCallable(typeins, node))
+        else:
+            res_option = call_func.call(applyargs, node)
         return res_option
 
     def getitem(
@@ -232,6 +229,7 @@ class TypeTemp(ABC):
         option_res = Option(any_ins)
         func = self.getattribute(op, bindlist)
         if not func or not isinstance(func, TypeFuncIns):
+            node.op
             # TODO: add warning here
             return option_res
 
@@ -566,7 +564,7 @@ class TypeFuncIns(TypeIns):
         return self.funname
 
     def call(
-        self, applyargs: "ApplyArgs", node: Optional[ast.Call]
+        self, applyargs: "ApplyArgs", node: Optional[ast.AST]
     ) -> Option["TypeIns"]:
         # TODO: deal with overloads(find a best match)
         from pystatic.arg import match_argument
