@@ -11,6 +11,7 @@ INDICE_PARAM_NOT_CLASS = "Expect a class type"
 NOT_SUBSCRIPTABLE = "type '{}' is not subscriptable"
 INDICE_ARGUMENT_NUMBER_MISMATCH = "receive {} but require {} argument(s)"
 NOT_CALLABLE = "{} is not callable"
+OPERATION_NOT_SUPPORTED = "{} is not supported in {}"
 
 # tuple
 NEED_MORE_VALUES_TO_UNPACK = "Need more values to unpack"

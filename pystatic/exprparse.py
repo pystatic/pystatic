@@ -6,7 +6,6 @@ from pystatic.visitor import NoGenVisitor
 from pystatic.typesys import TypeIns, any_ins
 from pystatic.evalutil import ApplyArgs, WithAst, GetItemArgs
 from pystatic.result import Result
-from pystatic.opmap import binop_map, unaryop_map
 from pystatic.predefined import *
 
 
@@ -141,9 +140,7 @@ class ExprParser(NoGenVisitor):
         elif self.annotation and isinstance(node.value, str):
             try:
                 astnode = ast.parse(node.value, mode="eval")
-                result = eval_expr(
-                    astnode.body, self.consultant, self.explicit, True
-                )
+                result = eval_expr(astnode.body, self.consultant, self.explicit, True)
                 # TODO: add warning here
                 res = result.value
             except SyntaxError:
@@ -185,10 +182,7 @@ class ExprParser(NoGenVisitor):
         operand_ins = self.visit(node.operand)
         assert isinstance(operand_ins, TypeIns)
 
-        op = unaryop_map.get(type(node.op))
-        assert op, f"{node.op} is not supported now"
-        result = operand_ins.unaryop_mgf(op, node)
-
+        result = operand_ins.unaryop_mgf(type(node.op), node)
         self.add_err(result.errors)
 
         self.add_to_container(result.value, node)
@@ -200,10 +194,7 @@ class ExprParser(NoGenVisitor):
         assert isinstance(left_ins, TypeIns)
         assert isinstance(right_ins, TypeIns)
 
-        op = binop_map.get(type(node.op))
-        assert op, f"{node.op} is not supported now"
-        result = left_ins.binop_mgf(right_ins, op, node)
-
+        result = left_ins.binop_mgf(right_ins, type(node.op), node)
         self.add_err(result.errors)
 
         self.add_to_container(result.value, node)
@@ -288,5 +279,17 @@ class ExprParser(NoGenVisitor):
         return self.visit(node.value)
 
     def visit_Compare(self, node: ast.Compare):
+        left_ins = self.visit(node.left)
+        assert isinstance(left_ins, TypeIns)
+
+        for comparator, op in zip(node.comparators, node.ops):
+            comparator_ins = self.visit(comparator)
+            assert isinstance(comparator_ins, TypeIns)
+
+            result = left_ins.binop_mgf(comparator_ins, type(op), node)  # type: ignore
+            self.add_err(result.errors)
+            left_ins = result.value
+
+        # assert that left_ins is bool type?
         self.add_to_container(bool_ins, node)
         return bool_ins

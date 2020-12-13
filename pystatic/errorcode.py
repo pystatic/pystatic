@@ -130,6 +130,19 @@ class NotCallable(ErrorCode):
         return self.node, NOT_CALLABLE.format(self.inable_type)
 
 
+class OperationNotSupported(ErrorCode):
+    """Doesn't support the operation(like '<', '>', ...)"""
+
+    def __init__(self, op_str: str, typeins: "TypeIns", node: Optional[ast.AST]):
+        super().__init__()
+        self.op_str = op_str
+        self.typeins = typeins
+        self.node = node
+
+    def make(self) -> Tuple[Optional[ast.AST], str]:
+        return self.node, OPERATION_NOT_SUPPORTED.format(self.op_str, self.typeins)
+
+
 class VarTypeCollide(ErrorCode):
     """Name has been defined as a class or function but used on the left of an
     assignment statement.

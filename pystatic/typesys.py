@@ -1,8 +1,9 @@
 import ast
 import copy
 from abc import ABC, abstractmethod
-from typing import Any, Optional, List, Final, Dict, TYPE_CHECKING
+from typing import Any, Optional, List, Final, Dict, Type, TYPE_CHECKING
 from pystatic.result import Result
+from pystatic.opmap import op_char_map, op_map
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
@@ -23,14 +24,14 @@ class TypeIns:
         self.bindlist = bindlist
 
     def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
-        option_res = Result(any_ins)
+        result = Result(any_ins)
         ins_res = self.temp.getattribute(name, self.bindlist)
 
         if not ins_res:
-            option_res.add_err(NoAttribute(node, self, name))
+            result.add_err(NoAttribute(node, self, name))
         else:
-            option_res.set_value(ins_res)
-        return option_res
+            result.set_value(ins_res)
+        return result
 
     def getattr(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
         return self.getattribute(name, node)
@@ -46,13 +47,23 @@ class TypeIns:
         # TODO: add error
         return self.temp.getitem(item, self.bindlist, node)
 
-    def unaryop_mgf(self, op: str, node: ast.UnaryOp) -> Result["TypeIns"]:
-        return self.temp.unaryop_mgf(self.bindlist, op, node)
+    def unaryop_mgf(self, op: Type, node: ast.AST) -> Result["TypeIns"]:
+        """
+        @param op: type of the operator.
 
-    def binop_mgf(
-        self, other: "TypeIns", op: str, node: ast.BinOp
-    ) -> Result["TypeIns"]:
-        return self.temp.binop_mgf(self.bindlist, other, op, node)
+        @param node: ast node represents this operation.
+        """
+        return self.temp.unaryop_mgf(self, op, node)
+
+    def binop_mgf(self, other: "TypeIns", op: Type, node: ast.AST) -> Result["TypeIns"]:
+        """
+        @param other: second operator.
+
+        @param op: type of the operator.
+
+        @param node: ast node represents this operation.
+        """
+        return self.temp.binop_mgf(self, other, op, node)
 
     def equiv(self, other):
         # note that `isinstance(other, TypeIns)` won't reject typeins and typetype
@@ -118,15 +129,15 @@ class TypeType(TypeIns):
         return ins_result.value
 
     def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
-        option_res = Result(any_ins)
+        result = Result(any_ins)
         ins_res = self.temp.get_type_attribute(name, self.bindlist)
 
         if not ins_res:
             err = NoAttribute(node, self, name)
-            option_res.add_err(err)
+            result.add_err(err)
         else:
-            option_res.set_value(ins_res)
-        return option_res
+            result.set_value(ins_res)
+        return result
 
     def getitem(
         self, item: "GetItemArgs", node: Optional[ast.AST] = None
@@ -198,40 +209,49 @@ class TypeTemp(ABC):
     def getitem(
         self, item: "GetItemArgs", bindlist: BindList, node: Optional[ast.AST]
     ) -> Result["TypeIns"]:
-        option_res = Result(any_ins)
+        result = Result(any_ins)
         # TODO: add error
-        return option_res
+        return result
 
     # magic operation functions(mgf is short for magic function).
     def unaryop_mgf(
-        self, bindlist: BindList, op: str, node: ast.UnaryOp
+        self, typeins: "TypeIns", op: Type, node: ast.AST
     ) -> Result["TypeIns"]:
         from pystatic.evalutil import ApplyArgs
 
-        option_res = Result(any_ins)
-        func = self.getattribute(op, bindlist)
+        result = Result(any_ins)
+        func_name = op_map.get(op)
+        assert func_name, f"{func_name} is not supported now"
+        func = self.getattribute(func_name, typeins.bindlist)
         if not func or not isinstance(func, TypeFuncIns):
-            # TODO: add warning here
-            return option_res
+            op_str = op_char_map.get(op)
+            assert op_str
+            result.add_err(OperationNotSupported(op_str, typeins, node))
+            return result
 
         else:
             applyargs = ApplyArgs()
+            applyargs.add_arg(typeins, node)  # self argument
             return func.call(applyargs, node)
 
     def binop_mgf(
-        self, bindlist: BindList, other: "TypeIns", op: str, node: ast.BinOp
+        self, typeins: "TypeIns", other: "TypeIns", op: Type, node: ast.AST
     ) -> Result["TypeIns"]:
         from pystatic.evalutil import ApplyArgs
 
-        option_res = Result(any_ins)
-        func = self.getattribute(op, bindlist)
+        result = Result(any_ins)
+        func_name = op_map.get(op)
+        assert func_name, f"{func_name} is not supported now"
+        func = self.getattribute(func_name, typeins.bindlist)
         if not func or not isinstance(func, TypeFuncIns):
-            node.op
-            # TODO: add warning here
-            return option_res
+            op_str = op_char_map.get(op)
+            assert op_str
+            result.add_err(OperationNotSupported(op_str, typeins, node))
+            return result
 
         else:
             applyargs = ApplyArgs()
+            applyargs.add_arg(typeins, node)  # self argument
             applyargs.add_arg(other, node)
             return func.call(applyargs, node)
 
@@ -462,18 +482,21 @@ class TypeAnyTemp(TypeTemp):
         return Result(self._cached_ins)
 
     def getitem(
-        self, item: "GetItemArgs", bindlist: BindList, node: Optional[ast.AST] = None
+        self,
+        item: "GetItemArgs",
+        bindlist: BindList,
+        node: Optional[ast.AST] = None,
     ) -> Result["TypeIns"]:
         return Result(self._cached_ins)
 
     # magic operation functions
     def unaryop_mgf(
-        self, bindlist: BindList, op: str, node: ast.UnaryOp
+        self, typeins: "TypeIns", op: Type, node: ast.AST
     ) -> Result["TypeIns"]:
         return Result(self._cached_ins)
 
     def binop_mgf(
-        self, bindlist: BindList, other: "TypeIns", op: str, node: ast.BinOp
+        self, typeins: "TypeIns", other: "TypeIns", op: Type, node: ast.AST
     ) -> Result["TypeIns"]:
         return Result(self._cached_ins)
 

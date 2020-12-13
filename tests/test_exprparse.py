@@ -9,7 +9,7 @@ from pystatic.predefined import *
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.exprparse import eval_expr
-
+from .util import error_assert
 
 def parse_expr(expr: str):
     astnode = ast.parse(expr, mode="eval")
@@ -123,7 +123,7 @@ def test_exprparse_type_expr():
     assert str(e) == "Tuple[int, str]"
 
 
-def test_exprparse():
+def test_exprparse1():
     src = "exprparse1"
     cwd = os.path.dirname(__file__)
     config = Config({"cwd": cwd})
@@ -197,3 +197,7 @@ def test_exprparse():
     assert not cmp_res_option.haserr()
     cmp_res = cmp_res_option.value
     assert cmp_res is bool_ins
+
+
+def test_exprparse_mgf():
+    error_assert("exprparse_mgf")

@@ -219,22 +219,6 @@ class TypeNoneTemp(TypeTemp):
         # TODO: warning
         return Result(self._cached_ins)
 
-    def unaryop_mgf(
-        self, bindlist: BindList, op: str, node: ast.UnaryOp
-    ) -> Result["TypeIns"]:
-        none_ins = self._cached_ins
-        result = Result(none_ins)
-        result.add_err(NoAttribute(node, none_ins, "None"))
-        return result
-
-    def binop_mgf(
-        self, bindlist: BindList, other: "TypeIns", op: str, node: ast.BinOp
-    ) -> Result["TypeIns"]:
-        none_ins = self._cached_ins
-        result = Result(none_ins)
-        result.add_err(NoAttribute(node, none_ins, "None"))
-        return result
-
     def getins(self, bindlist: BindList) -> Result["TypeIns"]:
         return Result(self._cached_ins)
 
