@@ -4,6 +4,7 @@ from pystatic.target import Stage, Target
 from pystatic.symtable import SymTable
 from pystatic.manager import Manager
 from pystatic.config import Config
+from pystatic.symid import SymId
 from pystatic.predefined import *
 
 DEFAULT_INDENT = 4
@@ -137,6 +138,6 @@ class Shell:
                         print(e)
 
 
-def run_shell(config: "Config"):
+def run(config: "Config", modules: List['SymId']):
     sh = Shell(config)
     sh.run()

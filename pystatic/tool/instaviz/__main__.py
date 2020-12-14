@@ -2,7 +2,7 @@
 # modified by https://github.com/DunderBird
 # resource: https://github.com/tonybaloney/instaviz
 
-from pystatic.instaviz.web import show_code_object
+from pystatic.tool.instaviz.web import show_code_object
 import dis
 import sys
 

@@ -3,7 +3,7 @@ InstaViz - a tool for visualizing ASTs and CPython code objects in a web server.
 """
 
 __version__ = "0.6.0"
-from .web import show_ast, show_code_object
+from .web import show_code_object
 from dis import get_instructions
 
 

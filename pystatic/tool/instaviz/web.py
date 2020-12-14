@@ -7,12 +7,21 @@ Entry points for managing a micro-http server to serve tables.
 """
 import ast
 import json
-from bottle import run, jinja2_view, route, static_file, TEMPLATE_PATH
 import os
+import dis
+from pystatic.reach import Reach
+from pystatic.manager import Manager
+import bottle
+from typing import List
+from pystatic.symid import SymId
+from pystatic.config import Config
+from bottle import jinja2_view, route, static_file, TEMPLATE_PATH
 from pygments import highlight
 from pygments.lexers.python import PythonLexer
 from pygments.formatters.html import HtmlFormatter
 from dill import source
+
+from pystatic.target import BlockTarget
 
 data = {}
 
@@ -20,7 +29,7 @@ data = {}
 @route("/static/<filename>")
 def server_static(filename):
     abs_app_dir_path = os.path.dirname(os.path.realpath(__file__))
-    root_path = os.path.join(abs_app_dir_path, 'static')
+    root_path = os.path.join(abs_app_dir_path, "static")
     return static_file(filename, root=root_path)
 
 
@@ -47,7 +56,7 @@ def start(host="localhost", port=8080):
     abs_app_dir_path = os.path.dirname(os.path.realpath(__file__))
     abs_views_path = os.path.join(abs_app_dir_path, "templates")
     TEMPLATE_PATH.insert(0, abs_views_path)
-    run(host=host, port=port)
+    bottle.run(host=host, port=port)
     print(f"Running web-server on http://{host}:{port}/")
 
 
@@ -61,15 +70,14 @@ def dedupe_nodes(l):
     return new_list
 
 
-def node_properties(node):
-    d = {}
+def node_properties(node, d):
     for field, value in ast.iter_fields(node):
         if isinstance(value, ast.AST):
-            d[field] = node_properties(value)
+            d[field] = node_properties(value, {})
         elif (
             isinstance(value, list) and len(value) > 0 and isinstance(value[0], ast.AST)
         ):
-            d[field] = [node_properties(v) for v in value]
+            d[field] = [node_properties(v, {}) for v in value]
         else:
             d[field] = value
     return d
@@ -82,33 +90,41 @@ def node_to_dict(node, parent):
         for n in children:
             i.extend(node_to_dict(n, node))
 
-    d = node_properties(node)
+    d = {}
+    reach = True
+    if hasattr(node, "reach"):
+        reach = False
+
+    if hasattr(node, "type"):
+        d["type"] = str(node.type)
+
+    node_properties(node, d)
     if hasattr(node, "lineno"):
         d["lineno"] = node.lineno
+
     i.append(
         {
             "id": id(node),
             "name": type(node).__name__,
             "parent": id(parent),
             "data": json.dumps(d, skipkeys=True),
+            "reach": str(reach),
         }
     )
     return i
 
 
-def show_code_object(obj, instructions):
+def show_code_object(obj, instructions, ast=None):
     """
     Render code object
     """
-    if hasattr(obj, '__code__'):
+    if hasattr(obj, "__code__"):
         cobj = obj.__code__
     else:
         cobj = obj
     global data
     data["co"] = {
-        attr: getattr(cobj, attr)
-        for attr in dir(cobj)
-        if attr.startswith("co_")
+        attr: getattr(cobj, attr) for attr in dir(cobj) if attr.startswith("co_")
     }
     data["co"]["co_code"] = data["co"]["co_code"].hex()
 
@@ -117,8 +133,11 @@ def show_code_object(obj, instructions):
 
     (lines, start_line) = source.getsourcelines(obj)
     src = "".join(lines)
-    tree = ast.parse(src, cobj.co_filename)
-    nodes = node_to_dict(tree, None)
+    if ast:
+        nodes = node_to_dict(ast, None)
+    else:
+        tree = ast.parse(src, cobj.co_filename)
+        nodes = node_to_dict(tree, None)
     data["nodes"] = dedupe_nodes(nodes)
     data["src"] = src
     data["last_line"] = start_line + len(lines)
@@ -126,6 +145,35 @@ def show_code_object(obj, instructions):
     start()
 
 
-def show_ast(ast):
-    # Not implemented
-    pass
+def show_target(target: "BlockTarget", path: str):
+    with open(path) as f:
+        co = compile(f.read(), path, mode="exec")
+        instructions = dis.get_instructions(co)
+        show_code_object(co, instructions, target.ast)
+
+
+def run(config: Config, module_paths: List[SymId]):
+    manager = Manager(config)
+    added = []
+    targets = []
+    target_paths = []
+    for path in module_paths:
+        result = manager.add_check_file(path)
+        if result:
+            symid = manager.get_symid(path)
+            assert symid
+            added.append((symid, path))
+        else:
+            # TODO: warning here
+            raise ValueError()
+
+    manager.preprocess()
+    manager.infer()
+
+    for symid, path in added:
+        target = manager.get_target(symid)
+        assert target
+        targets.append(target)
+        target_paths.append(path)
+
+    show_target(targets[0], target_paths[0])

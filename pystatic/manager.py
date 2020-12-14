@@ -11,7 +11,7 @@ from pystatic.message import MessageBox
 from pystatic.result import Result
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import TypePackageIns, builtins_symtable, typing_symtable
-from pystatic.symid import SymId, relpath2symid, symid2list
+from pystatic.symid import SymId, relpath2symid
 from pystatic.typesys import TypeIns
 from pystatic.predefined import TypeModuleIns
 from pystatic.target import BlockTarget, Target, Stage, PackageTarget
@@ -41,6 +41,24 @@ class Manager:
         self.__add_check_symid("typing", typing_symtable, False, None, True)
         self.preprocess()
 
+    def get_abspath(self, symid: "SymId") -> Optional[List[str]]:
+        """
+        Get absolute path of the symid, note that a symid may match multiple paths.
+        symid may not be added to check.
+        """
+        find_res = self.fsys.find_module(symid)
+        if not find_res:
+            return None
+        else:
+            return find_res.paths
+
+    def get_symid(self, path: str) -> Optional[SymId]:
+        """Convert a path to symid"""
+        return self.fsys.path_to_symid(path)
+
+    def get_target(self, symid: "SymId") -> Optional[Target]:
+        return self.targets.get(symid, None)
+
     def __add_check_symid(
         self,
         symid: "SymId",
@@ -50,11 +68,9 @@ class Manager:
         is_special: bool,
     ) -> Result[bool]:
         """
-        default_symtable:
-            if not None, then the symtable of the new target is set to it.
+        @param default_symtable: if not None, then the symtable of the new target is set to it.
 
-        oldpath:
-            if not None, then it is the path that find_module should return.
+        @param oldpath: if not None, then it is the path that find_module should return.
         """
         if symid in self.targets:
             return Result(False)
