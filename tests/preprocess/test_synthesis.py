@@ -17,21 +17,21 @@ def test_synthesis_1():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    int_typetype = manager.get_sym_type('builtins', 'int')
+    int_typetype = manager.eval_expr('builtins', 'int')
     assert int_typetype
     assert isinstance(int_typetype, TypeType)
 
-    A = manager.get_sym_type(symid, 'A')
+    A = manager.eval_expr(symid, 'A')
     assert isinstance(A, TypeType)
 
-    AB = manager.get_sym_type(symid, 'A.B')
+    AB = manager.eval_expr(symid, 'A.B')
     assert isinstance(AB, TypeType)
 
-    a = manager.get_sym_type(symid, 'a')
+    a = manager.eval_expr(symid, 'a')
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
     assert a.temp == A.temp
 
-    f = manager.get_sym_type(symid, 'f')
+    f = manager.eval_expr(symid, 'f')
     assert isinstance(f, TypeFuncIns)
 
     assert len(f.overloads) == 1
@@ -39,17 +39,17 @@ def test_synthesis_1():
     assert isinstance(ret_ins, TypeIns) and not isinstance(ret_ins, TypeType)
     assert ret_ins.temp == A.temp
 
-    assert manager.get_sym_type(symid, 'c')
-    assert manager.get_sym_type(symid, 'd')
+    assert manager.eval_expr(symid, 'c')
+    assert manager.eval_expr(symid, 'd')
 
-    a_dot_a = manager.get_sym_type(symid, 'a.a')
+    a_dot_a = manager.eval_expr(symid, 'a.a')
     assert isinstance(a_dot_a, TypeIns) and not isinstance(a_dot_a, TypeType)
     assert a_dot_a.temp == int_typetype.temp
 
-    e = manager.get_sym_type(symid, 'e')
+    e = manager.eval_expr(symid, 'e')
     assert type(e) == TypeIns
     assert e.temp == A.temp
 
-    g = manager.get_sym_type(symid, 'g')
+    g = manager.eval_expr(symid, 'g')
     assert type(g) == TypeIns
     assert g.temp == AB.temp

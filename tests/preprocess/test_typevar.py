@@ -19,23 +19,23 @@ def test_typevar():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    int_typetype = manager.get_sym_type('builtins', 'int')
+    int_typetype = manager.eval_expr('builtins', 'int')
     int_ins = int_typetype.temp.get_default_ins().value
     assert isinstance(int_typetype, TypeType)
     assert isinstance(int_ins, TypeIns)
 
-    str_typetype = manager.get_sym_type('builtins', 'str')
+    str_typetype = manager.eval_expr('builtins', 'str')
     str_ins = str_typetype.temp.get_default_ins().value
     assert isinstance(str_typetype, TypeType)
     assert isinstance(str_ins, TypeIns)
 
-    T = manager.get_sym_type(symid, 'T')
-    F = manager.get_sym_type(symid, 'F')
-    G = manager.get_sym_type(symid, 'G')
-    H = manager.get_sym_type(symid, 'H')
-    A = manager.get_sym_type(symid, 'A')
-    B = manager.get_sym_type(symid, 'B')
-    I = manager.get_sym_type(symid, 'I')
+    T = manager.eval_expr(symid, 'T')
+    F = manager.eval_expr(symid, 'F')
+    G = manager.eval_expr(symid, 'G')
+    H = manager.eval_expr(symid, 'H')
+    A = manager.eval_expr(symid, 'A')
+    B = manager.eval_expr(symid, 'B')
+    I = manager.eval_expr(symid, 'I')
     assert isinstance(A, TypeType)
     assert isinstance(B, TypeType)
     assert isinstance(T, TypeVarIns)

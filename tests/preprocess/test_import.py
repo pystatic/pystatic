@@ -23,10 +23,10 @@ def test_import():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    banana = manager.get_sym_type(symid, 'banana')
-    Banana = manager.get_sym_type(symid, 'Banana')
-    vegetable = manager.get_sym_type(symid, 'vegetable')
-    c = manager.get_sym_type(symid, 'c')
+    banana = manager.eval_expr(symid, 'banana')
+    Banana = manager.eval_expr(symid, 'Banana')
+    vegetable = manager.eval_expr(symid, 'vegetable')
+    c = manager.eval_expr(symid, 'c')
     assert isinstance(banana, TypeIns)
     assert isinstance(Banana, TypeType)
     assert isinstance(c, TypeIns) and not isinstance(c, TypeType)
@@ -46,8 +46,8 @@ def test_star_import():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    a = manager.get_sym_type(symid, 'a')
-    pack_type = manager.get_sym_type(symid, 'Pack')
+    a = manager.eval_expr(symid, 'a')
+    pack_type = manager.eval_expr(symid, 'Pack')
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
     assert isinstance(pack_type, TypeType)
     assert a.temp == pack_type.temp

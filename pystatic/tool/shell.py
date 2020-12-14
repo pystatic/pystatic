@@ -13,22 +13,22 @@ class BlockSplitor:
     def __init__(self) -> None:
         self.level = 0
         self.buffer = []
-        self.ps = '... '
+        self.ps = "... "
 
     def remove_linebreak(self, line: str):
         i = len(line) - 1
-        while i >= 0 and line[i] == '\n':
+        while i >= 0 and line[i] == "\n":
             i -= 1
-        return line[:i + 1]
+        return line[: i + 1]
 
     def count_level(self, line: str):
         i = 0
         white_cnt = 0
         length = len(line)
         while i < length:
-            if line[i] == '\t':
+            if line[i] == "\t":
                 white_cnt += DEFAULT_INDENT
-            elif line[i] == ' ':
+            elif line[i] == " ":
                 white_cnt += 1
             else:
                 break
@@ -49,7 +49,7 @@ class BlockSplitor:
 
         self.buffer.append(line)
 
-        if line.endswith(':'):
+        if line.endswith(":"):
             self.level += 1
 
         if self.level == 0:
@@ -58,7 +58,7 @@ class BlockSplitor:
         return False
 
     def get_str(self):
-        return '\n'.join(self.buffer)
+        return "\n".join(self.buffer)
 
     def clear(self):
         self.buffer = []
@@ -70,9 +70,9 @@ class BlockSplitor:
             self.clear()
             return res
 
-        print(self.ps, end='')
+        print(self.ps, end="")
         while not self.feed(input()):
-            print(self.ps, end='')
+            print(self.ps, end="")
 
         res = self.get_str()
         self.clear()
@@ -84,38 +84,40 @@ class Shell:
         self.manager = Manager(config)
         self.cwd = config.cwd
         self.splitor = BlockSplitor()
-        self.ps = '>>> '
+        self.ps = ">>> "
 
-        self.symid = '__shell__'
-        self.symtable = SymTable(self.symid, None, None, builtins_symtable,
-                                 self.manager, TableScope.GLOB)
+        self.symid = "__shell__"
+        self.symtable = SymTable(
+            self.symid, None, None, builtins_symtable, self.manager, TableScope.GLOB
+        )
         self.symtable.glob = self.symtable
         self.mbox = MessageBox(self.symid)
-        self.target = Target(self.symid, self.symtable, self.mbox, '', False,
-                             Stage.FINISH)
+        self.target = Target(
+            self.symid, self.symtable, self.mbox, "", False, Stage.FINISH
+        )
         self.manager.add_check_target(self.target)
 
     def run(self):
         while True:
-            print(self.ps, end='')
+            print(self.ps, end="")
             blk_str = self.splitor.read()
             if not blk_str:
                 continue
 
-            if blk_str[0] == ':':
+            if blk_str[0] == ":":
                 blk_str = blk_str[1:]
-                if blk_str == 'quit':
+                if blk_str == "quit":
                     break
 
             else:
                 try:
-                    astnode = ast.parse(blk_str, mode='eval')
+                    astnode = ast.parse(blk_str, mode="eval")
                     # input is an expression
                     ins = self.manager.eval_expr(self.symid, blk_str)
                     if ins:
-                        print(f'{ins}')
+                        print(f"{ins}")
                     else:
-                        print('Expression error')
+                        print("Expression error")
 
                 except SyntaxError:
                     try:
@@ -123,8 +125,7 @@ class Shell:
                         if len(astnode.body) == 0:
                             continue
                         self.target.ast = astnode.body[0]
-                        self.manager.change_target_stage(
-                            self.target, Stage.Preprocess)
+                        self.manager.recheck(self.symid, False)
                         self.manager.preprocess()
 
                         for err in self.mbox.error:
@@ -136,6 +137,6 @@ class Shell:
                         print(e)
 
 
-def run_shell(config: 'Config'):
+def run_shell(config: "Config"):
     sh = Shell(config)
     sh.run()

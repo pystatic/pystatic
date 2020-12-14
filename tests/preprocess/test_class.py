@@ -20,15 +20,15 @@ def test_class():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    int_typetype = manager.get_sym_type('builtins', 'int')
+    int_typetype = manager.eval_expr('builtins', 'int')
     assert int_typetype
     assert isinstance(int_typetype, TypeType)
 
-    any_typetype = manager.get_sym_type('typing', 'Any')
+    any_typetype = manager.eval_expr('typing', 'Any')
     assert any_typetype
     assert isinstance(any_typetype, TypeType)
 
-    A_type = manager.get_sym_type(symid, 'A')
+    A_type = manager.eval_expr(symid, 'A')
     assert A_type
     static_foo = A_type.getattribute('static_foo', None).value
     assert isinstance(static_foo, TypeFuncIns)  # static method

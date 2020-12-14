@@ -19,25 +19,25 @@ def test_alias():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    A_temp = manager.get_sym_type(symid, 'A').temp
-    B_temp = manager.get_sym_type(symid, 'B').temp
-    C_temp = manager.get_sym_type(symid, 'B.C').temp
+    A_temp = manager.eval_expr(symid, 'A').temp
+    B_temp = manager.eval_expr(symid, 'B').temp
+    C_temp = manager.eval_expr(symid, 'B.C').temp
 
     for temp in [A_temp, B_temp, C_temp]:
         assert isinstance(temp, TypeClassTemp)
 
-    Aalias = manager.get_sym_type(symid, 'Aalias')
-    Balias = manager.get_sym_type(symid, 'Balias')
-    Calias = manager.get_sym_type(symid, 'Calias')
-    UAB = manager.get_sym_type(symid, 'UAB')
-    OA = manager.get_sym_type(symid, 'OA')
-    A_ext = manager.get_sym_type(symid, 'A_ext')
+    Aalias = manager.eval_expr(symid, 'Aalias')
+    Balias = manager.eval_expr(symid, 'Balias')
+    Calias = manager.eval_expr(symid, 'Calias')
+    UAB = manager.eval_expr(symid, 'UAB')
+    OA = manager.eval_expr(symid, 'OA')
+    A_ext = manager.eval_expr(symid, 'A_ext')
 
     for alias in [Aalias, Balias, Calias, UAB, OA, A_ext]:
         assert isinstance(alias, TypeAlias)
 
-    a = manager.get_sym_type(symid, 'a')
-    b = manager.get_sym_type(symid, 'b')
+    a = manager.eval_expr(symid, 'a')
+    b = manager.eval_expr(symid, 'b')
     for ins in [a, b]:
         assert not isinstance(ins, TypeAlias)
 
@@ -60,5 +60,5 @@ def test_alias():
                       TypeIns) and not isinstance(UAB.bindlist[0], TypeType)
     assert UAB.bindlist[1].temp is B_temp
 
-    UD = manager.get_sym_type(symid, 'UD')
+    UD = manager.eval_expr(symid, 'UD')
     assert not isinstance(UD, TypeAlias)

@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 class Stage(IntEnum):
     """Number ascends as the analysis going deeper"""
+
     Parse = 1
     Preprocess = 2
     Infer = 3
@@ -20,37 +21,44 @@ class Stage(IntEnum):
 
 class BlockTarget:
     """Block target mainly used for function"""
-    def __init__(self,
-                 symid: 'SymId',
-                 symtable: 'SymTable',
-                 mbox: MessageBox,
-                 stage: Stage = Stage.Preprocess) -> None:
+
+    def __init__(
+        self,
+        symid: "SymId",
+        symtable: "SymTable",
+        mbox: MessageBox,
+        stage: Stage = Stage.Preprocess,
+    ) -> None:
         self.symid = symid
         self.symtable = symtable
-        self.mbox: 'MessageBox' = mbox
+        self.mbox: "MessageBox" = mbox
         self.ast: Optional[ast.AST] = None
         self.stage = stage
 
 
 class FunctionTarget(BlockTarget):
-    def __init__(self,
-                 symid: 'SymId',
-                 symtable: 'SymTable',
-                 astnode: 'ast.FunctionDef',
-                 mbox: 'MessageBox',
-                 stage: Stage = Stage.Preprocess):
+    def __init__(
+        self,
+        symid: "SymId",
+        symtable: "SymTable",
+        astnode: "ast.FunctionDef",
+        mbox: "MessageBox",
+        stage: Stage = Stage.Preprocess,
+    ):
         super().__init__(symid, symtable, mbox, stage)
         self.ast = astnode
 
 
 class MethodTarget(BlockTarget):
-    def __init__(self,
-                 symid: 'SymId',
-                 symtable: 'SymTable',
-                 clstemp: 'TypeClassTemp',
-                 astnode: 'ast.FunctionDef',
-                 mbox: 'MessageBox',
-                 stage: Stage = Stage.Preprocess) -> None:
+    def __init__(
+        self,
+        symid: "SymId",
+        symtable: "SymTable",
+        clstemp: "TypeClassTemp",
+        astnode: "ast.FunctionDef",
+        mbox: "MessageBox",
+        stage: Stage = Stage.Preprocess,
+    ) -> None:
         super().__init__(symid, symtable, mbox, stage)
         self.clstemp = clstemp
         self.ast = astnode
@@ -58,15 +66,18 @@ class MethodTarget(BlockTarget):
 
 class Target(BlockTarget):
     """Module level block target"""
-    def __init__(self,
-                 symid: 'SymId',
-                 symtable: 'SymTable',
-                 mbox: 'MessageBox',
-                 path: str,
-                 is_special: bool = False,
-                 stage: Stage = Stage.Parse):
+
+    def __init__(
+        self,
+        symid: "SymId",
+        symtable: "SymTable",
+        mbox: "MessageBox",
+        path: str,
+        is_special: bool = False,
+        stage: Stage = Stage.Parse,
+    ):
         """
-        :param is_special: If target is builtins or typing, is_special is True,
+        @param is_special: If target is builtins or typing, is_special is True,
         otherwise False.
         """
         super().__init__(symid, symtable, mbox, stage)
@@ -85,13 +96,15 @@ class Target(BlockTarget):
 
 
 class PackageTarget(Target):
-    def __init__(self,
-                 symid: 'SymId',
-                 symtable: 'SymTable',
-                 mbox: 'MessageBox',
-                 path: str,
-                 analyse_path: str,
-                 stage: Stage = Stage.Parse):
+    def __init__(
+        self,
+        symid: "SymId",
+        symtable: "SymTable",
+        mbox: "MessageBox",
+        path: str,
+        analyse_path: str,
+        stage: Stage = Stage.Parse,
+    ):
         super().__init__(symid, symtable, mbox, path, False, stage)
         self.__analyse_path = analyse_path
 
