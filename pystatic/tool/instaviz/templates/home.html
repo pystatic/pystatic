@@ -60,10 +60,8 @@
 
             {% for node in nodes %}
                 bgcolor = '#97C2FC';
-                fontcolor = '#343434';
                 if ("{{node.reach}}" === "False") {
-                    bgcolor = '#D31D3E';
-                    fontcolor = '#FFFFFF';
+                    bgcolor = '#FFFFFF';
                 }
 
                 nodes.push({
@@ -71,7 +69,6 @@
                     label: "{{node.name}}",
                     fields: "{{node.fields}}",
                     color: {background: bgcolor},
-                    font: {color: fontcolor}
                 });
                 edges.push({from: {{node.parent}}, to: {{node.id}}});
                 nodeData.set({{node.id}}, {{node.data}});

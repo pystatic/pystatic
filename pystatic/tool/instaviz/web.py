@@ -83,17 +83,21 @@ def node_properties(node, d):
     return d
 
 
-def node_to_dict(node, parent):
+def node_to_dict(node, parent, p_reach=True):
     i = []
-    children = list(ast.iter_child_nodes(node))
-    if len(children) > 0:
-        for n in children:
-            i.extend(node_to_dict(n, node))
 
     d = {}
     reach = True
-    if hasattr(node, "reach"):
+
+    if not p_reach:
         reach = False
+    elif hasattr(node, "reach"):
+        reach = False
+
+    children = list(ast.iter_child_nodes(node))
+    if len(children) > 0:
+        for n in children:
+            i.extend(node_to_dict(n, node, reach))
 
     if hasattr(node, "type"):
         d["type"] = str(node.type)

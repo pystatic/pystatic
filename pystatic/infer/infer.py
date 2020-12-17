@@ -66,9 +66,9 @@ class InferVisitor(BaseVisitor):
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
-        setattr(node, "type", rtype)
+        setattr(node.value, "type", rtype)
         for target in node.targets:
-            setattr(node, "type", rtype)
+            setattr(target, "type", rtype)
             if isinstance(target, ast.Name):
                 self.infer_name_node_of_assign(target, rtype, node.value)
             elif isinstance(target, (ast.List, ast.Tuple)):
