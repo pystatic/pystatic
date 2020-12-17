@@ -53,16 +53,13 @@ class InferVisitor(BaseVisitor):
         self.visit(self.root)
 
     def get_type(self, node: Optional[ast.AST]) -> TypeIns:
-        option = eval_expr(node, self.recorder)
-        option.dump_to_box(self.mbox)
-        return option.value
+        result = eval_expr(node, self.recorder)
+        result.dump_to_box(self.mbox)
+        return result.value
 
     def record_type(self, name: str, cur_type: TypeIns):
         self.cond_infer.save_type(name)
         self.recorder.record_type(name, cur_type)
-
-    def type_consistent(self, ltype: TypeIns, rtype: TypeIns) -> bool:
-        return type_consistent(ltype, rtype)
 
     def visit_Assign(self, node: ast.Assign):
         rtype = self.get_type(node.value)
@@ -83,7 +80,7 @@ class InferVisitor(BaseVisitor):
         comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):
             self.recorder.record_type(target.id, comment)
-        if not self.type_consistent(comment, rtype):
+        if not type_consistent(comment, rtype):
             self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
             self.record_type(name, rtype)
@@ -92,7 +89,7 @@ class InferVisitor(BaseVisitor):
         self, target: ast.AST, rtype: TypeIns, rnode: Optional[ast.AST]
     ):
         ltype = self.get_type(target)
-        if not self.type_consistent(ltype, rtype):
+        if not type_consistent(ltype, rtype):
             self.err_maker.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
 
     def check_multi_left_of_assign(
@@ -146,7 +143,7 @@ class InferVisitor(BaseVisitor):
         if not self.recorder.is_defined(name):  # var appear first time
             self.recorder.record_type(name, comment)
 
-        if not self.type_consistent(comment, rtype):
+        if not type_consistent(comment, rtype):
             self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
             self.record_type(name, rtype)
@@ -246,7 +243,7 @@ class InferVisitor(BaseVisitor):
     def check_ret_type(
         self, annotation: TypeIns, ret_node: ast.Return, ret_type: TypeIns
     ):
-        if not self.type_consistent(annotation, ret_type):
+        if not type_consistent(annotation, ret_type):
             if is_none(ret_type):
                 self.err_maker.add_err(ReturnValueExpected(ret_node))
             else:
