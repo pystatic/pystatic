@@ -43,7 +43,6 @@ def cmdline_main():
     if cmd_res.package:
         cmd_res.package = os.path.realpath(cmd_res.package)
         package_paths = _search_modules_under_package(cmd_res.package)
-        print(package_paths)
         if package_paths:
             cmd_res.module.extend(package_paths)
         else:
