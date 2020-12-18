@@ -37,9 +37,9 @@ def get_definition_in_function(target: "FunctionTarget", env: "PrepEnvironment")
     cur_ast = target.ast
     cur_mbox = target.mbox
     assert isinstance(cur_ast, ast.FunctionDef)
-    prepinfo = env.try_add_target_prepinfo(
-        target, PrepInfo(target.symtable, None, env, cur_mbox, False)
-    )
+
+    new_prepinfo = PrepFunctionInfo(target.symtable, None, env, cur_mbox, False, None)
+    prepinfo = env.try_add_target_prepinfo(target, new_prepinfo)
     return TypeDefVisitor(env, prepinfo, cur_mbox, False).accept_func(cur_ast)
 
 
@@ -47,10 +47,11 @@ def get_definition_in_method(target: "MethodTarget", env: "PrepEnvironment"):
     cur_ast = target.ast
     cur_mbox = target.mbox
     assert isinstance(cur_ast, ast.FunctionDef)
-    clstemp = target.clstemp
-    prepinfo = env.try_add_target_prepinfo(
-        target, PrepMethodInfo(clstemp, None, cur_mbox, env)
+
+    new_prepinfo = PrepMethodInfo(
+        target.clstemp, target.symtable, None, env, cur_mbox, False, None
     )
+    prepinfo = env.try_add_target_prepinfo(target, new_prepinfo)
     assert isinstance(prepinfo, PrepMethodInfo)
 
     return TypeDefVisitor(env, prepinfo, cur_mbox, True).accept_func(cur_ast)

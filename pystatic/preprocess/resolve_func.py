@@ -126,16 +126,12 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argume
     add_to_list(new_args.args, order_arg, node.args)
     add_to_list(new_args.kwonlyargs, order_kwarg, node.kwonlyargs)
 
-    # *args exists
+    # star at the start of the name is not stored for *args and **kwargs
     if node.vararg:
         vararg = resolve_arg_type(node.vararg)
-        vararg.name = "*" + vararg.name
         new_args.vararg = vararg
-
-    # **kwargs exists
     if node.kwarg:
         kwarg = resolve_arg_type(node.kwarg)
-        kwarg.name = "**" + kwarg.name
         new_args.kwarg = kwarg
 
     for arg, value in zip(reversed(order_arg), reversed(node.defaults)):

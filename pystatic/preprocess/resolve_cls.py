@@ -156,7 +156,13 @@ def resolve_cls_method(
                 env.add_target_prepinfo(
                     blk_target,
                     PrepMethodInfo(
-                        clsdef.clstemp, cur_prepinfo, cur_prepinfo.mbox, env
+                        clsdef.clstemp,
+                        blk_target.symtable,
+                        cur_prepinfo,
+                        env,
+                        cur_prepinfo.mbox,
+                        False,
+                        None,
                     ),
                 )
                 manager.q_preprocess.append(blk_target)
@@ -202,6 +208,7 @@ def _resolve_cls_method(clsdef: "prep_cls", mbox: "MessageBox") -> List[MethodTa
 
         name = node.name
         inner_symtable = symtable.new_symtable(name, TableScope.FUNC)
+        assert isinstance(inner_symtable, FunctionSymTable)
         func_ins = TypeFuncIns(name, symtable.glob_symid, inner_symtable, argument, ret)
         # get attribute because of assignment of self
         if not is_staticmethod:

@@ -6,7 +6,14 @@ from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
 from pystatic.predefined import TypeVarIns, TypeFuncIns
-from pystatic.symtable import ImportEntry, SymTable, ImportNode, Entry, TableScope
+from pystatic.symtable import (
+    ImportEntry,
+    SymTable,
+    ImportNode,
+    Entry,
+    TableScope,
+    FunctionSymTable,
+)
 from pystatic.result import Result
 from pystatic.message import MessageBox
 
@@ -33,6 +40,7 @@ class PrepInfo:
         env: "PrepEnvironment",
         mbox: "MessageBox",
         is_special: bool,
+        outside: Optional[Set[str]] = None,
     ):
         self.enclosing = enclosing
         self.is_special = is_special
@@ -50,13 +58,7 @@ class PrepInfo:
         self.env = env
         self.star_import: List[SymId] = []
 
-    def name_collide(self, name: str):
-        return (
-            name in self.typevar
-            or name in self.func
-            or name in self.local
-            or name in self.cls
-        )
+        self.outside = outside  # symbols that defined outside(function parameters)
 
     @property
     def glob_symid(self) -> str:
@@ -154,7 +156,11 @@ class PrepInfo:
                             mbox.add_err(SymbolRedefine(defnode, name, old_astnode))
                             return
                     else:
-                        return
+                        return  # variable has already been defined
+                elif self.outside and name in self.outside:
+                    # some name may be added outside this scope(for example: function parameters)
+                    return
+
                 local_def = prep_local(name, self, defnode)
                 self.local[name] = local_def
 
@@ -264,6 +270,7 @@ class PrepInfo:
                 return Result(any_ins)
 
     def dump(self):
+        """Put symbols to symtable"""
         for name, local in self.local.items():
             value = local.getins()
             self.symtable.add_entry(name, Entry(value, local.defnode))
@@ -280,15 +287,35 @@ class PrepInfo:
         self.symtable.star_import.extend(self.star_import)
 
 
-class PrepMethodInfo(PrepInfo):
+class PrepFunctionInfo(PrepInfo):
     def __init__(
         self,
-        clstemp: TypeClassTemp,
+        symtable: "FunctionSymTable",
         enclosing: Optional["PrepInfo"],
-        mbox: "MessageBox",
         env: "PrepEnvironment",
+        mbox: "MessageBox",
+        is_special: bool,
+        outside: Optional[Set[str]],
     ):
-        super().__init__(clstemp.get_inner_symtable(), enclosing, env, mbox, False)
+        super().__init__(symtable, enclosing, env, mbox, is_special, outside=outside)
+        if not self.outside:
+            self.outside = set(symtable.param.get_arg_namelist())
+        else:
+            self.outside |= set(symtable.param.get_arg_namelist())
+
+
+class PrepMethodInfo(PrepFunctionInfo):
+    def __init__(
+        self,
+        clstemp: "TypeClassTemp",
+        symtable: "FunctionSymTable",
+        enclosing: Optional["PrepInfo"],
+        env: "PrepEnvironment",
+        mbox: "MessageBox",
+        is_special: bool,
+        outside: Optional[Set[str]],
+    ):
+        super().__init__(symtable, enclosing, env, mbox, is_special, outside)
         self.clstemp = clstemp
         self.var_attr: Dict[str, "prep_local"] = {}
 

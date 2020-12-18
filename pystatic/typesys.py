@@ -7,7 +7,7 @@ from pystatic.opmap import op_char_map, op_map
 from pystatic.errorcode import *
 
 if TYPE_CHECKING:
-    from pystatic.symtable import SymTable
+    from pystatic.symtable import SymTable, FunctionSymTable
     from pystatic.evalutil import ApplyArgs, GetItemArgs, WithAst
     from pystatic.arg import Argument
 
@@ -545,7 +545,7 @@ class TypeFuncIns(TypeIns):
         self,
         funname: str,
         module_symid: str,
-        inner_symtable: "SymTable",
+        inner_symtable: "FunctionSymTable",
         argument: "Argument",
         ret: TypeIns,
     ) -> None:
@@ -555,11 +555,12 @@ class TypeFuncIns(TypeIns):
         self.module_symid = module_symid
 
         self._inner_symtable = inner_symtable
+        self._inner_symtable.param = argument
 
     def add_overload(self, argument: "Argument", ret: TypeIns):
         self.overloads.append(OverloadItem(argument, ret))
 
-    def get_inner_symtable(self) -> "SymTable":
+    def get_inner_symtable(self) -> "FunctionSymTable":
         return self._inner_symtable
 
     def str_expr(self, bindlist: BindList) -> str:

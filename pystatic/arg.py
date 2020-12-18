@@ -1,4 +1,5 @@
 import copy
+import itertools
 from typing import Optional, List, TYPE_CHECKING
 from pystatic.errorcode import *
 
@@ -33,16 +34,31 @@ class Argument(object):
         self.posonlyargs: List[Arg] = []
         self.args: List[Arg] = []
         self.kwonlyargs: List[Arg] = []
+
+        # vararg and kwarg's star is not store in the name
         self.vararg: Optional[Arg] = None
         self.kwarg: Optional[Arg] = None
+
+    def get_arg_namelist(self) -> List[str]:
+        """Get arguments' name and keep their order"""
+        res = []
+        for arg in itertools.chain(self.posonlyargs, self.args):
+            res.append(arg.name)
+        if self.vararg:
+            res.append(self.vararg.name)
+        for arg in self.kwonlyargs:
+            res.append(arg.name)
+        if self.kwarg:
+            res.append(self.kwarg.name)
+        return res
 
     def __str__(self):
         arg_list = [str(arg) for arg in self.posonlyargs + self.args]
         if self.vararg:
-            arg_list.append(str(self.vararg))
+            arg_list.append("*" + str(self.vararg))
         arg_list += [str(arg) for arg in self.kwonlyargs]
         if self.kwarg:
-            arg_list.append(str(self.kwarg))
+            arg_list.append("**" + str(self.kwarg))
 
         return "(" + ", ".join(arg_list) + ")"
 

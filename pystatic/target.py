@@ -7,7 +7,7 @@ from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
     from pystatic.symid import SymId
-    from pystatic.symtable import SymTable
+    from pystatic.symtable import SymTable, FunctionSymTable
 
 
 class Stage(IntEnum):
@@ -20,8 +20,6 @@ class Stage(IntEnum):
 
 
 class BlockTarget:
-    """Block target mainly used for function"""
-
     def __init__(
         self,
         symid: "SymId",
@@ -40,28 +38,28 @@ class FunctionTarget(BlockTarget):
     def __init__(
         self,
         symid: "SymId",
-        symtable: "SymTable",
+        symtable: "FunctionSymTable",
         astnode: "ast.FunctionDef",
         mbox: "MessageBox",
         stage: Stage = Stage.Preprocess,
     ):
+        self.symtable: "FunctionSymTable"
         super().__init__(symid, symtable, mbox, stage)
         self.ast = astnode
 
 
-class MethodTarget(BlockTarget):
+class MethodTarget(FunctionTarget):
     def __init__(
         self,
         symid: "SymId",
-        symtable: "SymTable",
+        symtable: "FunctionSymTable",
         clstemp: "TypeClassTemp",
         astnode: "ast.FunctionDef",
         mbox: "MessageBox",
         stage: Stage = Stage.Preprocess,
     ) -> None:
-        super().__init__(symid, symtable, mbox, stage)
+        super().__init__(symid, symtable, astnode, mbox, stage)
         self.clstemp = clstemp
-        self.ast = astnode
 
 
 class Target(BlockTarget):
