@@ -1,5 +1,7 @@
 import argparse
 import os
+from os.path import isdir
+from typing import Optional, List
 from pystatic.config import Config
 from pystatic.manager import Manager
 from pystatic.message import MessageBox
@@ -16,7 +18,6 @@ def cmdline_parse():
     parser.add_argument(
         "-p",
         "--package",
-        action="append",
         metavar="package path",
         help="package path",
         type=str,
@@ -34,11 +35,23 @@ def cmdline_parse():
 
 def cmdline_main():
     cmd_res = cmdline_parse()
+
     if not cmd_res.module:
         cmd_res.module = []
     cmd_res.module = [os.path.realpath(path) for path in cmd_res.module]
 
+    if cmd_res.package:
+        cmd_res.package = os.path.realpath(cmd_res.package)
+        package_paths = _search_modules_under_package(cmd_res.package)
+        print(package_paths)
+        if package_paths:
+            cmd_res.module.extend(package_paths)
+        else:
+            print(f"{cmd_res.package} may not be a package.")
+            return
+
     config = Config(cmd_res)
+    cmd_res.module = list(set(cmd_res.module))  # remove duplicates
 
     if cmd_res.shell:
         shell.run(config, cmd_res.module)
@@ -68,3 +81,29 @@ def cmdline_main():
 
             for err in mbox.to_message():
                 print(f"{err}")
+
+
+def _search_modules_under_package(package_abspath) -> Optional[List[str]]:
+    if not isdir(package_abspath):
+        return None
+
+    files = os.listdir(package_abspath)
+    is_package = False
+    for cur_file in files:
+        if cur_file == "__init__.py" and os.path.isfile(
+            os.path.join(package_abspath, cur_file)
+        ):
+            is_package = True
+            break
+
+    if not is_package:
+        return None
+
+    result = []
+    for (root, _, files) in os.walk(package_abspath):
+        for file in files:
+            if file.endswith(".py"):
+                file_abspath = os.path.realpath(os.path.join(root, file))
+                result.append(file_abspath)
+
+    return result
