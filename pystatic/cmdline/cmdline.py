@@ -4,7 +4,7 @@ from os.path import isdir
 from typing import Optional, List
 from pystatic.config import Config
 from pystatic.manager import Manager
-from pystatic.message import MessageBox
+from pystatic.message.messagebox import MessageBox
 import pystatic.tool.stubgen as stubgen
 import pystatic.tool.shell as shell
 import pystatic.tool.instaviz.web as web

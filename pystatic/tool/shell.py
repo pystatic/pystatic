@@ -1,5 +1,5 @@
 import ast
-from pystatic.message import MessageBox
+from pystatic.message.messagebox import MessageBox
 from pystatic.target import Stage, Target
 from pystatic.symtable import SymTable
 from pystatic.manager import Manager

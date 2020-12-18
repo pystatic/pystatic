@@ -1,10 +1,9 @@
-import ast
 import copy
 from abc import ABC, abstractmethod
-from typing import Any, Optional, List, Final, Dict, Type, TYPE_CHECKING
+from typing import Any, Final, Dict, Type
 from pystatic.result import Result
 from pystatic.opmap import op_char_map, op_map
-from pystatic.errorcode import *
+from pystatic.message.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.symtable import SymTable, FunctionSymTable

@@ -1,7 +1,7 @@
 import ast
 from typing import Callable
 from pystatic.predefined import TypeFuncIns, TypeIns
-from pystatic.message import MessageBox
+from pystatic.message.messagebox import MessageBox
 from pystatic.arg import Argument, Arg
 from pystatic.typesys import any_ins
 from pystatic.preprocess.resolve_util import eval_expr_ann

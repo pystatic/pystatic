@@ -1,13 +1,13 @@
 import os
 import logging
 from collections import deque
-from typing import Optional, Dict, Deque, Set
+from typing import Dict, Deque, Set
 from pystatic.config import Config
 from pystatic.exprparse import eval_expr
-from pystatic.errorcode import *
+from pystatic.message.errorcode import *
 from pystatic.fsys import Filesys, FilePath, ModuleFindRes
 from pystatic.infer.infer import InferStarter
-from pystatic.message import MessageBox
+from pystatic.message.messagebox import MessageBox
 from pystatic.result import Result
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import TypePackageIns, builtins_symtable, typing_symtable
@@ -32,6 +32,8 @@ class Manager:
 
         self.q_preprocess: Deque[BlockTarget] = deque()
         self.q_infer: Deque[BlockTarget] = deque()
+
+        self.glob_mbox = MessageBox()
 
         if not config.no_typeshed:
             self.__init_typeshed()

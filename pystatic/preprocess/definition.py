@@ -1,10 +1,8 @@
-import ast
 from contextlib import contextmanager
 from pystatic.visitor import BaseVisitor
-from pystatic.message import MessageBox
-from pystatic.reach import is_true, Reach
-from pystatic.staticinfer import static_infer
-from pystatic.target import BlockTarget, MethodTarget, FunctionTarget
+from pystatic.reach import is_true
+from pystatic.infer.staticinfer import static_infer
+from pystatic.target import MethodTarget, FunctionTarget
 from pystatic.preprocess.util import analyse_import_stmt
 from pystatic.preprocess.prepinfo import *
 

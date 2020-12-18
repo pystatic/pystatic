@@ -1,8 +1,8 @@
 from typing import Generic, TypeVar, Any, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from pystatic.errorcode import ErrorCode
-    from pystatic.message import MessageBox
+    from pystatic.message.errorcode import ErrorCode
+    from pystatic.message.messagebox import MessageBox
 
 T = TypeVar('T', bound=Any, covariant=True)
 

@@ -1,6 +1,8 @@
-from typing import List, Dict, Deque, Set
+from typing import Dict, Deque, Set
 from collections import deque
 from pystatic.preprocess.prepinfo import PrepDef
+from pystatic.message.messagebox import MessageBox
+from pystatic.message.errorcode import *
 
 
 class _Node:
@@ -15,10 +17,43 @@ class _Node:
         self.dependency.add(node)
 
 
+def _resolve_loop(cur_node: _Node, added: set, nodelist: List[_Node], mbox: MessageBox):
+    added.add(cur_node)
+    nodelist.append(cur_node)
+    for next_node in cur_node.dependency:
+        assert next_node.indeg != 0
+        if next_node in added:
+            loop_ref_list = []
+            if next_node == cur_node:
+                glob_symid = cur_node.prepdef.def_prepinfo.glob_symid
+                cur_item = (glob_symid, cur_node.prepdef.defnode)
+                loop_ref_list = [cur_item, cur_item]
+            else:
+                for i in range(len(nodelist) - 2, 0, -1):
+                    glob_symid = nodelist[i].prepdef.def_prepinfo.glob_symid
+                    loop_ref_list.append((glob_symid, nodelist[i].prepdef.defnode))
+                    if nodelist[i] == next_node:
+                        break
+            mbox.add_err(ReferenceLoop(loop_ref_list))
+
+        else:
+            _resolve_loop(next_node, added, nodelist, mbox)
+        next_node.indeg -= 1
+    added.remove(cur_node)
+    nodelist.pop()
+
+
+def resolve_loop(cur_node: _Node, mbox: MessageBox):
+    added = set()
+    nodelist = []
+    _resolve_loop(cur_node, added, nodelist, mbox)
+
+
 class DependencyGraph:
-    def __init__(self) -> None:
+    def __init__(self, mbox: "MessageBox") -> None:
         self._nodes: List["_Node"] = []
         self._mapping: Dict["PrepDef", _Node] = {}
+        self.mbox = mbox
 
     def lookup(self, prepdef: "PrepDef"):
         if prepdef not in self._mapping:
@@ -58,6 +93,6 @@ class DependencyGraph:
 
         for node in self._nodes:
             if node.indeg != 0:
-                raise NotImplementedError("resolve dependency error not implemented")
+                resolve_loop(node, self.mbox)
 
         return res

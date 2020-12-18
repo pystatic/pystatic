@@ -1,17 +1,16 @@
-import ast
-from typing import Dict, List
-from enum import Enum
+from typing import Dict
 from pystatic.exprparse import eval_expr
 from pystatic.result import Result
-from pystatic.message import ErrorMaker
-from pystatic.predefined import TypeLiteralIns, TypeIns
-from pystatic.errorcode import *
+from pystatic.message.errormaker import ErrorMaker
+from pystatic.predefined import TypeLiteralIns
+from pystatic.message.errorcode import *
 from pystatic.config import Config
-from pystatic.staticinfer import cmp_by_op
+from pystatic.infer.staticinfer import cmp_by_op
 from pystatic.infer.recorder import SymbolRecorder, StoredType
 from pystatic.visitor import BaseVisitor
 from pystatic.reach import Reach, cal_neg, is_true
 from pystatic.TypeCompatible.simpleType import type_consistent
+from pystatic.typesys import TypeIns
 
 
 class ConditionStmtType(Enum):
@@ -60,7 +59,7 @@ class ConditionInfer(BaseVisitor):
         tp = self.recorder.get_run_time_type(name)
         self.cur_condition.dirty_map[name] = StoredType(tp, is_permanent)
 
-    def accept(self, node: ast.stmt):
+    def accept(self, node: ast.stmt, *args, **kwargs):
         self.visit(node)
 
     def rejected(self):
@@ -165,11 +164,11 @@ class ConditionInfer(BaseVisitor):
         args = node.args
         first_type = self.err_maker.dump_result(eval_expr(args[0], self.recorder))
         second_typetype = self.err_maker.dump_result(eval_expr(args[1], self.recorder))
-        option = second_typetype.call(None, node)
+        result = second_typetype.call(None, node)
         name = args[0].id
-        if self.err_maker.exsit_error(option):
+        if result.haserr():
             assert "TODO"
-        second_type = option.value
+        second_type = result.value
         if type_consistent(first_type, second_type):
             if isinstance(args[0], ast.Name):
                 pre_type = self.recorder.get_run_time_type(name)
@@ -188,10 +187,10 @@ class ConditionInfer(BaseVisitor):
         return Reach.UNKNOWN
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
-        option: Result = eval_expr(test, self.recorder)
-        literal_ins: TypeLiteralIns = self.err_maker.dump_result(option)
-        if self.err_maker.exsit_error(option):
-            return self.dispose_error_condition(option)
+        result: Result = eval_expr(test, self.recorder)
+        literal_ins: TypeLiteralIns = self.err_maker.dump_result(result)
+        if result.haserr():
+            return self.dispose_error_condition(result)
         if literal_ins.value:
             return Reach.ALWAYS_TRUE
         else:
@@ -242,10 +241,10 @@ class ConditionInfer(BaseVisitor):
     def infer_value_of_name_node(self, test: ast.Name) -> Reach:
         if test.id == "TYPE_CHECKING":
             return Reach.TYPE_TRUE
-        option: Result = eval_expr(test, self.recorder)
-        tp = self.err_maker.dump_result(option)
-        if self.err_maker.exsit_error(option):
-            return self.dispose_error_condition(option)
+        result: Result = eval_expr(test, self.recorder)
+        tp = self.err_maker.dump_result(result)
+        if result.haserr():
+            return self.dispose_error_condition(result)
         if isinstance(tp, TypeLiteralIns):
             if tp.value:
                 return Reach.ALWAYS_TRUE
@@ -268,14 +267,14 @@ class ConditionInfer(BaseVisitor):
         self, left: ast.expr, right: ast.expr, op: ast.cmpop
     ) -> Reach:
         # TODO: modify after eval_expr suppose compare
-        option: Result = eval_expr(left, self.recorder)
-        left_tp = self.err_maker.dump_result(option)
-        if self.err_maker.exsit_error(option):
-            return self.dispose_error_condition(option)
-        option = eval_expr(right, self.recorder)
-        right_tp = self.err_maker.dump_result(option)
-        if self.err_maker.exsit_error(option):
-            return self.dispose_error_condition(option)
+        result: Result = eval_expr(left, self.recorder)
+        left_tp = self.err_maker.dump_result(result)
+        if result.haserr():
+            return self.dispose_error_condition(result)
+        result = eval_expr(right, self.recorder)
+        right_tp = self.err_maker.dump_result(result)
+        if result.haserr():
+            return self.dispose_error_condition(result)
         if self.is_cmp_between_constant(left_tp, right_tp):
             return cmp_by_op(left_tp.value, right_tp.value, op)
         else:

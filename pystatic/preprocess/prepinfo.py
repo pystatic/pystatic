@@ -1,7 +1,6 @@
-import ast
 from pystatic.reach import Reach
-from typing import Optional, TYPE_CHECKING, Dict, Union, List, Set, Final
-from pystatic.errorcode import *
+from typing import Dict, Set, Final
+from pystatic.message.errorcode import *
 from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
@@ -15,7 +14,7 @@ from pystatic.symtable import (
     FunctionSymTable,
 )
 from pystatic.result import Result
-from pystatic.message import MessageBox
+from pystatic.message.messagebox import MessageBox
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager

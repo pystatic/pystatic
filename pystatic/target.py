@@ -3,11 +3,11 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Optional
 from pystatic.typesys import TypeClassTemp
 from pystatic.predefined import TypeModuleIns
-from pystatic.message import MessageBox
 
 if TYPE_CHECKING:
     from pystatic.symid import SymId
     from pystatic.symtable import SymTable, FunctionSymTable
+    from pystatic.message.messagebox import MessageBox
 
 
 class Stage(IntEnum):
@@ -24,7 +24,7 @@ class BlockTarget:
         self,
         symid: "SymId",
         symtable: "SymTable",
-        mbox: MessageBox,
+        mbox: "MessageBox",
         stage: Stage = Stage.Preprocess,
     ) -> None:
         self.symid = symid

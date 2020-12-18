@@ -1,9 +1,8 @@
-import ast
 import enum
-from pystatic.symid import SymId, symid2list
-from typing import Dict, Optional, Union, List, TYPE_CHECKING, Tuple
+from pystatic.symid import symid2list
+from typing import Dict
 from pystatic.result import Result
-from pystatic.errorcode import *
+from pystatic.message.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager

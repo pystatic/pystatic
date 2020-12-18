@@ -1,11 +1,7 @@
-import ast
 import contextlib
-from typing import List, Optional, Protocol, Sequence
-from pystatic.errorcode import ErrorCode
+from typing import Protocol
 from pystatic.visitor import NoGenVisitor
-from pystatic.typesys import TypeIns, any_ins
-from pystatic.evalutil import ApplyArgs, WithAst, GetItemArgs
-from pystatic.result import Result
+from pystatic.evalutil import ApplyArgs
 from pystatic.predefined import *
 
 

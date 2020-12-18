@@ -6,7 +6,7 @@ from pystatic.target import MethodTarget
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.predefined import TypeGenericTemp, TypeVarIns, TypeFuncIns
 from pystatic.visitor import BaseVisitor
-from pystatic.message import MessageBox
+from pystatic.message.messagebox import MessageBox
 from pystatic.symtable import TableScope
 from pystatic.arg import Argument
 from pystatic.preprocess.resolve_func import resolve_func_template

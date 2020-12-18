@@ -1,7 +1,6 @@
 import copy
 import itertools
-from typing import Optional, List, TYPE_CHECKING
-from pystatic.errorcode import *
+from pystatic.message.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns

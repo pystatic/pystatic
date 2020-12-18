@@ -62,7 +62,7 @@ class Preprocessor:
             for prepinfo in prepinfo_list:
                 resolve_import(prepinfo, self.env)
 
-            resolve_order = toposort_prepdef(prepinfo_list)
+            resolve_order = toposort_prepdef(prepinfo_list, self.env.manager.glob_mbox)
             for prepdef in resolve_order:
                 resolve(prepdef, shallow=True)
 

@@ -1,16 +1,15 @@
-import ast
 import logging
 from contextlib import contextmanager
-from typing import Optional, Deque, TYPE_CHECKING
-from pystatic.typesys import *
+from typing import Deque
 from pystatic.predefined import *
 from pystatic.target import FunctionTarget, Target, BlockTarget
-from pystatic.message import MessageBox, ErrorMaker
+from pystatic.message.messagebox import MessageBox
+from pystatic.message.errormaker import ErrorMaker
 from pystatic.arg import Argument
-from pystatic.errorcode import *
+from pystatic.message.errorcode import *
 from pystatic.exprparse import eval_expr
 from pystatic.result import Result
-from pystatic.opmap import *
+from pystatic.opmap import op_map, op_char_map
 from pystatic.config import Config
 from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
@@ -156,9 +155,9 @@ class InferVisitor(BaseVisitor):
     def visit_AugAssign(self, node: ast.AugAssign):
         ltype = self.get_type(node.target)
         rtype = self.get_type(node.value)
-        func_name: str = binop_map[type(node.op)]
+        func_name: str = op_map[type(node.op)]
         option: Result = ltype.getattribute(func_name, None)
-        operand = binop_char_map[type(node.op)]
+        operand = op_char_map[type(node.op)]
         if self.err_maker.exsit_error(option):
             self.err_maker.add_err(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype)
