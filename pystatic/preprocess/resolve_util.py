@@ -25,6 +25,10 @@ class PrepTypeEvalResult:
 
 
 class PrepTypeEvaluator(ExprParser):
+    """Evaluate a node's type and can run in shallow mode.
+
+    shallow mode: won't dive inside subscript node
+    """
     def __init__(
         self, consultant: SupportGetAttribute, annotation: bool, shallow: bool
     ) -> None:

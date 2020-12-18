@@ -140,6 +140,7 @@ class Manager:
                 self.__add_target(new_target, to_check)
 
             elif find_res.res_type == ModuleFindRes.Namespace:
+                return Result(False)
                 assert False, "Namespace package not supported yet"
 
         return add_result
