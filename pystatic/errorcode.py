@@ -1,7 +1,6 @@
 import ast
 from enum import Enum
 from typing import Tuple, Optional, TYPE_CHECKING, Union, List
-from pystatic.error_register import *
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
@@ -29,6 +28,8 @@ class ErrorCode:
 
 
 class IncompatibleTypeInAssign(ErrorCode):
+    template = "Incompatible type in assignment"
+
     def __init__(
         self, node: Optional[ast.AST], expect_type: "TypeIns", expr_type: "TypeIns"
     ):
@@ -39,12 +40,14 @@ class IncompatibleTypeInAssign(ErrorCode):
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = INCOMPATIBLE_TYPE_IN_ASSIGN
+        review = self.template
         detail = f"expression has type '{self.expr_type}', variable has type '{self.expect_type}'"
         return self.node, self.concat_msg(review, detail)
 
 
 class SymbolUndefined(ErrorCode):
+    template = "Cannot determine type of '{}'"
+
     def __init__(self, node: Optional[ast.AST], name: str):
         super().__init__()
         self.node = node
@@ -52,12 +55,14 @@ class SymbolUndefined(ErrorCode):
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = SYMBOL_UNDEFINED.format(self.name)
+        review = self.template.format(self.name)
         detail = f"unresolved reference '{self.name}'"
         return self.node, self.concat_msg(review, detail)
 
 
 class SymbolRedefine(ErrorCode):
+    template = "'{}' has already defined"
+
     def __init__(
         self, node: Optional[ast.AST], name: str, old_node: Optional[ast.AST]
     ) -> None:
@@ -68,7 +73,7 @@ class SymbolRedefine(ErrorCode):
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = SYMBOL_REDEFINE.format(self.name)
+        review = self.template.format(self.name)
         if self.old_node:
             detail = f"{self.name} previously defined at line {self.old_node.lineno}"
             return self.node, self.concat_msg(review, detail)
@@ -77,16 +82,20 @@ class SymbolRedefine(ErrorCode):
 
 
 class IndiceParamNotClass(ErrorCode):
+    template = "Expect a class type"
+
     def __init__(self, node: Optional[ast.AST]) -> None:
         super().__init__()
         self.node = node
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, INDICE_PARAM_NOT_CLASS
+        return self.node, self.template
 
 
 class IndiceParamNumberMismatch(ErrorCode):
+    template = "receive {} but require {} argument(s)"
+
     def __init__(self, receive: int, arity: int, node: Optional[ast.AST]):
         self.receive = receive
         self.arity = arity
@@ -94,9 +103,7 @@ class IndiceParamNumberMismatch(ErrorCode):
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, INDICE_ARGUMENT_NUMBER_MISMATCH.format(
-            self.receive, self.arity
-        )
+        return self.node, self.template.format(self.receive, self.arity)
 
 
 class IndiceGeneralError(ErrorCode):
@@ -111,27 +118,33 @@ class IndiceGeneralError(ErrorCode):
 
 
 class NotSubscriptable(ErrorCode):
+    template = "type '{}' is not subscriptable"
+
     def __init__(self, inable_type: "TypeIns", node: Optional[ast.AST]) -> None:
         super().__init__()
         self.node = node
         self.inable_type = inable_type
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, NOT_SUBSCRIPTABLE.format(self.inable_type)
+        return self.node, self.template.format(self.inable_type)
 
 
 class NotCallable(ErrorCode):
+    template = "{} is not callable"
+
     def __init__(self, inable_type: "TypeIns", node: Optional[ast.AST]):
         super().__init__()
         self.node = node
         self.inable_type = inable_type
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, NOT_CALLABLE.format(self.inable_type)
+        return self.node, self.template.format(self.inable_type)
 
 
 class OperationNotSupported(ErrorCode):
     """Doesn't support the operation(like '<', '>', ...)"""
+
+    template = "{} is not supported in {}"
 
     def __init__(self, op_str: str, typeins: "TypeIns", node: Optional[ast.AST]):
         super().__init__()
@@ -140,13 +153,15 @@ class OperationNotSupported(ErrorCode):
         self.node = node
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, OPERATION_NOT_SUPPORTED.format(self.op_str, self.typeins)
+        return self.node, self.template.format(self.op_str, self.typeins)
 
 
 class VarTypeCollide(ErrorCode):
     """Name has been defined as a class or function but used on the left of an
     assignment statement.
     """
+
+    template = "'{}' doesn't match its definition"
 
     def __init__(
         self,
@@ -161,7 +176,7 @@ class VarTypeCollide(ErrorCode):
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = VAR_TYPE_COLLIDE.format(self.name)
+        review = self.template.format(self.name)
         if self.previledge_node:
             if isinstance(self.previledge_node, ast.ClassDef):
                 detail = f"{self.name} defined as a class at line {self.previledge_node.lineno}"
@@ -174,6 +189,8 @@ class VarTypeCollide(ErrorCode):
 
 
 class IncompatibleReturnType(ErrorCode):
+    template = "Incompatible return value type"
+
     def __init__(
         self, node: Optional[ast.AST], expect_type: "TypeIns", ret_type: "TypeIns"
     ):
@@ -184,12 +201,14 @@ class IncompatibleReturnType(ErrorCode):
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = INCOMPATIBLE_RETURN_TYPE
+        review = self.template
         detail = f"expected '{self.expect_type}', got '{self.ret_type}'"
         return self.node, self.concat_msg(review, detail)
 
 
 class IncompatibleArgument(ErrorCode):
+    template = "Incompatible type for parameter {}"
+
     def __init__(
         self, node: ast.AST, param_name: str, param_type: "TypeIns", arg_type: "TypeIns"
     ):
@@ -201,12 +220,14 @@ class IncompatibleArgument(ErrorCode):
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = INCOMPATIBLE_ARGUMENT.format(self.param_name)
+        review = self.template.format(self.param_name)
         detail = f"get '{self.arg_type}', expect '{self.param_type}'"
         return self.node, self.concat_msg(review, detail)
 
 
 class TooFewArgument(ErrorCode):
+    template = "Too few arguments"
+
     def __init__(self, node: Optional[ast.AST], missing_names: List[str]):
         super().__init__()
         self.node = node
@@ -215,22 +236,25 @@ class TooFewArgument(ErrorCode):
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = TOO_FEW_ARGUMENTS
         detail = f"missing " + ", ".join(self.missing_names)
-        return self.node, self.concat_msg(review, detail)
+        return self.node, self.concat_msg(self.template, detail)
 
 
 class TooMoreArgument(ErrorCode):
+    template = "Too more arguments"
+
     def __init__(self, node: Optional[ast.AST]):
         super().__init__()
         self.node = node
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, TOO_MORE_ARGUMENTS
+        return self.node, self.template
 
 
 class TooMoreValuesToUnpack(ErrorCode):
+    template = "Too more values to unpack"
+
     def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
         super().__init__()
         self.node = node
@@ -239,12 +263,13 @@ class TooMoreValuesToUnpack(ErrorCode):
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = TOO_MORE_VALUES_TO_UNPACK
         detail = f"expected {self.expected_num}, got {self.got_num}"
-        return self.node, self.concat_msg(review, detail)
+        return self.node, self.concat_msg(self.template, detail)
 
 
 class NeedMoreValuesToUnpack(ErrorCode):
+    template = "Need more values to unpack"
+
     def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
         super().__init__()
         self.node = node
@@ -253,22 +278,25 @@ class NeedMoreValuesToUnpack(ErrorCode):
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = NEED_MORE_VALUES_TO_UNPACK
         detail = f"expected {self.expected_num}, got {self.got_num}"
-        return self.node, self.concat_msg(review, detail)
+        return self.node, self.concat_msg(self.template, detail)
 
 
 class ReturnValueExpected(ErrorCode):
+    template = "Return value expected"
+
     def __init__(self, node: Optional[ast.AST]):
         super().__init__()
         self.node = node
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, RETURN_VALUE_EXPECTED
+        return self.node, self.template
 
 
 class NoAttribute(ErrorCode):
+    template = "Type '{}' has no attribute '{}'"
+
     def __init__(self, node: Optional[ast.AST], target_type: "TypeIns", attr_name: str):
         super().__init__()
         self.node = node
@@ -277,11 +305,13 @@ class NoAttribute(ErrorCode):
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        msg = NO_ATTRIBUTE.format(self.target_type, self.attr_name)
+        msg = self.template.format(self.target_type, self.attr_name)
         return self.node, msg
 
 
 class UnsupportedBinOperand(ErrorCode):
+    template = "Unsupported operand types for '{}'"
+
     def __init__(
         self,
         node: Optional[ast.AST],
@@ -297,22 +327,26 @@ class UnsupportedBinOperand(ErrorCode):
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = UNSUPPORTED_OPERAND.format(self.operand)
+        review = self.template.format(self.operand)
         detail = f"'{self.left_type}' and {self.right_type}"
         return self.node, self.concat_msg(review, detail)
 
 
 class CodeUnreachable(ErrorCode):
+    template = "This code is unreachable"
+
     def __init__(self, node: Optional[ast.AST]):
         super().__init__()
         self.node = node
         self.level = Level.HINT
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, CODE_UNREACHABLE
+        return self.node, self.template
 
 
 class NonIterative(ErrorCode):
+    template = "type '{}' is non-iterative"
+
     def __init__(self, node: Optional[ast.AST], fake_iter: "TypeIns"):
         super().__init__()
         self.node = node
@@ -320,36 +354,42 @@ class NonIterative(ErrorCode):
         self.level = Level.WARN
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, NON_ITERATIVE.format(self.iter)
+        return self.node, self.template.format(self.iter)
 
 
 # Class related
 class DuplicateBaseclass(ErrorCode):
+    template = "duplicate baseclass is not allowed"
+
     def __init__(self, node: Optional[ast.AST]) -> None:
         super().__init__()
         self.node = node
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, DUPLICATE_BASECLASS
+        return self.node, self.template
 
 
 # Errors that have nothing to do with type inconsistency
 class FileNotFound(ErrorCode):
+    template = "{} not found"
+
     def __init__(self, path: "FilePath") -> None:
         super().__init__()
         self.path = path
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return None, FILE_NOT_FOUND.format(self.path)
+        return None, self.template.format(self.path)
 
 
 class ModuleNotFound(ErrorCode):
+    template = "{} not found"
+
     def __init__(self, symid: "SymId") -> None:
         super().__init__()
         self.symid = symid
         self.level = Level.ERROR
 
     def make(self) -> Tuple[Optional[ast.AST], str]:
-        return None, MODULE_NOT_FOUND.format(self.symid)
+        return None, self.template.format(self.symid)

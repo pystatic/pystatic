@@ -82,9 +82,9 @@ def match_argument(
     missing_args: List[str] = []
     too_more_arg = False
 
-    def match_arg(arg: Arg, typeins: "TypeIns", node: ast.AST):
+    def match_arg(arg: Arg, name: str, typeins: "TypeIns", node: ast.AST):
         if not type_consistent(arg.ann, typeins):
-            errorlist.append(IncompatibleArgument(node, arg.name, arg.ann, typeins))
+            errorlist.append(IncompatibleArgument(node, name, arg.ann, typeins))
 
     i_apply_arg = 0
     len_apply_arg = len(applyargs.args)
@@ -94,7 +94,8 @@ def match_argument(
         if i_apply_arg >= len_apply_arg:
             missing_args.append(arg.name)
         else:
-            match_arg(arg, args[i_apply_arg].value, args[i_apply_arg].node)
+            # match posonly arguments
+            match_arg(arg, arg.name, args[i_apply_arg].value, args[i_apply_arg].node)
             i_apply_arg += 1
 
     i_param_arg = 0
@@ -104,8 +105,12 @@ def match_argument(
         if i_apply_arg >= len_apply_arg:
             break
         else:
+            # match arg
             match_arg(
-                param_args[i_param_arg], args[i_apply_arg].value, args[i_apply_arg].node
+                param_args[i_param_arg],
+                param_args[i_param_arg].name,
+                args[i_apply_arg].value,
+                args[i_apply_arg].node,
             )
             i_apply_arg += 1
             i_param_arg += 1
@@ -118,29 +123,37 @@ def match_argument(
                     errorlist.append(TooMoreArgument(callnode))
                     too_more_arg = True
             else:
-                # *args
+                # match *args
                 while i_apply_arg < len_apply_arg:
                     match_arg(
-                        argument.vararg, args[i_apply_arg].value, args[i_apply_arg].node
+                        argument.vararg,
+                        "*" + argument.vararg.name,
+                        args[i_apply_arg].value,
+                        args[i_apply_arg].node,
                     )
                     i_apply_arg += 1
     else:
         assert i_apply_arg >= len_apply_arg
         while i_param_arg < len_param_arg:
-            name = param_args[i_param_arg].name
-            if name in kwargs:
+            # match keyword argument with args
+            cur_argname = param_args[i_param_arg].name
+            if cur_argname in kwargs:
                 match_arg(
-                    param_args[i_param_arg], kwargs[name].value, kwargs[name].node
+                    param_args[i_param_arg],
+                    cur_argname,
+                    kwargs[cur_argname].value,
+                    kwargs[cur_argname].node,
                 )
-                kwargs.pop(name)
+                kwargs.pop(cur_argname)
             else:
-                missing_args.append(name)
+                missing_args.append(cur_argname)
             i_param_arg += 1
 
     for arg in argument.kwonlyargs:
         if arg.name in kwargs:
+            # match kwonlyargs
             target_ins = kwargs[arg.name]
-            match_arg(arg, target_ins.value, target_ins.node)
+            match_arg(arg, arg.name, target_ins.value, target_ins.node)
             kwargs.pop(arg.name)
         else:
             missing_args.append(arg.name)
@@ -148,7 +161,13 @@ def match_argument(
     if len(kwargs):
         if argument.kwarg:
             for apply_kwarg in kwargs.values():
-                match_arg(argument.kwarg, apply_kwarg.value, apply_kwarg.node)
+                # match **kwargs
+                match_arg(
+                    argument.kwarg,
+                    "**" + argument.kwarg.name,
+                    apply_kwarg.value,
+                    apply_kwarg.node,
+                )
         else:
             if not too_more_arg:
                 too_more_arg = True
