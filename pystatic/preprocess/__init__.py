@@ -1,1 +1,3 @@
-from pystatic.preprocess.main import Preprocessor
+from pystatic.preprocess.preprocessor import Preprocessor
+
+__all__ = []

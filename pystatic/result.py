@@ -1,8 +1,8 @@
 from typing import Generic, TypeVar, Any, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from pystatic.message.errorcode import ErrorCode
-    from pystatic.message.messagebox import MessageBox
+    from pystatic.error.errorcode import ErrorCode
+    from pystatic.error.errorbox import ErrorBox
 
 T = TypeVar('T', bound=Any, covariant=True)
 
@@ -34,9 +34,9 @@ class Result(Generic[T]):
             else:
                 self.errors.extend(other.errors)
 
-    def dump_to_box(self, mbox: 'MessageBox'):
+    def dump_to_box(self, errbox: 'ErrorBox'):
         if self.errors:
-            mbox.error.extend(self.errors)
+            errbox.error.extend(self.errors)
 
     def haserr(self):
         if self.errors:

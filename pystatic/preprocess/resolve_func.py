@@ -1,7 +1,7 @@
 import ast
 from typing import Callable
 from pystatic.predefined import TypeFuncIns, TypeIns
-from pystatic.message.messagebox import MessageBox
+from pystatic.error.errorbox import ErrorBox
 from pystatic.arg import Argument, Arg
 from pystatic.typesys import any_ins
 from pystatic.preprocess.resolve_util import eval_expr_ann
@@ -26,8 +26,8 @@ def resolve_func(func: "prep_func"):
     ):
         func_ins.add_overload(argument, ret)
 
-    mbox = func.def_prepinfo.mbox
-    resolve_func_template(func, add_func_def, add_func_overload, mbox)
+    errbox = func.def_prepinfo.errbox
+    resolve_func_template(func, add_func_def, add_func_overload, errbox)
 
 
 TAddFunDef = Callable[[Argument, TypeIns, ast.FunctionDef], TypeFuncIns]
@@ -39,7 +39,7 @@ def resolve_func_template(
     func: "prep_func",
     add_func_def: TAddFunDef,
     add_func_overload: TAddFunOverload,
-    mbox: "MessageBox",
+    errbox: "ErrorBox",
 ):
     prepinfo = func.def_prepinfo
 
@@ -48,8 +48,8 @@ def resolve_func_template(
         nonlocal prepinfo
         argument_result = eval_argument_type(node.args, prepinfo)
         return_result = eval_return_type(node.returns, prepinfo)
-        argument_result.dump_to_box(mbox)
-        return_result.dump_to_box(mbox)
+        argument_result.dump_to_box(errbox)
+        return_result.dump_to_box(errbox)
         return argument_result.value, return_result.value
 
     overload_list: List[FunTuple] = []
@@ -67,7 +67,7 @@ def resolve_func_template(
         else:
             if not_overload:
                 overload_list.append((*get_arg_ret(astnode), astnode))
-                mbox.add_err(SymbolRedefine(astnode, func.name, not_overload[-1]))
+                errbox.add_err(SymbolRedefine(astnode, func.name, not_overload[-1]))
                 setattr(astnode, "reach", Reach.REDEFINE)
             else:
                 not_overload = (*get_arg_ret(astnode), astnode)
@@ -93,7 +93,7 @@ def resolve_func_template(
 
 def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argument]:
     """Gernerate an Argument instance according to an ast.arguments node"""
-    mbox = prepinfo.mbox
+    errbox = prepinfo.errbox
     new_args = Argument()
     # order_arg: [**posonlyargs, **args]
     # order_kwarg: [**kwonlyargs]
@@ -105,11 +105,11 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argume
 
     def resolve_arg_type(node: ast.arg) -> Arg:
         """Generate an Arg instance according to an ast.arg node"""
-        nonlocal mbox, prepinfo
+        nonlocal errbox, prepinfo
         new_arg = Arg(node.arg, any_ins)
         if node.annotation:
             ann_result = eval_expr_ann(node.annotation, prepinfo)
-            ann_result.dump_to_box(mbox)
+            ann_result.dump_to_box(errbox)
             new_arg.ann = ann_result.value
         return new_arg
 

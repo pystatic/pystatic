@@ -4,10 +4,10 @@ from collections import deque
 from typing import Dict, Deque, Set
 from pystatic.config import Config
 from pystatic.exprparse import eval_expr
-from pystatic.message.errorcode import *
+from pystatic.error.errorcode import *
+from pystatic.error.errorbox import ErrorBox
 from pystatic.fsys import Filesys, FilePath, ModuleFindRes
 from pystatic.infer.infer import InferStarter
-from pystatic.message.messagebox import MessageBox
 from pystatic.result import Result
 from pystatic.preprocess import Preprocessor
 from pystatic.predefined import TypePackageIns, builtins_symtable, typing_symtable
@@ -33,7 +33,8 @@ class Manager:
         self.q_preprocess: Deque[BlockTarget] = deque()
         self.q_infer: Deque[BlockTarget] = deque()
 
-        self.glob_mbox = MessageBox()
+        self.manager_errbox = ErrorBox(MANAGER_TAG)
+        self.message_cache: Dict[SymId, List[Message]] = {}
 
         if not config.no_typeshed:
             self.__init_typeshed()
@@ -92,7 +93,7 @@ class Manager:
                     symid, None, None, builtins_symtable, self, TableScope.GLOB
                 )
                 symtable.glob = symtable
-            mbox = MessageBox(symid)
+            errbox = ErrorBox(symid)
 
             # TODO: support namespace
             assert len(find_res.paths) == 1
@@ -111,7 +112,7 @@ class Manager:
             if find_res.res_type == ModuleFindRes.Module:
                 file_path = self.fsys.realpath(find_res.paths[0])
                 new_target = Target(
-                    symid, symtable, mbox, file_path, is_special=is_special
+                    symid, symtable, errbox, file_path, is_special=is_special
                 )
 
                 self.__parse(new_target)
@@ -130,7 +131,7 @@ class Manager:
                 symtable.symid = symtable.symid + ".__init__"
 
                 new_target = PackageTarget(
-                    symid, symtable, mbox, dir_path, analyse_path
+                    symid, symtable, errbox, dir_path, analyse_path
                 )
                 new_target.module_ins = TypePackageIns(
                     new_target.symtable, find_res.paths, None
@@ -224,23 +225,37 @@ class Manager:
             self.__add_target(target, to_check)
         self.update_stage(target, target.stage, True)
 
-    def get_mbox_by_symid(self, symid: "SymId") -> Optional[MessageBox]:
+    def send(self, tag: str, msg: Message):
+        if tag in self.message_cache:
+            self.message_cache[tag].append(msg)
+        elif tag in self.targets:
+            self.message_cache[tag] = [msg]
+
+    def take_messages_by_symid(self, symid: "SymId") -> Sequence[Message]:
         """Get messages according to the symid"""
+        self.manager_errbox.release(self)
         target = self.targets.get(symid)
         if target:
-            return target.mbox
+            target.errbox.release(self)
         elif symid.endswith(".__init__"):
             package_id = symid[: -len(".__init__")]
             if (target := self.targets.get(package_id)) :
-                return target.mbox
+                target.errbox.release(self)
+        else:
+            return []
+        if (res := self.message_cache.get(symid, None)) :
+            self.message_cache[symid] = []
+            return sorted(res)
+        else:
+            return []
 
-    def get_mbox(self, path: FilePath) -> Optional[MessageBox]:
+    def take_messages(self, path: FilePath) -> Sequence[Message]:
         """Get messages according to a absolute file path"""
         path = os.path.normcase(path)
         symid = self.fsys.path_to_symid(path)
         if symid:
-            return self.get_mbox_by_symid(symid)
-        return None
+            return self.take_messages_by_symid(symid)
+        return []
 
     def preprocess(self):
         self.pre_proc.process()

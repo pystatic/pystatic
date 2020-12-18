@@ -1,7 +1,7 @@
-from enum import auto
+from enum import auto, Enum
 from pystatic.symtable import TableScope, Entry, SymTable
 from pystatic.typesys import *
-from pystatic.message.errorcode import *
+from pystatic.error.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.evalutil import InsWithAst, GetItemArgs

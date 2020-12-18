@@ -3,10 +3,9 @@ from contextlib import contextmanager
 from typing import Deque
 from pystatic.predefined import *
 from pystatic.target import FunctionTarget, Target, BlockTarget
-from pystatic.message.messagebox import MessageBox
-from pystatic.message.errormaker import ErrorMaker
+from pystatic.error.errorbox import ErrorBox
 from pystatic.arg import Argument
-from pystatic.message.errorcode import *
+from pystatic.error.errorcode import *
 from pystatic.exprparse import eval_expr
 from pystatic.result import Result
 from pystatic.opmap import op_map, op_char_map
@@ -33,27 +32,39 @@ class InferVisitor(BaseVisitor):
         self,
         node: ast.AST,
         module: TypeModuleIns,
-        mbox: MessageBox,
+        errbox: ErrorBox,
         symid: "SymId",
         config: Config,
         manager: "Manager",
     ):
         self.root = node
-        self.mbox = mbox
+        self.errbox = errbox
         self.symid = symid
-        self.err_maker = ErrorMaker(self.mbox)
         self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
         self.config = config
-        self.cond_infer = ConditionInfer(self.recorder, self.err_maker, self.config)
+        self.cond_infer = ConditionInfer(self.recorder, self.errbox, self.config)
         self.manager = manager
+
+    def dump_result(self, result: Result):
+        result.dump_to_box(self.errbox)
+        return result.value
+
+    def generate_code_unreachable_error(self, code_frag: List[ast.stmt]):
+        if len(code_frag) == 0:
+            return
+        begin = code_frag[0]
+        end = code_frag[-1]
+        begin.end_lineno = end.end_lineno
+        begin.end_col_offset = end.end_col_offset
+        self.errbox.add_err(CodeUnreachable(begin))
 
     def infer(self):
         self.visit(self.root)
 
     def get_type(self, node: Optional[ast.AST]) -> TypeIns:
         result = eval_expr(node, self.recorder)
-        result.dump_to_box(self.mbox)
+        result.dump_to_box(self.errbox)
         return result.value
 
     def record_type(self, name: str, cur_type: TypeIns):
@@ -80,7 +91,7 @@ class InferVisitor(BaseVisitor):
         if not self.recorder.is_defined(name):
             self.recorder.record_type(target.id, comment)
         if not type_consistent(comment, rtype):
-            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.errbox.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
             self.record_type(name, rtype)
 
@@ -89,24 +100,24 @@ class InferVisitor(BaseVisitor):
     ):
         ltype = self.get_type(target)
         if not type_consistent(ltype, rtype):
-            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
+            self.errbox.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
 
     def check_multi_left_of_assign(
         self, target: List[ast.expr], rtype: TypeIns, rnode: Optional[ast.AST]
     ):
         type_list = rtype.bindlist
         if not type_list:  # a,b=()
-            self.err_maker.add_err(NeedMoreValuesToUnpack(rnode, len(target), 0))
+            self.errbox.add_err(NeedMoreValuesToUnpack(rnode, len(target), 0))
             return
         if not isinstance(rnode, (ast.Tuple, ast.List)):  # a,b=1
-            self.err_maker.add_err(NeedMoreValuesToUnpack(rnode, len(target), 1))
+            self.errbox.add_err(NeedMoreValuesToUnpack(rnode, len(target), 1))
             return
         if len(target) < len(type_list):
-            self.err_maker.add_err(
+            self.errbox.add_err(
                 TooMoreValuesToUnpack(rnode, len(target), len(type_list))
             )
         elif len(target) > len(type_list):
-            self.err_maker.add_err(
+            self.errbox.add_err(
                 NeedMoreValuesToUnpack(rnode, len(target), len(type_list))
             )
         for lvalue, tp, node in zip(target, type_list, rnode.elts):
@@ -143,7 +154,7 @@ class InferVisitor(BaseVisitor):
             self.recorder.record_type(name, comment)
 
         if not type_consistent(comment, rtype):
-            self.err_maker.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
+            self.errbox.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
             self.record_type(name, rtype)
 
@@ -156,22 +167,24 @@ class InferVisitor(BaseVisitor):
         ltype = self.get_type(node.target)
         rtype = self.get_type(node.value)
         func_name: str = op_map[type(node.op)]
-        option: Result = ltype.getattribute(func_name, None)
+        result: Result = ltype.getattribute(func_name, None)
         operand = op_char_map[type(node.op)]
-        if self.err_maker.exsit_error(option):
-            self.err_maker.add_err(
+        if result.haserr():
+            self.errbox.add_err(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype)
             )
             return
-        func_type = self.err_maker.dump_result(option)
+
+        result.dump_to_box(self.errbox)
+        func_type = result.value
         self.check_arg_of_operand_func(node.value, func_type, operand, ltype, rtype)
 
     def check_arg_of_operand_func(self, node, func_type, operand, ltype, rtype):
         apply_args = ApplyArgs()
         apply_args.add_arg(rtype, node)
-        option: Result = func_type.call(apply_args)
-        if self.err_maker.exsit_error(option):
-            self.err_maker.add_err(UnsupportedBinOperand(node, operand, ltype, rtype))
+        result: Result = func_type.call(apply_args)
+        if result.haserr():
+            self.errbox.add_err(UnsupportedBinOperand(node, operand, ltype, rtype))
 
     @contextmanager
     def visit_scope(self, node):
@@ -202,7 +215,7 @@ class InferVisitor(BaseVisitor):
 
     def preprocess_in_func(self, node: ast.FunctionDef, func_type: TypeFuncIns):
         new_table = func_type.get_inner_symtable()
-        func_target = FunctionTarget(self.symid, new_table, node, self.mbox)
+        func_target = FunctionTarget(self.symid, new_table, node, self.errbox)
         self.manager.preprocess_block(func_target)
 
     def infer_argument(self, argument: Argument):
@@ -230,7 +243,7 @@ class InferVisitor(BaseVisitor):
             self.recorder.reset_ret_val()
             return
         if num == 0 and not is_none(ret_annotation):
-            self.err_maker.add_err(ReturnValueExpected(node))
+            self.errbox.add_err(ReturnValueExpected(node))
 
     def visit_Return(self, node: ast.Return):
         self.cond_infer.accept(node)
@@ -244,9 +257,9 @@ class InferVisitor(BaseVisitor):
     ):
         if not type_consistent(annotation, ret_type):
             if is_none(ret_type):
-                self.err_maker.add_err(ReturnValueExpected(ret_node))
+                self.errbox.add_err(ReturnValueExpected(ret_node))
             else:
-                self.err_maker.add_err(
+                self.errbox.add_err(
                     IncompatibleReturnType(ret_node.value, annotation, ret_type)
                 )
 
@@ -260,7 +273,7 @@ class InferVisitor(BaseVisitor):
             if self.cond_infer.detect_break():
                 index = stmt_list.index(stmt)
                 if not ignore_error:
-                    self.err_maker.generate_code_unreachable_error(stmt_list[index:])
+                    self.generate_code_unreachable_error(stmt_list[index:])
                 break
             self.visit(stmt)
 
@@ -270,7 +283,7 @@ class InferVisitor(BaseVisitor):
         if not self.cond_infer.rejected():
             self.accept_condition_stmt_list(stmt_list, condition_type)
         else:
-            self.err_maker.generate_code_unreachable_error(stmt_list)
+            self.generate_code_unreachable_error(stmt_list)
 
     @contextmanager
     def visit_condition(self, node):
@@ -339,7 +352,7 @@ class InferVisitor(BaseVisitor):
         if is_any(container):
             return False
         if container.bindlist is None:
-            self.err_maker.add_err(NonIterative(node, container))
+            self.errbox.add_err(NonIterative(node, container))
             return False
         return True
 
@@ -358,7 +371,7 @@ class InferStarter:
             infer_visitor = InferVisitor(
                 target.ast,
                 target.module_ins,
-                target.mbox,
+                target.errbox,
                 symid,
                 self.config,
                 self.manager,

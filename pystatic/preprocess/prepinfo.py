@@ -1,6 +1,6 @@
 from pystatic.reach import Reach
 from typing import Dict, Set, Final
-from pystatic.message.errorcode import *
+from pystatic.error.errorcode import *
 from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
 from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
@@ -14,7 +14,7 @@ from pystatic.symtable import (
     FunctionSymTable,
 )
 from pystatic.result import Result
-from pystatic.message.messagebox import MessageBox
+from pystatic.error.errorbox import ErrorBox
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -37,13 +37,13 @@ class PrepInfo:
         symtable: "SymTable",
         enclosing: Optional["PrepInfo"],
         env: "PrepEnvironment",
-        mbox: "MessageBox",
+        errbox: "ErrorBox",
         is_special: bool,
         outside: Optional[Set[str]] = None,
     ):
         self.enclosing = enclosing
         self.is_special = is_special
-        self.mbox = mbox
+        self.errbox = errbox
 
         self.cls: Dict[str, "prep_cls"] = {}
         self.local: Dict[str, "prep_local"] = {}
@@ -64,21 +64,21 @@ class PrepInfo:
         return self.symtable.glob_symid
 
     def new_cls_prepinfo(self, symtable: "SymTable"):
-        return PrepInfo(symtable, self, self.env, self.mbox, False)
+        return PrepInfo(symtable, self, self.env, self.errbox, False)
 
-    def add_cls_def(self, node: ast.ClassDef, mbox: "MessageBox"):
+    def add_cls_def(self, node: ast.ClassDef, errbox: "ErrorBox"):
         clsname = node.name
         if (old_def := self.cls.get(clsname)) :
-            mbox.add_err(SymbolRedefine(node, clsname, old_def.defnode))
+            errbox.add_err(SymbolRedefine(node, clsname, old_def.defnode))
             setattr(node, "reach", Reach.REDEFINE)
             return old_def.prepinfo
 
         # definition priority: class > function > local symbol
         if (old_def := self.local.get(clsname)) :
-            mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
+            errbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
             self.local.pop(clsname)
         elif (old_def := self.func.get(clsname)) :
-            mbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
+            errbox.add_err(VarTypeCollide(node, clsname, old_def.defnode))
             setattr(old_def.defnode, "reach", Reach.REDEFINE)
             self.func.pop(clsname)
 
@@ -97,23 +97,23 @@ class PrepInfo:
         self.symtable.add_entry(clsname, Entry(clstemp.get_default_typetype(), node))
         return new_prepinfo
 
-    def add_func_def(self, node: ast.FunctionDef, mbox: "MessageBox"):
+    def add_func_def(self, node: ast.FunctionDef, errbox: "ErrorBox"):
         name = node.name
         if name in self.func:
             # name collision of different function is checked later
             self.func[name].defnodes.append(node)
         else:
             if (old_def := self.cls.get(name)) :
-                mbox.add_err(VarTypeCollide(old_def.defnode, name, node))
+                errbox.add_err(VarTypeCollide(old_def.defnode, name, node))
                 setattr(node, "reach", Reach.REDEFINE)
                 return
             elif (old_def := self.local.get(name)) :
-                mbox.add_err(VarTypeCollide(node, name, old_def.defnode))
+                errbox.add_err(VarTypeCollide(node, name, old_def.defnode))
                 self.local.pop(name)
 
             self.func[name] = prep_func(self, node)
 
-    def add_local_def(self, node: AssignNode, is_method: bool, mbox: "MessageBox"):
+    def add_local_def(self, node: AssignNode, is_method: bool, errbox: "ErrorBox"):
         def is_strong_def(node: AssignNode):
             """If a assignment has annotations or type_comments, then it's a strong
             definition.
@@ -142,17 +142,17 @@ class PrepInfo:
                         return
                 # NOTE: local_def finally added here
                 if (old_def := self.cls.get(name)) :
-                    mbox.add_err(VarTypeCollide(old_def.defnode, name, defnode))
+                    errbox.add_err(VarTypeCollide(old_def.defnode, name, defnode))
                     return
                 elif (old_def := self.func.get(name)) :
-                    mbox.add_err(SymbolRedefine(defnode, name, old_def.defnode))
+                    errbox.add_err(SymbolRedefine(defnode, name, old_def.defnode))
                     return
                 elif (old_def := self.local.get(name)) :
                     if is_strong_def(defnode):
                         old_astnode = old_def.defnode
                         if is_strong_def(old_astnode):
                             # variable defined earlier with type annotation
-                            mbox.add_err(SymbolRedefine(defnode, name, old_astnode))
+                            errbox.add_err(SymbolRedefine(defnode, name, old_astnode))
                             return
                     else:
                         return  # variable has already been defined
@@ -292,11 +292,11 @@ class PrepFunctionInfo(PrepInfo):
         symtable: "FunctionSymTable",
         enclosing: Optional["PrepInfo"],
         env: "PrepEnvironment",
-        mbox: "MessageBox",
+        errbox: "ErrorBox",
         is_special: bool,
         outside: Optional[Set[str]],
     ):
-        super().__init__(symtable, enclosing, env, mbox, is_special, outside=outside)
+        super().__init__(symtable, enclosing, env, errbox, is_special, outside=outside)
         if not self.outside:
             self.outside = set(symtable.param.get_arg_namelist())
         else:
@@ -310,11 +310,11 @@ class PrepMethodInfo(PrepFunctionInfo):
         symtable: "FunctionSymTable",
         enclosing: Optional["PrepInfo"],
         env: "PrepEnvironment",
-        mbox: "MessageBox",
+        errbox: "ErrorBox",
         is_special: bool,
         outside: Optional[Set[str]],
     ):
-        super().__init__(symtable, enclosing, env, mbox, is_special, outside)
+        super().__init__(symtable, enclosing, env, errbox, is_special, outside)
         self.clstemp = clstemp
         self.var_attr: Dict[str, "prep_local"] = {}
 

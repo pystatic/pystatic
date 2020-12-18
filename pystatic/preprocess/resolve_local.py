@@ -100,4 +100,4 @@ def resolve_local(local: "prep_local", shallow: bool):
         local.stage = PREP_COMPLETE
 
     if not shallow:
-        eval_res.option_ins.dump_to_box(local.def_prepinfo.mbox)
+        eval_res.option_ins.dump_to_box(local.def_prepinfo.errbox)

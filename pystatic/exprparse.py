@@ -1,7 +1,7 @@
 import contextlib
 from typing import Protocol
 from pystatic.visitor import NoGenVisitor
-from pystatic.evalutil import ApplyArgs
+from pystatic.evalutil import ApplyArgs, WithAst, GetItemArgs
 from pystatic.predefined import *
 
 

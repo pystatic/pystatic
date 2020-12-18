@@ -1,8 +1,8 @@
 from typing import Dict, Deque, Set
 from collections import deque
 from pystatic.preprocess.prepinfo import PrepDef
-from pystatic.message.messagebox import MessageBox
-from pystatic.message.errorcode import *
+from pystatic.error.errorbox import ErrorBox
+from pystatic.error.errorcode import *
 
 
 class _Node:
@@ -17,7 +17,7 @@ class _Node:
         self.dependency.add(node)
 
 
-def _resolve_loop(cur_node: _Node, added: set, nodelist: List[_Node], mbox: MessageBox):
+def _resolve_loop(cur_node: _Node, added: set, nodelist: List[_Node], errbox: ErrorBox):
     added.add(cur_node)
     nodelist.append(cur_node)
     for next_node in cur_node.dependency:
@@ -34,26 +34,26 @@ def _resolve_loop(cur_node: _Node, added: set, nodelist: List[_Node], mbox: Mess
                     loop_ref_list.append((glob_symid, nodelist[i].prepdef.defnode))
                     if nodelist[i] == next_node:
                         break
-            mbox.add_err(ReferenceLoop(loop_ref_list))
+            errbox.add_err(ReferenceLoop(loop_ref_list))
 
         else:
-            _resolve_loop(next_node, added, nodelist, mbox)
+            _resolve_loop(next_node, added, nodelist, errbox)
         next_node.indeg -= 1
     added.remove(cur_node)
     nodelist.pop()
 
 
-def resolve_loop(cur_node: _Node, mbox: MessageBox):
+def resolve_loop(cur_node: _Node, errbox: ErrorBox):
     added = set()
     nodelist = []
-    _resolve_loop(cur_node, added, nodelist, mbox)
+    _resolve_loop(cur_node, added, nodelist, errbox)
 
 
 class DependencyGraph:
-    def __init__(self, mbox: "MessageBox") -> None:
+    def __init__(self, errbox: "ErrorBox") -> None:
         self._nodes: List["_Node"] = []
         self._mapping: Dict["PrepDef", _Node] = {}
-        self.mbox = mbox
+        self.errbox = errbox
 
     def lookup(self, prepdef: "PrepDef"):
         if prepdef not in self._mapping:
@@ -93,6 +93,6 @@ class DependencyGraph:
 
         for node in self._nodes:
             if node.indeg != 0:
-                resolve_loop(node, self.mbox)
+                resolve_loop(node, self.errbox)
 
         return res

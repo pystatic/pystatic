@@ -54,7 +54,7 @@ if False or False:
 
 # error condition
 if unknown:  # E Cannot determine type of 'unknown'(unresolved reference 'unknown')
-    a = 1  # E This code is unreachable
+    a = 1
 t: int = 1
 
 if True:

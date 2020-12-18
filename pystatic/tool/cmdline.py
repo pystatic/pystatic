@@ -4,7 +4,7 @@ from os.path import isdir
 from typing import Optional, List
 from pystatic.config import Config
 from pystatic.manager import Manager
-from pystatic.message.messagebox import MessageBox
+from pystatic.error.errorbox import ErrorBox
 import pystatic.tool.stubgen as stubgen
 import pystatic.tool.shell as shell
 import pystatic.tool.instaviz.web as web
@@ -60,14 +60,14 @@ def cmdline_main():
         web.run(config, cmd_res.module)
     else:
         manager = Manager(config)
-        cmdline_mbox = MessageBox("cmdline")
         if not cmd_res.module:
             print("please enter module path or package path")
             return
 
+        cmdline_errbox = ErrorBox("__CMDLINE__")
         for mod in cmd_res.module:
             add_result = manager.add_check_file(mod)
-            add_result.dump_to_box(cmdline_mbox)
+            add_result.dump_to_box(cmdline_errbox)
 
         manager.preprocess()
         manager.infer()
@@ -76,9 +76,9 @@ def cmdline_main():
             print(f"{err}")
 
         for mod in cmd_res.module:
-            mbox = manager.get_mbox(mod)
+            errbox = manager.get_mbox(mod)
 
-            for err in mbox.to_message():
+            for err in errbox.to_message():
                 print(f"{err}")
 
 

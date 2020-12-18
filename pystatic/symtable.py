@@ -2,7 +2,7 @@ import enum
 from pystatic.symid import symid2list
 from typing import Dict
 from pystatic.result import Result
-from pystatic.message.errorcode import *
+from pystatic.error.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager

@@ -1,6 +1,6 @@
 import copy
 import itertools
-from pystatic.message.errorcode import *
+from pystatic.error.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns

@@ -1,9 +1,8 @@
+from enum import Enum
 from typing import Dict
 from pystatic.exprparse import eval_expr
 from pystatic.result import Result
-from pystatic.message.errormaker import ErrorMaker
 from pystatic.predefined import TypeLiteralIns
-from pystatic.message.errorcode import *
 from pystatic.config import Config
 from pystatic.infer.staticinfer import cmp_by_op
 from pystatic.infer.recorder import SymbolRecorder, StoredType
@@ -11,6 +10,16 @@ from pystatic.visitor import BaseVisitor
 from pystatic.reach import Reach, cal_neg, is_true
 from pystatic.TypeCompatible.simpleType import type_consistent
 from pystatic.typesys import TypeIns
+from pystatic.error.errorbox import ErrorBox
+from pystatic.error.errorcode import *
+
+
+def level_error_in_result(result: Result):
+    if result.errors:
+        for err in result.errors:
+            if err.level == Level.ERROR:
+                return True
+    return False
 
 
 class ConditionStmtType(Enum):
@@ -36,12 +45,15 @@ class Condition:
 
 class ConditionInfer(BaseVisitor):
     def __init__(
-        self, recorder: SymbolRecorder, err_maker: ErrorMaker, config: Config
+        self,
+        recorder: SymbolRecorder,
+        errbox: ErrorBox,
+        config: Config,
     ) -> None:
         super().__init__()
         self.recorder = recorder
         self.reach_map: Dict[ast.stmt, Reach] = {}
-        self.err_maker = err_maker
+        self.errbox = errbox
         self.config = config
         self.reach_stack: List[Condition] = [
             Condition(ConditionStmtType.GLOBAL, Reach.ALWAYS_TRUE)
@@ -50,6 +62,10 @@ class ConditionInfer(BaseVisitor):
         self.break_node: Optional[ast.stmt] = None
         self.isinstance_cond = False
         self.temp_type: Dict[str, StoredType] = {}
+
+    def dump_result(self, result: Result):
+        result.dump_to_box(self.errbox)
+        return result.value
 
     @property
     def cur_condition(self):
@@ -162,8 +178,8 @@ class ConditionInfer(BaseVisitor):
 
     def visit_isinstance(self, node: ast.Call) -> Reach:
         args = node.args
-        first_type = self.err_maker.dump_result(eval_expr(args[0], self.recorder))
-        second_typetype = self.err_maker.dump_result(eval_expr(args[1], self.recorder))
+        first_type = self.dump_result(eval_expr(args[0], self.recorder))
+        second_typetype = self.dump_result(eval_expr(args[1], self.recorder))
         result = second_typetype.call(None, node)
         name = args[0].id
         if result.haserr():
@@ -188,7 +204,7 @@ class ConditionInfer(BaseVisitor):
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
         result: Result = eval_expr(test, self.recorder)
-        literal_ins: TypeLiteralIns = self.err_maker.dump_result(result)
+        literal_ins: TypeLiteralIns = self.dump_result(result)
         if result.haserr():
             return self.dispose_error_condition(result)
         if literal_ins.value:
@@ -242,7 +258,7 @@ class ConditionInfer(BaseVisitor):
         if test.id == "TYPE_CHECKING":
             return Reach.TYPE_TRUE
         result: Result = eval_expr(test, self.recorder)
-        tp = self.err_maker.dump_result(result)
+        tp = self.dump_result(result)
         if result.haserr():
             return self.dispose_error_condition(result)
         if isinstance(tp, TypeLiteralIns):
@@ -268,11 +284,11 @@ class ConditionInfer(BaseVisitor):
     ) -> Reach:
         # TODO: modify after eval_expr suppose compare
         result: Result = eval_expr(left, self.recorder)
-        left_tp = self.err_maker.dump_result(result)
+        left_tp = self.dump_result(result)
         if result.haserr():
             return self.dispose_error_condition(result)
         result = eval_expr(right, self.recorder)
-        right_tp = self.err_maker.dump_result(result)
+        right_tp = self.dump_result(result)
         if result.haserr():
             return self.dispose_error_condition(result)
         if self.is_cmp_between_constant(left_tp, right_tp):
@@ -280,8 +296,8 @@ class ConditionInfer(BaseVisitor):
         else:
             return Reach.UNKNOWN
 
-    def dispose_error_condition(self, option: Result) -> Reach:
-        if self.err_maker.level_error_in_result(option):
+    def dispose_error_condition(self, result: Result) -> Reach:
+        if level_error_in_result(result):
             return Reach.ALWAYS_FALSE
         else:
             return Reach.UNKNOWN

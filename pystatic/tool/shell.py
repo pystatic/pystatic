@@ -1,5 +1,5 @@
 import ast
-from pystatic.message.messagebox import MessageBox
+from pystatic.error.errorbox import ErrorBox
 from pystatic.target import Stage, Target
 from pystatic.symtable import SymTable
 from pystatic.manager import Manager
@@ -92,9 +92,9 @@ class Shell:
             self.symid, None, None, builtins_symtable, self.manager, TableScope.GLOB
         )
         self.symtable.glob = self.symtable
-        self.mbox = MessageBox(self.symid)
+        self.errbox = ErrorBox(self.symid)
         self.target = Target(
-            self.symid, self.symtable, self.mbox, "", False, Stage.FINISH
+            self.symid, self.symtable, self.errbox, "", False, Stage.FINISH
         )
         self.manager.add_check_target(self.target)
 
@@ -129,10 +129,10 @@ class Shell:
                         self.manager.recheck(self.symid, False)
                         self.manager.preprocess()
 
-                        for err in self.mbox.error:
+                        for err in self.errbox.error:
                             print(err)
 
-                        self.mbox.clear()
+                        self.errbox.clear()
 
                     except SyntaxError as e:
                         print(e)

@@ -10,7 +10,7 @@ from pystatic.preprocess.prepinfo import *
 def get_definition(target: "BlockTarget", env: "PrepEnvironment"):
     # TODO: seperate function block target and target
     cur_ast = target.ast
-    cur_mbox = target.mbox
+    cur_mbox = target.errbox
     symtable = target.symtable
     symid = target.symid
 
@@ -33,7 +33,7 @@ def get_definition(target: "BlockTarget", env: "PrepEnvironment"):
 
 def get_definition_in_function(target: "FunctionTarget", env: "PrepEnvironment"):
     cur_ast = target.ast
-    cur_mbox = target.mbox
+    cur_mbox = target.errbox
     assert isinstance(cur_ast, ast.FunctionDef)
 
     new_prepinfo = PrepFunctionInfo(target.symtable, None, env, cur_mbox, False, None)
@@ -43,7 +43,7 @@ def get_definition_in_function(target: "FunctionTarget", env: "PrepEnvironment")
 
 def get_definition_in_method(target: "MethodTarget", env: "PrepEnvironment"):
     cur_ast = target.ast
-    cur_mbox = target.mbox
+    cur_mbox = target.errbox
     assert isinstance(cur_ast, ast.FunctionDef)
 
     new_prepinfo = PrepMethodInfo(
@@ -60,12 +60,12 @@ class TypeDefVisitor(BaseVisitor):
         self,
         env: "PrepEnvironment",
         prepinfo: "PrepInfo",
-        mbox: "MessageBox",
+        errbox: "ErrorBox",
         is_method=False,
     ) -> None:
         super().__init__()
         self.prepinfo = prepinfo
-        self.mbox = mbox
+        self.errbox = errbox
         self.env = env
         self.glob_symid = prepinfo.symtable.glob.symid  # the module's symid
         self.is_method = is_method
@@ -92,13 +92,13 @@ class TypeDefVisitor(BaseVisitor):
 
     def visit_Assign(self, node: ast.Assign):
         # TODO: here pystatic haven't add redefine warning and check consistence
-        self.prepinfo.add_local_def(node, self.is_method, self.mbox)
+        self.prepinfo.add_local_def(node, self.is_method, self.errbox)
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        self.prepinfo.add_local_def(node, self.is_method, self.mbox)
+        self.prepinfo.add_local_def(node, self.is_method, self.errbox)
 
     def visit_ClassDef(self, node: ast.ClassDef):
-        new_prepinfo = self.prepinfo.add_cls_def(node, self.mbox)
+        new_prepinfo = self.prepinfo.add_cls_def(node, self.errbox)
         # enter class scope
         with self.enter_class(new_prepinfo):
             for body in node.body:
@@ -113,7 +113,7 @@ class TypeDefVisitor(BaseVisitor):
         self.prepinfo.add_import_def(node, infolist)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.prepinfo.add_func_def(node, self.mbox)
+        self.prepinfo.add_func_def(node, self.errbox)
 
     def visit_If(self, node: ast.If):
         reach_res = static_infer(node.test, self.env.manager.config)

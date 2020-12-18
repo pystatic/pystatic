@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Final, Dict, Type
 from pystatic.result import Result
 from pystatic.opmap import op_char_map, op_map
-from pystatic.message.errorcode import *
+from pystatic.error.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.symtable import SymTable, FunctionSymTable

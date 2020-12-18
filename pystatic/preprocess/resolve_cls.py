@@ -6,7 +6,7 @@ from pystatic.target import MethodTarget
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.predefined import TypeGenericTemp, TypeVarIns, TypeFuncIns
 from pystatic.visitor import BaseVisitor
-from pystatic.message.messagebox import MessageBox
+from pystatic.error.errorbox import ErrorBox
 from pystatic.symtable import TableScope
 from pystatic.arg import Argument
 from pystatic.preprocess.resolve_func import resolve_func_template
@@ -17,13 +17,13 @@ from pystatic.preprocess.prepinfo import *
 def resolve_cls(clsdef: "prep_cls", shallow: bool):
     # resolve super classes
     clstemp = clsdef.clstemp
-    mbox = clsdef.def_prepinfo.mbox
+    errbox = clsdef.def_prepinfo.errbox
     clstemp.baseclass = []
     is_generic = True
     for base_node in clsdef.defnode.bases:
         base_res = eval_preptype(base_node, clsdef.prepinfo, False, shallow)
         res_type = base_res.option_ins.value
-        base_res.option_ins.dump_to_box(mbox)
+        base_res.option_ins.dump_to_box(errbox)
 
         if res_type == any_ins:
             continue
@@ -36,23 +36,23 @@ def resolve_cls(clsdef: "prep_cls", shallow: bool):
                 if res_ins.temp == old_ins.temp:
                     is_new = False
                     if not shallow:
-                        mbox.add_err(DuplicateBaseclass(base_node))
+                        errbox.add_err(DuplicateBaseclass(base_node))
                     break
             if is_new:
                 clstemp.baseclass.append(res_type.get_default_ins())
         is_generic = is_generic or base_res.generic
 
     if not shallow:
-        resolve_cls_placeholder(clsdef, clsdef.def_prepinfo.mbox)
+        resolve_cls_placeholder(clsdef, clsdef.def_prepinfo.errbox)
 
     if not shallow or not is_generic:
         clsdef.stage = PREP_COMPLETE
 
 
-def resolve_cls_placeholder(clsdef: "prep_cls", mbox: "MessageBox"):
+def resolve_cls_placeholder(clsdef: "prep_cls", errbox: "ErrorBox"):
     """Resolve placeholders of a class"""
     clstemp = clsdef.clstemp
-    visitor = _TypeVarVisitor(clsdef.prepinfo, mbox)
+    visitor = _TypeVarVisitor(clsdef.prepinfo, errbox)
     for base_node in clsdef.defnode.bases:
         visitor.accept(base_node)
 
@@ -65,11 +65,11 @@ class _TypeVarVisitor(BaseVisitor):
     Used to generate correct placeholders.
     """
 
-    def __init__(self, prepinfo: "PrepInfo", mbox: "MessageBox") -> None:
+    def __init__(self, prepinfo: "PrepInfo", errbox: "ErrorBox") -> None:
         self.prepinfo = prepinfo
         self.typevars: List["TypeVarIns"] = []
         self.generic_tpvars: List["TypeVarIns"] = []
-        self.mbox = mbox
+        self.errbox = errbox
         self.in_gen = False
 
         self.met_gen = False
@@ -113,14 +113,14 @@ class _TypeVarVisitor(BaseVisitor):
         name_result = self.prepinfo.getattribute(node.id, node)
         if isinstance(name_result.value, TypeVarIns):
             self.add_tpvar(name_result.value)
-        name_result.dump_to_box(self.mbox)
+        name_result.dump_to_box(self.errbox)
         return name_result.value
 
     def visit_Attribute(self, node: ast.Attribute):
         left_value = self.visit(node.value)
         assert isinstance(left_value, TypeIns)
         result = left_value.getattribute(node.attr, node)
-        result.dump_to_box(self.mbox)
+        result.dump_to_box(self.errbox)
         res = result.value
         if isinstance(res, TypeVarIns):
             self.add_tpvar(res)
@@ -139,7 +139,7 @@ class _TypeVarVisitor(BaseVisitor):
 
 
 def resolve_cls_method(
-    prepinfo: "PrepInfo", env: "PrepEnvironment", mbox: "MessageBox"
+    prepinfo: "PrepInfo", env: "PrepEnvironment", errbox: "ErrorBox"
 ):
     # TODO: symid here is not set correctly
     manager = env.manager
@@ -149,7 +149,7 @@ def resolve_cls_method(
     while len(queue):
         cur_prepinfo = queue.popleft()
         for clsdef in cur_prepinfo.cls.values():
-            method_targets = _resolve_cls_method(clsdef, mbox)
+            method_targets = _resolve_cls_method(clsdef, errbox)
             for blk_target in method_targets:
                 # NOTE: here we add the target directly to the queue
                 # that get around manager, which may be problematic
@@ -160,7 +160,7 @@ def resolve_cls_method(
                         blk_target.symtable,
                         cur_prepinfo,
                         env,
-                        cur_prepinfo.mbox,
+                        cur_prepinfo.errbox,
                         False,
                         None,
                     ),
@@ -171,7 +171,7 @@ def resolve_cls_method(
                 queue.append(subclsdef.prepinfo)
 
 
-def _resolve_cls_method(clsdef: "prep_cls", mbox: "MessageBox") -> List[MethodTarget]:
+def _resolve_cls_method(clsdef: "prep_cls", errbox: "ErrorBox") -> List[MethodTarget]:
     targets = []  # method targets that need to be preprocessed
     clstemp = clsdef.clstemp
     symid = clstemp.name
@@ -197,7 +197,7 @@ def _resolve_cls_method(clsdef: "prep_cls", mbox: "MessageBox") -> List[MethodTa
             argument.args[0].ann = clstemp.get_default_typetype()
         elif not is_staticmethod:
             default_ins_result = clstemp.get_default_ins()
-            default_ins_result.dump_to_box(mbox)
+            default_ins_result.dump_to_box(errbox)
             argument.args[0].ann = default_ins_result.value
 
     def add_func_def(
@@ -214,7 +214,7 @@ def _resolve_cls_method(clsdef: "prep_cls", mbox: "MessageBox") -> List[MethodTa
         if not is_staticmethod:
             symtb = func_ins.get_inner_symtable()
             method_symid = ".".join([symid, name])
-            targets.append(MethodTarget(method_symid, symtb, clstemp, node, mbox))
+            targets.append(MethodTarget(method_symid, symtb, clstemp, node, errbox))
 
         return func_ins
 
@@ -226,6 +226,6 @@ def _resolve_cls_method(clsdef: "prep_cls", mbox: "MessageBox") -> List[MethodTa
         ins.add_overload(args, ret)
 
     for func in clsdef.prepinfo.func.values():
-        resolve_func_template(func, add_func_def, add_func_overload, mbox)
+        resolve_func_template(func, add_func_def, add_func_overload, errbox)
 
     return targets

@@ -1,67 +1,49 @@
 import ast
-from enum import Enum
-from typing import Sequence, Tuple, Optional, TYPE_CHECKING, Union, List
+from pystatic.error.position import ast_to_position
+from typing import Sequence, Tuple, Optional, TYPE_CHECKING, Union, List, Protocol
+from pystatic.error.level import Level
+from pystatic.error.message import Message, PositionMessage
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
     from pystatic.fsys import FilePath
     from pystatic.symid import SymId
+    from pystatic.error.errorbox import ErrorBox
 
 
-class Level(Enum):
-    HINT = 1  # code unreachable
-    WARN = 2  # type error
-    ERROR = 3  # will cause runtime error
+MANAGER_TAG = "__MANAGER_TAG__"
 
 
-class Message(object):
-    """Message
+class Sendable(Protocol):
+    def send(self, tag: str, msg: Message):
+        ...
 
-    from_node: generate an error message for the position implied by the node
-    """
 
-    def __init__(
-        self,
-        lineno: int,
-        end_lineno: Optional[int],
-        col_offset: int,
-        end_col_offset: Optional[int],
-        msg: str,
-    ):
-        self.lineno = lineno
-        self.end_lineno: int = end_lineno if end_lineno else lineno
-        self.col_offset = col_offset
-        self.end_col_offset: int = end_col_offset if end_col_offset else col_offset
-        self.msg = msg
-
-    @classmethod
-    def from_node(cls, node: ast.AST, msg: str):
-        return cls(
-            node.lineno, node.end_lineno, node.col_offset, node.end_col_offset, msg
-        )
-
-    def __lt__(self, other):
-        """used for sort"""
-        return (self.lineno, self.col_offset, self.end_lineno, self.end_col_offset) < (
-            other.lineno,
-            other.col_offset,
-            other.end_lineno,
-            other.end_col_offset,
-        )
-
-    def __str__(self):
-        return f"line {self.lineno} col {self.col_offset}: " + self.msg
+class HasTag(Protocol):
+    tag: str
 
 
 class ErrorCode:
-    def __init__(self):
-        self.level = Level.ERROR
+    __slots__ = ["level", "node"]
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def __init__(self, level: Level, node: Optional[ast.AST]):
+        self.level = level
+        self.node = node
+
+    def to_string(self) -> str:
         ...
 
+    def send_message(self, box: HasTag, mailman: Sendable):
+        if self.node:
+            msg = PositionMessage(
+                self.level, ast_to_position(self.node), self.to_string()
+            )
+        else:
+            msg = Message(self.level, self.to_string())
+        mailman.send(box.tag, msg)
+
     @staticmethod
-    def concat_msg(review: str, detail: str):
+    def concat_msg(review: str, detail: str) -> str:
         msg = review + "(" + detail + ")"
         return msg
 
@@ -72,31 +54,26 @@ class IncompatibleTypeInAssign(ErrorCode):
     def __init__(
         self, node: Optional[ast.AST], expect_type: "TypeIns", expr_type: "TypeIns"
     ):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.WARN, node)
         self.expect_type = expect_type
         self.expr_type = expr_type
-        self.level = Level.WARN
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         review = self.template
         detail = f"expression has type '{self.expr_type}', variable has type '{self.expect_type}'"
-        return self.node, self.concat_msg(review, detail)
+        return self.concat_msg(review, detail)
 
 
 class SymbolUndefined(ErrorCode):
     template = "Cannot determine type of '{}'"
 
     def __init__(self, node: Optional[ast.AST], name: str):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.WARN, node)
         self.name = name
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        review = self.template.format(self.name)
+    def to_string(self) -> str:
         detail = f"unresolved reference '{self.name}'"
-        return self.node, self.concat_msg(review, detail)
+        return self.concat_msg(self.template.format(self.name), detail)
 
 
 class SymbolRedefine(ErrorCode):
@@ -105,79 +82,70 @@ class SymbolRedefine(ErrorCode):
     def __init__(
         self, node: Optional[ast.AST], name: str, old_node: Optional[ast.AST]
     ) -> None:
-        super().__init__()
-        self.node = node
+        super().__init__(Level.WARN, node)
         self.name = name
         self.old_node = old_node
-        self.level = Level.WARN
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         review = self.template.format(self.name)
         if self.old_node:
             detail = f"{self.name} previously defined at line {self.old_node.lineno}"
-            return self.node, self.concat_msg(review, detail)
+            return self.concat_msg(review, detail)
         else:
-            return self.node, review
+            return review
 
 
 class IndiceParamNotClass(ErrorCode):
     template = "Expect a class type"
 
     def __init__(self, node: Optional[ast.AST]) -> None:
-        super().__init__()
-        self.node = node
-        self.level = Level.ERROR
+        super().__init__(Level.WARN, node)
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template
+    def to_string(self) -> str:
+        return self.template
 
 
 class IndiceParamNumberMismatch(ErrorCode):
     template = "receive {} but require {} argument(s)"
 
     def __init__(self, receive: int, arity: int, node: Optional[ast.AST]):
+        super().__init__(Level.ERROR, node)
         self.receive = receive
         self.arity = arity
-        self.node = node
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template.format(self.receive, self.arity)
+    def to_string(self) -> str:
+        return self.template.format(self.receive, self.arity)
 
 
 class IndiceGeneralError(ErrorCode):
     def __init__(self, msg: str, node: Optional[ast.AST]):
-        super().__init__()
+        super().__init__(Level.ERROR, node)
         self.msg = msg
-        self.node = node
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.msg
+    def to_string(self) -> str:
+        return self.msg
 
 
 class NotSubscriptable(ErrorCode):
     template = "type '{}' is not subscriptable"
 
     def __init__(self, inable_type: "TypeIns", node: Optional[ast.AST]) -> None:
-        super().__init__()
-        self.node = node
+        super().__init__(Level.ERROR, node)
         self.inable_type = inable_type
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template.format(self.inable_type)
+    def to_string(self) -> str:
+        return self.template.format(self.inable_type)
 
 
 class NotCallable(ErrorCode):
     template = "{} is not callable"
 
     def __init__(self, inable_type: "TypeIns", node: Optional[ast.AST]):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.ERROR, node)
         self.inable_type = inable_type
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template.format(self.inable_type)
+    def to_string(self) -> str:
+        return self.template.format(self.inable_type)
 
 
 class OperationNotSupported(ErrorCode):
@@ -186,13 +154,12 @@ class OperationNotSupported(ErrorCode):
     template = "{} is not supported in {}"
 
     def __init__(self, op_str: str, typeins: "TypeIns", node: Optional[ast.AST]):
-        super().__init__()
+        super().__init__(Level.ERROR, node)
         self.op_str = op_str
         self.typeins = typeins
-        self.node = node
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template.format(self.op_str, self.typeins)
+    def to_string(self) -> str:
+        return self.template.format(self.op_str, self.typeins)
 
 
 class VarTypeCollide(ErrorCode):
@@ -208,13 +175,11 @@ class VarTypeCollide(ErrorCode):
         name: str,
         varnode: Optional[ast.AST],
     ) -> None:
-        super().__init__()
+        super().__init__(Level.WARN, varnode)
         self.previledge_node = previlege_node
-        self.node = varnode
         self.name = name
-        self.level = Level.WARN
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         review = self.template.format(self.name)
         if self.previledge_node:
             if isinstance(self.previledge_node, ast.ClassDef):
@@ -222,9 +187,9 @@ class VarTypeCollide(ErrorCode):
             else:
                 assert isinstance(self.previledge_node, ast.FunctionDef)
                 detail = f"{self.name} defined as a function at line {self.previledge_node.lineno}"
-            return self.node, self.concat_msg(review, detail)
+            return self.concat_msg(review, detail)
         else:
-            return self.node, review
+            return review
 
 
 class IncompatibleReturnType(ErrorCode):
@@ -233,16 +198,14 @@ class IncompatibleReturnType(ErrorCode):
     def __init__(
         self, node: Optional[ast.AST], expect_type: "TypeIns", ret_type: "TypeIns"
     ):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.WARN, node)
         self.expect_type = expect_type
         self.ret_type = ret_type
-        self.level = Level.WARN
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         review = self.template
         detail = f"expected '{self.expect_type}', got '{self.ret_type}'"
-        return self.node, self.concat_msg(review, detail)
+        return self.concat_msg(review, detail)
 
 
 class IncompatibleArgument(ErrorCode):
@@ -251,101 +214,91 @@ class IncompatibleArgument(ErrorCode):
     def __init__(
         self, node: ast.AST, param_name: str, param_type: "TypeIns", arg_type: "TypeIns"
     ):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.WARN, node)
         self.param_name = param_name
         self.param_type = param_type
         self.arg_type = arg_type
-        self.level = Level.WARN
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         review = self.template.format(self.param_name)
         detail = f"get '{self.arg_type}', expect '{self.param_type}'"
-        return self.node, self.concat_msg(review, detail)
+        return self.concat_msg(review, detail)
 
 
 class TooFewArgument(ErrorCode):
     template = "Too few arguments"
 
     def __init__(self, node: Optional[ast.AST], missing_names: List[str]):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.ERROR, node)
         assert missing_names
         self.missing_names = missing_names
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         detail = f"missing " + ", ".join(self.missing_names)
-        return self.node, self.concat_msg(self.template, detail)
+        return self.concat_msg(self.template, detail)
 
 
 class TooMoreArgument(ErrorCode):
     template = "Too more arguments"
 
     def __init__(self, node: Optional[ast.AST]):
-        super().__init__()
+        super().__init__(Level.ERROR, node)
         self.node = node
         self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template
+    def to_string(self) -> str:
+        return self.template
 
 
 class TooMoreValuesToUnpack(ErrorCode):
     template = "Too more values to unpack"
 
     def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.ERROR, node)
         self.expected_num = expected_num
         self.got_num = got_num
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         detail = f"expected {self.expected_num}, got {self.got_num}"
-        return self.node, self.concat_msg(self.template, detail)
+        return self.concat_msg(self.template, detail)
 
 
 class NeedMoreValuesToUnpack(ErrorCode):
     template = "Need more values to unpack"
 
     def __init__(self, node: Optional[ast.AST], expected_num: int, got_num: int):
-        super().__init__()
+        super().__init__(Level.ERROR, node)
         self.node = node
         self.expected_num = expected_num
         self.got_num = got_num
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         detail = f"expected {self.expected_num}, got {self.got_num}"
-        return self.node, self.concat_msg(self.template, detail)
+        return self.concat_msg(self.template, detail)
 
 
 class ReturnValueExpected(ErrorCode):
     template = "Return value expected"
 
     def __init__(self, node: Optional[ast.AST]):
-        super().__init__()
+        super().__init__(Level.WARN, node)
         self.node = node
         self.level = Level.WARN
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template
+    def to_string(self) -> str:
+        return self.template
 
 
 class NoAttribute(ErrorCode):
     template = "Type '{}' has no attribute '{}'"
 
     def __init__(self, node: Optional[ast.AST], target_type: "TypeIns", attr_name: str):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.WARN, node)
         self.target_type = target_type
         self.attr_name = attr_name
-        self.level = Level.WARN
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        msg = self.template.format(self.target_type, self.attr_name)
-        return self.node, msg
+    def to_string(self) -> str:
+        return self.template.format(self.target_type, self.attr_name)
 
 
 class UnsupportedBinOperand(ErrorCode):
@@ -358,42 +311,36 @@ class UnsupportedBinOperand(ErrorCode):
         left_type: "TypeIns",
         right_type: "TypeIns",
     ):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.ERROR, node)
         self.operand = operand
         self.left_type = left_type
         self.right_type = right_type
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
+    def to_string(self) -> str:
         review = self.template.format(self.operand)
         detail = f"'{self.left_type}' and {self.right_type}"
-        return self.node, self.concat_msg(review, detail)
+        return self.concat_msg(review, detail)
 
 
 class CodeUnreachable(ErrorCode):
     template = "This code is unreachable"
 
     def __init__(self, node: Optional[ast.AST]):
-        super().__init__()
-        self.node = node
-        self.level = Level.HINT
+        super().__init__(Level.HINT, node)
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template
+    def to_string(self) -> str:
+        return self.template
 
 
 class NonIterative(ErrorCode):
     template = "type '{}' is non-iterative"
 
     def __init__(self, node: Optional[ast.AST], fake_iter: "TypeIns"):
-        super().__init__()
-        self.node = node
+        super().__init__(Level.WARN, node)
         self.iter = fake_iter
-        self.level = Level.WARN
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template.format(self.iter)
+    def to_string(self) -> str:
+        return self.template.format(self.iter)
 
 
 # Class related
@@ -401,12 +348,10 @@ class DuplicateBaseclass(ErrorCode):
     template = "duplicate baseclass is not allowed"
 
     def __init__(self, node: Optional[ast.AST]) -> None:
-        super().__init__()
-        self.node = node
-        self.level = Level.ERROR
+        super().__init__(Level.ERROR, node)
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return self.node, self.template
+    def to_string(self) -> str:
+        return self.template
 
 
 # Errors that have nothing to do with type inconsistency
@@ -414,30 +359,28 @@ class FileNotFound(ErrorCode):
     template = "{} not found"
 
     def __init__(self, path: "FilePath") -> None:
-        super().__init__()
+        super().__init__(Level.ERROR, None)
         self.path = path
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return None, self.template.format(self.path)
+    def to_string(self) -> str:
+        return self.template.format(self.path)
 
 
 class ModuleNotFound(ErrorCode):
     template = "{} not found"
 
     def __init__(self, symid: "SymId") -> None:
-        super().__init__()
+        super().__init__(Level.ERROR, None)
         self.symid = symid
-        self.level = Level.ERROR
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return None, self.template.format(self.symid)
+    def to_string(self) -> str:
+        return self.template.format(self.symid)
 
 
 class ReferenceLoop(ErrorCode):
     def __init__(self, nodelist: Sequence[Tuple["SymId", ast.AST]]):
-        super().__init__()
+        super().__init__(Level.WARN, None)
         self.nodelist = nodelist
 
-    def make(self) -> Tuple[Optional[ast.AST], str]:
-        return None, ""
+    def to_string(self) -> str:
+        return ""

@@ -62,7 +62,9 @@ class Preprocessor:
             for prepinfo in prepinfo_list:
                 resolve_import(prepinfo, self.env)
 
-            resolve_order = toposort_prepdef(prepinfo_list, self.env.manager.glob_mbox)
+            resolve_order = toposort_prepdef(
+                prepinfo_list, self.env.manager.manager_errbox
+            )
             for prepdef in resolve_order:
                 resolve(prepdef, shallow=True)
 
@@ -72,7 +74,7 @@ class Preprocessor:
                 resolve(prepdef, shallow=False)
 
             for prepinfo in prepinfo_list:
-                resolve_cls_method(prepinfo, self.env, prepinfo.mbox)
+                resolve_cls_method(prepinfo, self.env, prepinfo.errbox)
                 dump_to_symtable(prepinfo)
 
             for target in to_check:

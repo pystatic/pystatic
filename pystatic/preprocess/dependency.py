@@ -2,12 +2,12 @@ from collections import deque
 from typing import Deque, List
 from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
 from pystatic.preprocess.topo import DependencyGraph
-from pystatic.message.messagebox import MessageBox
+from pystatic.error.errorbox import ErrorBox
 from pystatic.preprocess.prepinfo import *
 
 
-def toposort_prepdef(prepinfo_list: List[PrepInfo], mbox: MessageBox):
-    graph = DependencyGraph(mbox)
+def toposort_prepdef(prepinfo_list: List[PrepInfo], errbox: ErrorBox):
+    graph = DependencyGraph(errbox)
     for prepinfo in prepinfo_list:
         _first_prepdef_visitor.set_prepinfo(prepinfo)
         for cls in prepinfo.cls.values():

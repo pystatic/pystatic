@@ -1,3 +1,4 @@
+from pystatic.error.message import PositionMessage
 import sys
 
 sys.path.extend([".", ".."])
@@ -6,7 +7,7 @@ import os
 from collections import namedtuple
 from pystatic.manager import Manager
 from pystatic.config import Config
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 MsgWithLine = namedtuple("MsgWithLine", ["lineno", "msg"])
 
@@ -23,17 +24,20 @@ def error_assert(symid: str, precise: bool = True):
     manager.infer()
 
     true_msg_list = parse_file_error(path)
-    mbox = manager.get_mbox_by_symid(symid)
-    test_msg_list = mbox.to_message()
+    msg_list: List[PositionMessage] = [
+        msg
+        for msg in manager.take_messages_by_symid(symid)
+        if isinstance(msg, PositionMessage)
+    ]
 
     if precise:
-        assert len(true_msg_list) == len(test_msg_list)
-        for true_msg, test_msg in zip(true_msg_list, test_msg_list):
-            assert test_msg.lineno == true_msg.lineno
+        for true_msg, test_msg in zip(true_msg_list, msg_list):
+            assert test_msg.pos.lineno == true_msg.lineno
             assert test_msg.msg == true_msg.msg
+        assert len(true_msg_list) == len(msg_list)
     else:
         true_msg_list = [(true_msg.lineno, true_msg.msg) for true_msg in true_msg_list]
-        test_msg_list = [(test_msg.lineno, test_msg.msg) for test_msg in test_msg_list]
+        test_msg_list = [(test_msg.pos.lineno, test_msg.msg) for test_msg in msg_list]
         for true_msg in true_msg_list:
             assert true_msg in test_msg_list
 
@@ -46,7 +50,7 @@ def parse_file_error(file_path):
     lineno = 1
     for line in lines:
         line = line.strip()
-        if line.startswith('#') and not line.startswith('# E'):
+        if line.startswith("#") and not line.startswith("# E"):
             lineno += 1
             continue
         index = line.find("# E")
@@ -57,8 +61,8 @@ def parse_file_error(file_path):
     return msg_list
 
 
-def check_error_msg(mbox, true_msg_list):
-    test_msg_list = mbox.to_message()
+def check_error_msg(errbox, true_msg_list):
+    test_msg_list = errbox.to_message()
     assert len(test_msg_list) == len(true_msg_list)
     for true_msg, test_msg in zip(true_msg_list, test_msg_list):
         assert test_msg.lineno == true_msg.lineno
