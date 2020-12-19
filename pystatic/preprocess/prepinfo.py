@@ -221,7 +221,37 @@ class PrepInfo:
         self.type_alias.add(alias)
         self.symtable.add_entry(alias, Entry(typealias, defnode))
 
-    def get_prep_def(self, name: str) -> Optional[PrepDef]:
+    def get_def(
+        self, name: str, allow_impt=False
+    ) -> Union[PrepDef, "prep_impt", "TypeIns", None]:
+        """
+        Get def of a name
+
+        @return: def can be either prep_def or TypeIns
+        """
+        res = None
+        if (res := self.cls.get(name)) :
+            return res
+        elif (res := self.local.get(name)) :
+            return res
+        elif (res := self.func.get(name)) :
+            return res
+        elif (res := self.impt.get(name)) :
+            if res.value:
+                return res.value
+            elif allow_impt:
+                return res
+            else:
+                return None
+
+    def get_prep_def(self, name: str) -> Union[PrepDef, None]:
+        """
+        Get prep definition of a name
+
+        This function won't return TypeIns
+
+        @param name: symbol's name
+        """
         res = None
         if (res := self.cls.get(name)) :
             return res
@@ -361,17 +391,27 @@ class PrepEnvironment:
     def get_target_prepinfo(self, target: "BlockTarget"):
         return self.target_prepinfo.get(target)
 
-    def lookup(self, module_symid: "SymId", name: str):
+    def lookup(self, module_symid: "SymId", name: str, allow_impt=False):
+        """
+        Look up a name
+
+        This function may return prep_defs or TypeIns of the symbol.
+
+        @param name: name of the symbol
+
+        @param allow_impt: whether prep_impt of the symbol(not the definition part)
+        is allowed to return
+        """
         prepinfo = self.symid_prepinfo.get(module_symid)
         if prepinfo:
-            res = prepinfo.get_prep_def(name)
+            res = prepinfo.get_def(name, allow_impt)
             if res:
                 return res
             else:
                 for symid in prepinfo.star_import:
                     module_prepinfo = self.symid_prepinfo.get(symid)
                     if module_prepinfo:
-                        res = module_prepinfo.get_prep_def(name)
+                        res = module_prepinfo.get_def(name, allow_impt)
                         if res:
                             return res
 
@@ -444,8 +484,8 @@ class prep_local:
         self, name: str, def_prepinfo: "PrepInfo", defnode: AssignNode
     ) -> None:
         """
-        :param typenode: if typenode is None then this symbol's stage is set to
-        PREP_COMPLETE.
+        @param typenode: if typenode is None then this symbol's stage is set to
+        PREP_COMPLETE
         """
         self.name = name
         self.defnode = defnode

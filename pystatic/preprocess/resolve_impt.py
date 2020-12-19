@@ -47,13 +47,14 @@ def _resolve_import_chain(prepinfo: "PrepInfo", name: str, env: "PrepEnvironment
     while True:
         if cur_state in state_set:
             # TODO: error: import loop
+            return
             raise NotImplementedError("import loop")
 
         mod_symid = cur_state[0]  # module symid
         name_in_mod = cur_state[1]  # name in the current module
         state_set.add(cur_state)
 
-        lookup_res = env.lookup(mod_symid, name_in_mod)
+        lookup_res = env.lookup(mod_symid, name_in_mod, True)
         if lookup_res:
             if isinstance(lookup_res, prep_impt):
                 if lookup_res.value:

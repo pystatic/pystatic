@@ -334,11 +334,11 @@ class ExprParser(NoGenVisitor):
         # TODO: make this more accurate
         self.add_to_container(str_ins, node)
         return str_ins
-    
+
     def visit_Yield(self, node: ast.Yield):
         # TODO: fix this
         return any_ins
-    
+
     def visit_IfExp(self, node: ast.IfExp):
         # TODO: fix this
         return self.visit(node.body)

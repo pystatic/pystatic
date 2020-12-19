@@ -384,3 +384,14 @@ class ReferenceLoop(ErrorCode):
 
     def to_string(self) -> str:
         return ""
+
+    def send_message(self, box: HasTag, mailman: Sendable):
+        msgs = []
+        for symid, node in self.nodelist:
+            pos = ast_to_position(node)
+            msgs.append(f"({symid} line {pos.lineno} col {pos.col_offset})")
+        hint = "reference loop: " + " -> ".join(msgs)
+        for symid, node in self.nodelist:
+            mailman.send(
+                symid, PositionMessage(self.level, ast_to_position(node), hint)
+            )

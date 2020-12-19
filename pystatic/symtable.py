@@ -187,7 +187,7 @@ class SymTable:
         """
         res = self.local.get(name)
         if search_star_import and not res:
-            searched = set(self.glob_symid)
+            searched = {self.glob_symid}
             for module_symid in self.star_import:
                 if module_symid not in searched:
                     searched.add(module_symid)

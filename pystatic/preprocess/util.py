@@ -96,14 +96,20 @@ def analyse_import_stmt(
         imp_name = "." * node.level
         imp_name += node.module or ""
         module_symid = rel2abssymid(pkg_symid, imp_name)
-        imported = []
         for alias in node.names:
             attr_name = alias.name
             as_name = alias.asname or attr_name
-            imported.append((as_name, attr_name))
-            info_list.append(
-                prep_impt(module_symid, attr_name, as_name, prepinfo, node)
-            )
+            if (
+                symid.endswith(".__init__") and module_symid == symid[:-9]
+            ):  # 9 == len('.__init__')
+                # special case: __init__.py import a module under the same package
+                info_list.append(
+                    prep_impt(module_symid + attr_name, "", as_name, prepinfo, node)
+                )
+            else:
+                info_list.append(
+                    prep_impt(module_symid, attr_name, as_name, prepinfo, node)
+                )
 
     else:
         raise TypeError("node doesn't stand for an import statement")

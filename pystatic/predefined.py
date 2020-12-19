@@ -24,42 +24,10 @@ typing_symtable = SymTable(
 )
 typing_symtable.glob = typing_symtable
 
-typing_symtable.add_type_def("Any", any_temp)
-typing_symtable.add_entry("Any", Entry(any_type))
-
-
-def _add_cls_to_symtable(name: str, def_sym: "SymTable"):
-    symtable = def_sym.new_symtable(name, TableScope.CLASS)
-    clstemp = TypeClassTemp(name, builtins_symtable, symtable)
-    clstype = clstemp.get_default_typetype()
-    clsins = clstemp.get_default_ins().value
-
-    def_sym.add_entry(name, Entry(clstype))
-    def_sym.add_type_def(name, clstemp)
-
-    return clstemp, clstype, clsins
-
-
-def _add_spt_to_symtable(
-    spt_temp_cls: Type[TypeTemp], def_sym: "SymTable", *args, **kwargs
-):
-    """Add special types to typing"""
-    spt_temp = spt_temp_cls(*args, **kwargs)
-    def_sym.add_type_def(spt_temp.name, spt_temp)
-    spt_type = spt_temp.get_default_typetype()
-    def_sym.add_entry(spt_temp.name, Entry(spt_type))
-    return spt_temp, spt_type, spt_temp.get_default_ins().value
-
-
-int_temp, int_type, int_ins = _add_cls_to_symtable("int", builtins_symtable)
-float_temp, float_type, float_ins = _add_cls_to_symtable("float", builtins_symtable)
-str_temp, str_type, str_ins = _add_cls_to_symtable("str", builtins_symtable)
-bool_temp, bool_type, bool_ins = _add_cls_to_symtable("bool", builtins_symtable)
-complex_temp, complex_type, complex_ins = _add_cls_to_symtable(
-    "complex", builtins_symtable
+typing_extensions_symtable = SymTable(
+    "typing_extensions", None, None, builtins_symtable, None, TableScope.GLOB
 )
-byte_temp, byte_type, byte_ins = _add_cls_to_symtable("byte", builtins_symtable)
-slice_temp, slice_type, slice_ins = _add_cls_to_symtable("slice", builtins_symtable)
+typing_extensions_symtable.glob = typing_extensions_symtable
 
 
 class TypeVarTemp(TypeClassTemp):
@@ -100,9 +68,12 @@ class TypeVarTemp(TypeClassTemp):
         if len(applyargs.args) > args_rear:
             default_ins.bound = None
             for rangenode in applyargs.args[args_rear:]:
-                assert isinstance(rangenode.value, TypeType), "expect typetype"
-                rangeins = rangenode.value.getins(ins_result)
-                default_ins.constraints.append(rangeins)
+                if rangenode.value == none_ins:
+                    default_ins.constraints.append(rangenode.value)
+                else:
+                    assert isinstance(rangenode.value, TypeType), "expect typetype"
+                    rangeins = rangenode.value.getins(ins_result)
+                    default_ins.constraints.append(rangeins)
 
         cova = applyargs.kwargs.get("covariant")
         contra = applyargs.kwargs.get("contravariant")
@@ -491,7 +462,6 @@ class TypeLiteralIns(TypeIns):
             return str_ins
         else:
             raise TypeError(value)
-            return any_ins
 
     def equiv(self, other):
         if other.__class__ != self.__class__:
@@ -564,6 +534,35 @@ class TypePackageIns(TypeModuleIns):
         self._inner_symtable.add_entry(name, Entry(module_ins))
 
 
+# add pre-defined types to special symtables
+def _add_cls_to_symtable(name: str, def_sym: "SymTable"):
+    symtable = def_sym.new_symtable(name, TableScope.CLASS)
+    clstemp = TypeClassTemp(name, builtins_symtable, symtable)
+    clstype = clstemp.get_default_typetype()
+    clsins = clstemp.get_default_ins().value
+
+    def_sym.add_entry(name, Entry(clstype))
+    def_sym.add_type_def(name, clstemp)
+
+    return clstemp, clstype, clsins
+
+
+def _add_spt_to_symtable(
+    spt_temp_cls: Type[TypeTemp], def_sym: "SymTable", *args, **kwargs
+):
+    """Add special types to typing"""
+    spt_temp = spt_temp_cls(*args, **kwargs)
+    def_sym.add_type_def(spt_temp.name, spt_temp)
+    spt_type = spt_temp.get_default_typetype()
+    def_sym.add_entry(spt_temp.name, Entry(spt_type))
+    return spt_temp, spt_type, spt_temp.get_default_ins().value
+
+
+# typing.py:
+typing_symtable.add_type_def("Any", any_temp)
+typing_symtable.add_entry("Any", Entry(any_type))
+
+
 typevar_temp, typevar_type, _ = _add_spt_to_symtable(TypeVarTemp, typing_symtable)
 
 _invariant_tpvar = TypeVarIns(
@@ -594,6 +593,16 @@ callable_temp, callable_type, _ = _add_spt_to_symtable(
 )
 Type_temp, Type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp, typing_symtable)
 
+# builtins.py
+int_temp, int_type, int_ins = _add_cls_to_symtable("int", builtins_symtable)
+float_temp, float_type, float_ins = _add_cls_to_symtable("float", builtins_symtable)
+str_temp, str_type, str_ins = _add_cls_to_symtable("str", builtins_symtable)
+bool_temp, bool_type, bool_ins = _add_cls_to_symtable("bool", builtins_symtable)
+complex_temp, complex_type, complex_ins = _add_cls_to_symtable(
+    "complex", builtins_symtable
+)
+byte_temp, byte_type, byte_ins = _add_cls_to_symtable("byte", builtins_symtable)
+slice_temp, slice_type, slice_ins = _add_cls_to_symtable("slice", builtins_symtable)
 none_temp, none_type, none_ins = _add_spt_to_symtable(TypeNoneTemp, builtins_symtable)
 ellipsis_temp, ellipsis_type, ellipsis_ins = _add_spt_to_symtable(
     TypeEllipsisTemp, builtins_symtable
@@ -609,3 +618,7 @@ type_meta_ins = type_meta_temp.get_default_ins().value
 type_meta_type = type_meta_temp.get_default_typetype()
 builtins_symtable.add_type_def("type", type_meta_temp)
 builtins_symtable.add_entry("type", Entry(type_meta_type))
+
+# typing_extension.py
+typing_extensions_symtable.add_type_def("Literal", literal_temp)
+typing_extensions_symtable.add_entry("Literal", Entry(literal_type))

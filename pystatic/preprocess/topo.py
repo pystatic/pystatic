@@ -17,7 +17,9 @@ class _Node:
         self.dependency.add(node)
 
 
-def _resolve_loop(cur_node: _Node, added: set, nodelist: List[_Node], errbox: ErrorBox):
+def _resolve_loop(
+    cur_node: _Node, added: set, nodelist: List[_Node], errbox: ErrorBox, order_list
+):
     added.add(cur_node)
     nodelist.append(cur_node)
     for next_node in cur_node.dependency:
@@ -37,16 +39,17 @@ def _resolve_loop(cur_node: _Node, added: set, nodelist: List[_Node], errbox: Er
             errbox.add_err(ReferenceLoop(loop_ref_list))
 
         else:
-            _resolve_loop(next_node, added, nodelist, errbox)
+            _resolve_loop(next_node, added, nodelist, errbox, order_list)
         next_node.indeg -= 1
     added.remove(cur_node)
+    order_list.append(cur_node.prepdef)
     nodelist.pop()
 
 
-def resolve_loop(cur_node: _Node, errbox: ErrorBox):
+def resolve_loop(cur_node: _Node, errbox: ErrorBox, order_list):
     added = set()
     nodelist = []
-    _resolve_loop(cur_node, added, nodelist, errbox)
+    _resolve_loop(cur_node, added, nodelist, errbox, order_list)
 
 
 class DependencyGraph:
@@ -93,6 +96,6 @@ class DependencyGraph:
 
         for node in self._nodes:
             if node.indeg != 0:
-                resolve_loop(node, self.errbox)
+                resolve_loop(node, self.errbox, res)
 
         return res

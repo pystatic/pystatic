@@ -10,7 +10,7 @@ from pystatic.fsys import Filesys, FilePath, ModuleFindRes
 from pystatic.infer.infer import InferStarter
 from pystatic.result import Result
 from pystatic.preprocess import Preprocessor
-from pystatic.predefined import TypePackageIns, builtins_symtable, typing_symtable
+from pystatic.predefined import *
 from pystatic.symid import SymId, relpath2symid
 from pystatic.typesys import TypeIns
 from pystatic.predefined import TypeModuleIns
@@ -42,6 +42,9 @@ class Manager:
     def __init_typeshed(self):
         self.__add_check_symid("builtins", builtins_symtable, False, None, True)
         self.__add_check_symid("typing", typing_symtable, False, None, True)
+        self.__add_check_symid(
+            "typing_extensions", typing_extensions_symtable, False, None, True
+        )
         self.preprocess()
 
     def get_abspath(self, symid: "SymId") -> Optional[List[str]]:
