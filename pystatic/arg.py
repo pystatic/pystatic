@@ -85,9 +85,9 @@ def match_argument(
         if not type_consistent(arg.ann, typeins):
             errorlist.append(IncompatibleArgument(node, name, arg.ann, typeins))
 
-    i_apply_arg = 0
+    i_apply_arg = 0  # index of args scanned in applyargs argument list
     len_apply_arg = len(applyargs.args)
-    args = applyargs.args
+    args = applyargs.args  # args part of applyargs argument list
 
     for arg in argument.posonlyargs:
         if i_apply_arg >= len_apply_arg:
@@ -97,9 +97,9 @@ def match_argument(
             match_arg(arg, arg.name, args[i_apply_arg].value, args[i_apply_arg].node)
             i_apply_arg += 1
 
-    i_param_arg = 0
+    i_param_arg = 0  # index of args scanned in parameter argument list
     len_param_arg = len(argument.args)
-    param_args = argument.args
+    param_args = argument.args  # args part of parameter argument list
     while i_param_arg < len_param_arg:
         if i_apply_arg >= len_apply_arg:
             break
@@ -116,7 +116,9 @@ def match_argument(
 
     kwargs = applyargs.kwargs
     if i_param_arg >= len_param_arg:
+        # args part of parameter argument list are all matched
         if i_apply_arg < len_apply_arg:
+            # use args in applyargs to match keyword argument of parameter
             if not argument.vararg:
                 if not too_more_arg:
                     errorlist.append(TooMoreArgument(callnode))
@@ -132,9 +134,10 @@ def match_argument(
                     )
                     i_apply_arg += 1
     else:
+        # args part of applyargs are all matched
         assert i_apply_arg >= len_apply_arg
         while i_param_arg < len_param_arg:
-            # match keyword argument with args
+            # match keyword argument in applyargs with args of parameter args
             cur_argname = param_args[i_param_arg].name
             if cur_argname in kwargs:
                 match_arg(
@@ -150,7 +153,7 @@ def match_argument(
 
     for arg in argument.kwonlyargs:
         if arg.name in kwargs:
-            # match kwonlyargs
+            # match kwonlyargs of parameter
             target_ins = kwargs[arg.name]
             match_arg(arg, arg.name, target_ins.value, target_ins.node)
             kwargs.pop(arg.name)

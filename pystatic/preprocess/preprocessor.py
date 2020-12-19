@@ -1,6 +1,4 @@
-import ast
 from collections import deque
-from pystatic.preprocess.resolve_cls import resolve_cls_placeholder
 from pystatic.preprocess.resolve_spt import resolve_typevar
 from typing import TYPE_CHECKING, List, Deque
 from pystatic.target import BlockTarget, FunctionTarget, MethodTarget, Stage, Target

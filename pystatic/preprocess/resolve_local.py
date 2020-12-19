@@ -53,7 +53,8 @@ def judge_typealias(prepinfo: "PrepInfo", node: AssignNode) -> Optional[TypeAlia
                     prepinfo.add_type_alias(target.id, typealias, node)
                     return typealias
                 else:
-                    raise NotImplementedError()
+                    # TODO: implement here
+                    return None
     return None
 
 

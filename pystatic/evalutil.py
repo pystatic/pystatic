@@ -1,6 +1,6 @@
 """Data structures and helper functions used in exprparse"""
 import ast
-from typing import (Generic, TYPE_CHECKING, List, Dict, TypeVar, Any)
+from typing import (Generic, Optional, TYPE_CHECKING, List, Dict, TypeVar, Any)
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
@@ -28,11 +28,13 @@ class GetItemArgs:
 
 
 class ApplyArgs:
-    __slots__ = ['args', 'kwargs']
+    __slots__ = ['args', 'kwargs', 'varkwarg', 'vararg']
 
     def __init__(self):
         self.args: List[InsWithAst] = []
         self.kwargs: Dict[str, InsWithAst] = {}
+        self.varkwarg: Optional[InsWithAst] = None
+        self.vararg: Optional[InsWithAst] = None
 
     def add_arg(self, tpins: 'TypeIns', node: ast.AST):
         self.args.append(InsWithAst(tpins, node))

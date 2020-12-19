@@ -2,7 +2,7 @@ import copy
 from abc import ABC, abstractmethod
 from typing import Any, Final, Dict, Type
 from pystatic.result import Result
-from pystatic.opmap import op_char_map, op_map
+from pystatic.opmap import get_funname, get_opstr
 from pystatic.error.errorcode import *
 
 if TYPE_CHECKING:
@@ -219,11 +219,11 @@ class TypeTemp(ABC):
         from pystatic.evalutil import ApplyArgs
 
         result = Result(any_ins)
-        func_name = op_map.get(op)
+        func_name = get_funname(op)
         assert func_name, f"{func_name} is not supported now"
         func = self.getattribute(func_name, typeins.bindlist)
         if not func or not isinstance(func, TypeFuncIns):
-            op_str = op_char_map.get(op)
+            op_str = get_opstr(op)
             assert op_str
             result.add_err(OperationNotSupported(op_str, typeins, node))
             return result
@@ -239,11 +239,11 @@ class TypeTemp(ABC):
         from pystatic.evalutil import ApplyArgs
 
         result = Result(any_ins)
-        func_name = op_map.get(op)
+        func_name = get_funname(op)
         assert func_name, f"{func_name} is not supported now"
         func = self.getattribute(func_name, typeins.bindlist)
         if not func or not isinstance(func, TypeFuncIns):
-            op_str = op_char_map.get(op)
+            op_str = get_opstr(op)
             assert op_str
             result.add_err(OperationNotSupported(op_str, typeins, node))
             return result

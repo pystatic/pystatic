@@ -72,14 +72,12 @@ def cmdline_main():
         manager.preprocess()
         manager.infer()
 
-        for err in cmdline_mbox.to_message():
-            print(f"{err}")
-
+        cmdline_errbox.release(manager)
         for mod in cmd_res.module:
-            errbox = manager.get_mbox(mod)
-
-            for err in errbox.to_message():
-                print(f"{err}")
+            msg_list = manager.take_messages(mod)
+            for msg in msg_list:
+                output_info = " ".join([mod, str(msg)])
+                print(output_info)
 
 
 def _search_modules_under_package(package_abspath) -> Optional[List[str]]:

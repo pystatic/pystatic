@@ -1,15 +1,9 @@
 import ast
+from pystatic.evalutil import ApplyArgs
 from typing import List, Dict, Set, Union
 from pystatic.error.errorcode import SymbolUndefined
 from pystatic.typesys import TypeIns, TypeType, any_type
-from pystatic.predefined import (
-    TypeFuncIns,
-    TypeModuleIns,
-    TypeUnionTemp,
-    TypeLiteralIns,
-    builtins_symtable,
-    none_ins,
-)
+from pystatic.predefined import *
 from pystatic.result import Result
 from pystatic.symtable import SymTable
 from pystatic.TypeCompatible.simpleType import type_consistent
@@ -125,7 +119,9 @@ class SymbolRecorder:
         tp = table.legb_lookup(name)
         if tp:
             return tp
-        assert False, f"undefined {name}"
+        else:
+            # TODO: this should not happen, check out why
+            return any_ins
 
     def get_run_time_type(self, name: str):
         tp = self.cur_scope.type_map.get(name)
@@ -151,6 +147,9 @@ class SymbolRecorder:
             else:
                 pre_type = stored_type.pre_type
                 cur_type = self.get_run_time_type(name)
+                # TODO: find out why this fails
+                pre_type = pre_type if pre_type else any_ins
+                cur_type = cur_type if cur_type else any_ins
                 if type_consistent(pre_type, cur_type):
                     self.record_type(name, cur_type)
                 else:
@@ -163,7 +162,7 @@ def literal_to_normal_type(literal_ins: TypeLiteralIns):
     name = type(val).__name__
     builtin_type = builtins_symtable.legb_lookup(name)
     assert builtin_type
-    return builtin_type.call(None).value
+    return builtin_type.call(ApplyArgs(), None).value
 
 
 def make_union_type(type_list) -> TypeIns:

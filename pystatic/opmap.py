@@ -1,47 +1,38 @@
+# https://docs.python.org/3/library/operator.html
+
 import ast
-import _ast
-from typing import Type, Dict
+from typing import Type, Dict, Tuple
 
-# MGF: magic function
-MGF_UADD = "__pos__"
-MGF_USUB = "__neg__"
-MGF_INVERT = "__invert__"
-MGF_MULT = "__mul__"
-MGF_ADD = "__add__"
-MGF_SUB = "__sub__"
-MGF_LT = "__lt__"
-MGF_GT = "__gt__"
-MGF_EQ = "__eq__"
 
-op_map: Dict[Type, str] = {
-    # unary part
-    ast.UAdd: MGF_UADD,
-    ast.USub: MGF_USUB,
-    ast.Invert: MGF_INVERT,
-    # binary part
-    ast.Add: MGF_ADD,
-    ast.Sub: MGF_SUB,
-    ast.Mult: MGF_MULT,
-    ast.Eq: MGF_EQ,
-    ast.Lt: MGF_LT,
-    ast.Gt: MGF_GT,
-}
+def get_funname(op: Type):
+    return op_map[op][0]
 
-op_char_map: Dict[Type, str] = {
-    ast.Add: "+",
-    ast.Sub: "-",
-    ast.Mult: "*",
-    ast.MatMult: "@",
-    ast.Div: "/",
-    ast.Mod: "%",
-    ast.Pow: "**",
-    ast.LShift: "<<",
-    ast.RShift: ">>",
-    ast.BitOr: "|",
-    ast.BitXor: "^",
-    ast.BitAnd: "&",
-    ast.FloorDiv: "//",
-    ast.Eq: "==",
-    ast.Lt: "<",
-    ast.Gt: ">",
+
+def get_opstr(op: Type):
+    return op_map[op][1]
+
+
+op_map: Dict[Type, Tuple[str, str]] = {
+    ast.Lt: ("__lt__", "<"),
+    ast.LtE: ("__le__", "<="),
+    ast.Eq: ("__eq__", "=="),
+    ast.NotEq: ("__ne__", "!="),
+    ast.Gt: ("__gt__", ">"),
+    ast.GtE: ("__ge__", ">="),
+    ast.Not: ("__not__", "!"),
+    ast.Add: ("__add__", "+"),
+    ast.And: ("__and__", "&"),
+    ast.FloorDiv: ("__floordiv__", "//"),
+    ast.Invert: ("__invert__", "~"),
+    ast.Mod: ("__mod__", "%"),
+    ast.Mult: ("__mul__", "*"),
+    ast.MatMult: ("__matmul__", "@"),
+    ast.Or: ("__or__", "|"),
+    ast.Sub: ("__sub__", "-"),
+    ast.BitXor: ("__xor__", "^"),
+    ast.LShift: ("__lshift__", "<<"),
+    ast.RShift: ("__rshift__", ">>"),
+    ast.USub: ("__neg__", "-"),
+    ast.In: ("__contains__", "in"),
+    ast.BitOr: ("__or__", "|")
 }

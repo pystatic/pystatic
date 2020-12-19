@@ -59,6 +59,7 @@ complex_temp, complex_type, complex_ins = _add_cls_to_symtable(
     "complex", builtins_symtable
 )
 byte_temp, byte_type, byte_ins = _add_cls_to_symtable("byte", builtins_symtable)
+slice_temp, slice_type, slice_ins = _add_cls_to_symtable("slice", builtins_symtable)
 
 
 class TypeVarTemp(TypeClassTemp):
@@ -119,8 +120,11 @@ class TypeVarTemp(TypeClassTemp):
             if default_ins.constraints:
                 raise NotImplementedError()
             bound = bound_ins_ast.value
-            assert isinstance(bound, TypeType), "TODO"
-            default_ins.bound = bound.get_default_ins()
+            # TODO: re-implement this, make it more accurate
+            if isinstance(bound, TypeType):
+                default_ins.bound = bound.get_default_ins()
+            else:
+                default_ins.bound = bound
 
         if covariant and contravariant:
             raise NotImplementedError()
@@ -214,8 +218,12 @@ class TypeNoneTemp(TypeTemp):
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         return None
 
-    def getitem(self, item: "GetItemArgs", bindlist: BindList) -> Result["TypeIns"]:
-        # TODO: warning
+    def getitem(
+        self, item: "GetItemArgs", bindlist: BindList, node: Optional[ast.AST]
+    ) -> Result["TypeIns"]:
+        # TODO: warning here
+        res = Result(self._cached_ins)
+        res.add_err(NotSubscriptable(self._cached_ins, node))
         return Result(self._cached_ins)
 
     def getins(self, bindlist: BindList) -> Result["TypeIns"]:

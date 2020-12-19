@@ -23,6 +23,9 @@ class Message:
         else:
             return pos < other_pos
 
+    def __str__(self):
+        return self.msg
+
 
 class PositionMessage(Message):
     def __init__(
@@ -36,3 +39,13 @@ class PositionMessage(Message):
 
     def get_position(self) -> Optional[Position]:
         return self.pos
+
+    def __str__(self):
+        return (
+            "line: "
+            + str(self.pos.lineno)
+            + " col: "
+            + str(self.pos.col_offset)
+            + " "
+            + self.msg
+        )

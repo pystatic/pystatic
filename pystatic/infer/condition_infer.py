@@ -181,6 +181,10 @@ class ConditionInfer(BaseVisitor):
         first_type = self.dump_result(eval_expr(args[0], self.recorder))
         second_typetype = self.dump_result(eval_expr(args[1], self.recorder))
         result = second_typetype.call(None, node)
+
+        if not isinstance(args[0], ast.Name):
+            return Reach.UNKNOWN
+
         name = args[0].id
         if result.haserr():
             assert "TODO"

@@ -7,8 +7,9 @@ from pystatic.error.errorbox import ErrorBox
 from pystatic.arg import Argument
 from pystatic.error.errorcode import *
 from pystatic.exprparse import eval_expr
+from pystatic.evalutil import ApplyArgs
 from pystatic.result import Result
-from pystatic.opmap import op_map, op_char_map
+from pystatic.opmap import get_funname, get_opstr
 from pystatic.config import Config
 from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
@@ -141,6 +142,9 @@ class InferVisitor(BaseVisitor):
             self.check_composed_node_of_annassign(target, rtype, node.value)
 
     def record_no_value_node(self, target: ast.Name):
+        # TODO: fix this
+        if not isinstance(target, ast.Name):
+            return
         assert isinstance(target, ast.Name)
         name = target.id
         comment = self.recorder.get_comment_type(name)
@@ -166,9 +170,9 @@ class InferVisitor(BaseVisitor):
     def visit_AugAssign(self, node: ast.AugAssign):
         ltype = self.get_type(node.target)
         rtype = self.get_type(node.value)
-        func_name: str = op_map[type(node.op)]
+        func_name: str = get_funname(type(node.op))
         result: Result = ltype.getattribute(func_name, None)
-        operand = op_char_map[type(node.op)]
+        operand = get_opstr(type(node.op))
         if result.haserr():
             self.errbox.add_err(
                 UnsupportedBinOperand(node.target, operand, ltype, rtype)
@@ -182,7 +186,7 @@ class InferVisitor(BaseVisitor):
     def check_arg_of_operand_func(self, node, func_type, operand, ltype, rtype):
         apply_args = ApplyArgs()
         apply_args.add_arg(rtype, node)
-        result: Result = func_type.call(apply_args)
+        result: Result = func_type.call(apply_args, None)
         if result.haserr():
             self.errbox.add_err(UnsupportedBinOperand(node, operand, ltype, rtype))
 

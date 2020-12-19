@@ -28,8 +28,14 @@ def resolve_cls(clsdef: "prep_cls", shallow: bool):
         if res_type == any_ins:
             continue
 
-        assert isinstance(res_type, TypeType)
+        # TODO: re-implement here
+        # assert isinstance(res_type, TypeType)
         if res_type:
+            if not isinstance(res_type, TypeType):
+                old_bindlist = res_type.bindlist
+                res_type = res_type.temp.get_default_typetype()
+                res_type.bindlist = old_bindlist
+
             res_ins = res_type.get_default_ins()
             is_new = True
             for old_ins in clstemp.baseclass:
@@ -196,9 +202,11 @@ def _resolve_cls_method(clsdef: "prep_cls", errbox: "ErrorBox") -> List[MethodTa
         if is_classmethod:
             argument.args[0].ann = clstemp.get_default_typetype()
         elif not is_staticmethod:
-            default_ins_result = clstemp.get_default_ins()
-            default_ins_result.dump_to_box(errbox)
-            argument.args[0].ann = default_ins_result.value
+            # TODO: the first argument may not be always self (may be (*args, **kwargs))
+            if len(argument.args) > 0:
+                default_ins_result = clstemp.get_default_ins()
+                default_ins_result.dump_to_box(errbox)
+                argument.args[0].ann = default_ins_result.value
 
     def add_func_def(
         argument: Argument, ret: TypeIns, node: ast.FunctionDef

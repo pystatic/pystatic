@@ -160,7 +160,8 @@ class TypeCompatible:
         if isinstance(tempb, TypeAnyTemp):
             return False
         elif isinstance(tempb, TypeOptionalTemp):
-            return self.OptionalRightCom(b, a)
+            # TODO: implement this
+            return True
         elif isinstance(tempb, TypeNoneTemp):
             return self.NoneCom(b, a)
         elif isinstance(tempb, TypeUnionTemp):
@@ -193,7 +194,8 @@ class TypeCompatible:
 
     def UnionLeftCom(self, a: TypeIns, b: TypeIns) -> bool:
         tempb = b.temp
-        assert a.bindlist != None
+        if a.bindlist is None:
+            return False
         for index in range(len(a.bindlist)):
             typeinsi = a.bindlist[index]
             if self.TypeCompatible(typeinsi, b):
@@ -233,15 +235,26 @@ class TypeCompatible:
         if isinstance(tempa, TypeSetTemp):
             return self.SetCom(a, b)
         elif isinstance(tempa, TypeTupleTemp):
+            if not isinstance(tempb, TypeTupleTemp):
+                return False
             return self.TupleCom(a, b, state)
         elif isinstance(tempa, TypeDictTemp):
             return self.DictCom(a, b)
         elif isinstance(tempa, TypeListTemp):
+            if not isinstance(b, TypeListTemp):
+                return False
             return self.ListCom(a, b)
         else:
             return False
 
     def SetCom(self, a: TypeIns, b: TypeIns) -> bool:
+        if a.bindlist and not b.bindlist:
+            return False
+        elif b.bindlist and not a.bindlist:
+            return False
+
+        if len(a.bindlist) != len(b.bindlist):
+            return False
         if self.TypeCompatibleStrict(a.bindlist[0], b.bindlist[0]):
             return True
         else:
@@ -313,6 +326,8 @@ class TypeCompatible:
     def inheritance_check(self, tempa: TypeClassTemp, tempb: TypeTemp):
         if tempa == tempb:
             return True
+        if not isinstance(tempb, TypeClassTemp):
+            return False
         for index in range(len(tempb.baseclass)):
             if tempb.baseclass[index].temp.name == tempa.name:
                 return True

@@ -1,7 +1,7 @@
 import contextlib
 from typing import Protocol
 from pystatic.visitor import NoGenVisitor
-from pystatic.evalutil import ApplyArgs, WithAst, GetItemArgs
+from pystatic.evalutil import ApplyArgs, WithAst, GetItemArgs, InsWithAst
 from pystatic.predefined import *
 
 
@@ -110,8 +110,11 @@ class ExprParser(NoGenVisitor):
         for kwargnode in node.keywords:
             argins = self.visit(kwargnode.value)
             assert isinstance(argins, TypeIns)
-            assert kwargnode.arg, "**kwargs is not supported now"
-            applyargs.add_kwarg(kwargnode.arg, argins, kwargnode.value)
+            if not kwargnode.arg:
+                # **kwargs
+                applyargs.varkwarg = WithAst(argins, kwargnode.value)
+            else:
+                applyargs.add_kwarg(kwargnode.arg, argins, kwargnode.value)
         return applyargs
 
     def visit_Expr(self, node: ast.Expr):
@@ -163,19 +166,21 @@ class ExprParser(NoGenVisitor):
         return attr_result.value
 
     def visit_Call(self, node: ast.Call) -> TypeIns:
-        left_ins = self.visit(node.func)
-        assert isinstance(left_ins, TypeIns)
+        with self.block_container():
+            left_ins = self.visit(node.func)
+            assert isinstance(left_ins, TypeIns)
 
-        applyargs = self.generate_applyargs(node)
-        call_result = left_ins.call(applyargs, node)
+            applyargs = self.generate_applyargs(node)
+            call_result = left_ins.call(applyargs, node)
 
-        self.add_err(call_result.errors)
+            self.add_err(call_result.errors)
 
         self.add_to_container(call_result.value, node)
         return call_result.value
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> TypeIns:
-        operand_ins = self.visit(node.operand)
+        with self.block_container():
+            operand_ins = self.visit(node.operand)
         assert isinstance(operand_ins, TypeIns)
 
         result = operand_ins.unaryop_mgf(type(node.op), node)
@@ -185,8 +190,9 @@ class ExprParser(NoGenVisitor):
         return result.value
 
     def visit_BinOp(self, node: ast.BinOp) -> TypeIns:
-        left_ins = self.visit(node.left)
-        right_ins = self.visit(node.right)
+        with self.block_container():
+            left_ins = self.visit(node.left)
+            right_ins = self.visit(node.right)
         assert isinstance(left_ins, TypeIns)
         assert isinstance(right_ins, TypeIns)
 
@@ -269,23 +275,70 @@ class ExprParser(NoGenVisitor):
         return res
 
     def visit_Slice(self, node: ast.Slice):
-        raise NotImplementedError()
+        # assume slice node's value is slice_ins
+        self.add_to_container(slice_ins, node)
+        return slice_ins
 
     def visit_Index(self, node: ast.Index):
         return self.visit(node.value)
 
     def visit_Compare(self, node: ast.Compare):
-        left_ins = self.visit(node.left)
-        assert isinstance(left_ins, TypeIns)
+        with self.block_container():
+            left_ins = self.visit(node.left)
+            assert isinstance(left_ins, TypeIns)
 
-        for comparator, op in zip(node.comparators, node.ops):
-            comparator_ins = self.visit(comparator)
-            assert isinstance(comparator_ins, TypeIns)
+            for comparator, op in zip(node.comparators, node.ops):
+                comparator_ins = self.visit(comparator)
+                assert isinstance(comparator_ins, TypeIns)
 
-            result = left_ins.binop_mgf(comparator_ins, type(op), node)  # type: ignore
-            self.add_err(result.errors)
-            left_ins = result.value
+                result = left_ins.binop_mgf(comparator_ins, type(op), node)  # type: ignore
+                self.add_err(result.errors)
+                left_ins = result.value
 
         # assert that left_ins is bool type?
         self.add_to_container(bool_ins, node)
         return bool_ins
+
+    def visit_Lambda(self, node: ast.Lambda):
+        with self.block_container():
+            bodyins = self.visit(node.body)
+        assert isinstance(bodyins, TypeIns)
+        self.add_to_container(bodyins, node)
+        return bodyins
+
+    def visit_BoolOp(self, node: ast.BoolOp):
+        # TODO: make this more accurate
+        with self.block_container():
+            cur_ins = self.visit(node.values[0])
+        self.add_to_container(cur_ins, node)
+        return cur_ins
+
+    def visit_ListComp(self, node: ast.ListComp):
+        listins = list_type.get_default_ins()
+        self.add_to_container(listins, node)
+        return listins
+
+    def visit_DictComp(self, node: ast.DictComp):
+        # TODO finish this
+        dict_ins = dict_type.get_default_ins()
+        self.add_to_container(dict_ins, node)
+        return dict_ins
+
+    def visit_Starred(self, node: ast.Starred):
+        # FIXME: fix this
+        # TODO: make this more accurate
+        self.add_to_container(any_ins, node)
+        return any_ins
+
+    def visit_JoinedStr(self, node: ast.JoinedStr):
+        # TODO: make this more accurate
+        self.add_to_container(str_ins, node)
+        return str_ins
+    
+    def visit_Yield(self, node: ast.Yield):
+        # TODO: fix this
+        return any_ins
+    
+    def visit_IfExp(self, node: ast.IfExp):
+        # TODO: fix this
+        return self.visit(node.body)
