@@ -282,6 +282,8 @@ class TypeCompatible:
             return False
 
     def DictCom(self, a: TypeIns, b: TypeIns) -> bool:
+        if not a.bindlist or not b.bindlist:
+            return False
         if self.TypeCompatibleStrict(
             a.bindlist[0], b.bindlist[0]
         ) and self.TypeCompatibleStrict(a.bindlist[1], b.bindlist[1]):

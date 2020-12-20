@@ -259,6 +259,14 @@ class Manager:
             return self.take_messages_by_symid(symid)
         return []
 
+    def take_all_messages(self) -> Dict[SymId, List[Message]]:
+        self.manager_errbox.release(self)
+        for target in self.targets.values():
+            target.errbox.release(self)
+        tmp_messages = self.message_cache
+        self.message_cache = {}
+        return tmp_messages
+
     def preprocess(self):
         self.pre_proc.process()
         pass

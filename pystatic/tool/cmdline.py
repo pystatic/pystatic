@@ -79,6 +79,13 @@ def cmdline_main():
                 output_info = " ".join([mod, str(msg)])
                 print(output_info)
 
+        # symid_errors = manager.take_all_messages()
+
+        # for symid, err_list in symid_errors.items():
+        #     for err in err_list:
+        #         output_info = " ".join([symid, str(err)])
+        #         print(output_info)
+
 
 def _search_modules_under_package(package_abspath) -> Optional[List[str]]:
     if not isdir(package_abspath):
