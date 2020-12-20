@@ -384,6 +384,9 @@ class TypeGenericTemp(TypeTemp):
 class TypeProtocolTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__("Protocol")
+    
+    def arity(self) -> int:
+        return INFINITE_ARITY
 
     @property
     def module_symid(self) -> str:

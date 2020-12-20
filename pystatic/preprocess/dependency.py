@@ -43,8 +43,10 @@ def create_cls_dependency(graph: "DependencyGraph", cls: prep_cls):
 
         # FIXME: there should be dependency from this class to its attributes,
         # but doing so will create dependency loop.
-        for func in prepinfo.func.values():
-            create_func_dependency(graph, func)
+        
+        #　TODO: we need create_func_dependency at all?
+        # for func in prepinfo.func.values():
+        #     create_func_dependency(graph, func)
         for local in prepinfo.local.values():
             create_local_dependency(graph, local)
 
@@ -58,9 +60,11 @@ def create_func_dependency(graph: "DependencyGraph", func: prep_func):
     graph.add_prepdef(func)
     for node in node_list:
         assert isinstance(node, ast.FunctionDef)
-        arg_def = _first_prepdef_visitor.accept(node.args)
-        if arg_def:
-            graph.add_dependency(func, arg_def)
+        for argnode in node.args.args:
+            if argnode.annotation:
+                arg_def = _first_prepdef_visitor.accept(argnode.annotation)
+                if arg_def:
+                    graph.add_dependency(func, arg_def)
         ret_def = _first_prepdef_visitor.accept(node.returns)
         if ret_def:
             graph.add_dependency(func, ret_def)
