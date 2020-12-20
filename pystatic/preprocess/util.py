@@ -117,67 +117,6 @@ def analyse_import_stmt(
     return info_list
 
 
-def update_symtable_import_cache(
-    symtable: "SymTable", entry: "prep_impt", manager: "Manager"
-) -> Optional[TypeIns]:
-    symid = entry.symid
-
-    symidlist = absolute_symidlist(symtable.glob_symid, symid)
-    if not symidlist:
-        return None
-
-    cache = symtable.import_cache
-
-    # get the initial module ins or package ins
-    cur_symid = symidlist[0]
-    cur_ins = cache.get_module_ins(cur_symid)
-
-    if not cur_ins:
-        cur_ins = manager.get_module_ins(symidlist[0])
-        if not cur_ins:
-            return None
-        cache.set_moduleins(cur_symid, cur_ins)
-
-    assert isinstance(cur_ins, TypeModuleIns)
-    for i in range(1, len(symidlist)):
-        if not isinstance(cur_ins, TypePackageIns):
-            return None
-
-        cur_symid += f".{symidlist[i]}"
-        if symidlist[i] not in cur_ins.submodule:
-            module_ins = manager.get_module_ins(cur_symid)
-            if not module_ins:
-                return None
-
-            # FIXME: fix me after modify TypePackageIns
-            assert isinstance(module_ins, TypeModuleIns)
-            if isinstance(module_ins, TypePackageIns):
-                cur_ins.add_submodule(symidlist[i], module_ins)
-            else:
-                if i != len(symidlist) - 1:
-                    return None
-                cur_ins.add_submodule(symidlist[i], module_ins)
-                return module_ins
-
-        cur_ins = cur_ins.submodule[symidlist[i]]
-
-    assert cur_symid == entry.symid
-
-    # If the source is a package then another module may be imported.
-    # Example:
-    # from fruit import apple
-    # fruit is a package and apple is a module so pystatic need to add apple
-    # to fruit's submodule list
-    if isinstance(cur_ins, TypePackageIns):
-        if not entry.is_import_module():
-            cur_symid += f".{entry.origin_name}"
-            module_ins = manager.get_module_ins(cur_symid)
-
-            if module_ins:
-                cur_ins.add_submodule(entry.origin_name, module_ins)
-    return cur_ins
-
-
 def add_baseclass(temp: TypeClassTemp, basecls: "TypeIns"):
     if basecls not in temp.baseclass:
         temp.baseclass.append(basecls)

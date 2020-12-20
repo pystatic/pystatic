@@ -178,8 +178,7 @@ class Manager:
     def update_stage(self, target: BlockTarget, stage: Stage, isnew: bool = False):
         """Update the stage of a target
 
-        ifnew:
-            True if target is not in self.targets.
+        @param ifnew: True if target is not in self.targets.
 
         If target's original stage is equal to the new stage and isnew is false,
         then nothing will happen.

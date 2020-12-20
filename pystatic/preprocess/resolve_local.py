@@ -61,7 +61,7 @@ def judge_typealias(prepinfo: "PrepInfo", node: AssignNode) -> Optional[TypeAlia
 def resolve_local(local: "prep_local", shallow: bool):
     """Resolve local symbols' TypeIns
 
-    :param shallow: if set True, local's current stage must be LOCAL_NORMAL.
+    @param shallow: if set True, local's current stage must be LOCAL_NORMAL.
     This function will judge the type of the local symbol(typevar or typealias)
     and won't visit node inside subscript node.
     """

@@ -1,7 +1,8 @@
 from collections import deque
 from typing import List, Deque
-from pystatic.preprocess.util import update_symtable_import_cache
+from pystatic.symid import SymId, rel2abssymid, symid_parent, absolute_symidlist
 from pystatic.preprocess.prepinfo import *
+from pystatic.predefined import *
 
 
 def resolve_import(prepinfo: "PrepInfo", env: "PrepEnvironment"):
@@ -11,8 +12,9 @@ def resolve_import(prepinfo: "PrepInfo", env: "PrepEnvironment"):
     while len(queue):
         cur_prepinfo = queue.popleft()
         symtable = cur_prepinfo.symtable
-        for _, entry in cur_prepinfo.impt.items():
-            update_symtable_import_cache(symtable, entry, env.manager)
+        tmp_impt = {**cur_prepinfo.impt}  # copy of cur_prepinfo.impt
+        for _, entry in tmp_impt.items():
+            update_symtable_import_cache(symtable, cur_prepinfo, entry, env.manager)
             if not entry.origin_name:
                 # import <module_name>
                 module_ins = env.manager.get_module_ins(entry.symid)
@@ -79,3 +81,80 @@ def _resolve_import_chain(prepinfo: "PrepInfo", name: str, env: "PrepEnvironment
         # result is None implies nothing found
         # TODO: warning here
         return False
+
+
+def update_symtable_import_cache(
+    symtable: "SymTable", prepinfo: "PrepInfo", entry: "prep_impt", manager: "Manager"
+) -> Optional[TypeIns]:
+    def set_prepinfo_impt(symid: SymId, moduleins: TypeModuleIns):
+        if (cur_impt := prepinfo.impt.get(symid)) :
+            if not cur_impt.value:
+                cur_impt.value = moduleins
+        else:
+            prepinfo.impt[symid] = prep_impt(
+                symid, "", symid, entry.def_prepinfo, entry.defnode
+            )
+            prepinfo.impt[symid].value = moduleins
+
+    symid = entry.symid
+
+    symidlist = absolute_symidlist(symtable.glob_symid, symid)
+    if not symidlist:
+        return None
+
+    cache = symtable.import_cache
+
+    # get the initial module ins or package ins
+    cur_symid = symidlist[0]
+    cur_ins = cache.get_module_ins(cur_symid)
+
+    if not cur_ins:
+        cur_ins = manager.get_module_ins(cur_symid)
+        if cur_ins is None:
+            return None
+        else:
+            cache.set_moduleins(cur_symid, cur_ins)
+
+    assert isinstance(cur_ins, TypeModuleIns)
+    for i in range(1, len(symidlist)):
+        if not isinstance(cur_ins, TypePackageIns):
+            return None
+
+        set_prepinfo_impt(cur_symid, cur_ins)
+
+        cur_symid += f".{symidlist[i]}"
+        if symidlist[i] not in cur_ins.submodule:
+            module_ins = manager.get_module_ins(cur_symid)
+            if not module_ins:
+                return None
+
+            # FIXME: fix me after modify TypePackageIns
+            assert isinstance(module_ins, TypeModuleIns)
+            if isinstance(module_ins, TypePackageIns):
+                cur_ins.add_submodule(symidlist[i], module_ins)
+            else:
+                if i != len(symidlist) - 1:
+                    return None
+                cur_ins.add_submodule(symidlist[i], module_ins)
+                return module_ins
+
+        cur_ins = cur_ins.submodule[symidlist[i]]
+
+    assert cur_symid == entry.symid
+    set_prepinfo_impt(cur_symid, cur_ins)
+
+    # If the source is a package then another module may be imported.
+    # Example:
+    # from fruit import apple
+    # fruit is a package and apple is a module so pystatic need to add apple
+    # to fruit's submodule list
+    if isinstance(cur_ins, TypePackageIns):
+        if not entry.is_import_module():
+            cur_symid += f".{entry.origin_name}"
+            module_ins = manager.get_module_ins(cur_symid)
+
+            if module_ins:
+                cur_ins.add_submodule(entry.origin_name, module_ins)
+                set_prepinfo_impt(cur_symid, module_ins)
+
+    return cur_ins
