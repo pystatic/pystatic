@@ -1,4 +1,6 @@
+from pystatic.typesys import TypeType, TypeIns
 from pystatic.error.message import PositionMessage
+from pystatic.predefined import *
 import sys
 
 sys.path.extend([".", ".."])
@@ -80,3 +82,7 @@ def get_manager_path(
     manager = Manager(Config(config))
     manager.add_check_file(filepath)
     return manager, filepath
+
+def assert_is_instance(target):
+    """Assert target is TypeIns except TypeType"""
+    assert isinstance(target, TypeIns) and not isinstance(target, TypeType)

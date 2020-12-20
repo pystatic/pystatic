@@ -2,7 +2,7 @@ import sys
 import os
 
 sys.path.extend(['.', '..'])
-from ..util import get_manager_path
+from ..util import get_manager_path, assert_is_instance
 
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.predefined import TypeModuleIns, TypeModuleTemp, TypeFuncIns, TypeVarIns
@@ -51,3 +51,18 @@ def test_star_import():
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
     assert isinstance(pack_type, TypeType)
     assert a.temp == pack_type.temp
+
+def test_multidot_import():
+    symid = 'preprocess.prep_import_multidot'
+    manager, filepath = get_manager_path({}, symid)
+    manager.preprocess()
+
+    module_ins = manager.get_module_ins(symid)
+    assert isinstance(module_ins, TypeModuleIns)
+    assert module_ins.symid == symid
+
+    a = manager.eval_expr(symid, 'a')
+    apple_type = manager.eval_expr(symid, 'preprocess.pack.fruit.apple.Apple')
+    assert_is_instance(a)
+    assert isinstance(apple_type, TypeType)
+    assert a.temp == apple_type.temp
