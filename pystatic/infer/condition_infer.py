@@ -8,7 +8,7 @@ from pystatic.infer.staticinfer import cmp_by_op
 from pystatic.infer.recorder import SymbolRecorder, StoredType
 from pystatic.visitor import BaseVisitor
 from pystatic.reach import Reach, cal_neg, is_true
-from pystatic.TypeCompatible.simpleType import type_consistent
+from pystatic.consistence.simpleType import type_consistent
 from pystatic.typesys import TypeIns
 from pystatic.error.errorbox import ErrorBox
 from pystatic.error.errorcode import *

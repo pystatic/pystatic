@@ -14,7 +14,7 @@ from pystatic.config import Config
 from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
-from pystatic.TypeCompatible.simpleType import (
+from pystatic.consistence.simpleType import (
     TypeCompatible,
     is_any,
     is_none,

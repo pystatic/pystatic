@@ -598,6 +598,7 @@ callable_temp, callable_type, _ = _add_spt_to_symtable(
 Type_temp, Type_type, _ = _add_spt_to_symtable(TypeTypeAnnTemp, typing_symtable)
 
 # builtins.py
+object_temp, object_type, object_ins = _add_cls_to_symtable("object", builtins_symtable)
 int_temp, int_type, int_ins = _add_cls_to_symtable("int", builtins_symtable)
 float_temp, float_type, float_ins = _add_cls_to_symtable("float", builtins_symtable)
 str_temp, str_type, str_ins = _add_cls_to_symtable("str", builtins_symtable)

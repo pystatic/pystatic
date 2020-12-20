@@ -187,6 +187,9 @@ class TypeTemp(ABC):
     def arity(self) -> int:
         return len(self.placeholders)
 
+    def get_mro(self):
+        return [self]
+
     # basic
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         return None
@@ -413,6 +416,7 @@ class TypeClassTemp(TypeTemp):
 
         self.baseclass: "List[TypeIns]"
         self.baseclass = []
+        self.mro = None
 
         self.metaclass = metaclass
 
@@ -453,6 +457,47 @@ class TypeClassTemp(TypeTemp):
                 if res:
                     break
         return res
+
+    def get_mro(self):
+        """C3 algorithm"""
+        from pystatic.predefined import object_temp
+
+        # type parameter is not concerned
+        if self.mro is not None:
+            return list(self.mro)  # copy of self.mro
+        to_merge = []
+        for base in self.baseclass:
+            base_mro = base.temp.get_mro()
+            if base_mro:
+                to_merge.append(base_mro)
+
+        if self.baseclass:
+            to_merge.append(
+                [base.temp for base in self.baseclass]
+            )  # append a copy of baseclasses
+        cur_ans = []
+        while to_merge:
+            listlen = len(to_merge)
+            for i in range(listlen):
+                head = to_merge[i][0]
+                for j in range(i + 1, listlen):
+                    if head in to_merge[j][1:]:
+                        break
+                else:
+                    cur_ans.append(head)
+                    for j in range(listlen):
+                        try:
+                            to_merge[j].remove(head)
+                        except ValueError:
+                            pass
+                    break
+            new_to_merge = [x for x in to_merge if x]
+            to_merge = new_to_merge
+
+        self.mro = [self] + cur_ans
+        if self.mro[-1] is object_temp:
+            self.mro = self.mro[:-1]
+        return list(self.mro)  # copy of self.mro
 
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         res = self.get_local_attr(name)

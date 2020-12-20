@@ -47,6 +47,7 @@ def resolve_cls(clsdef: "prep_cls", shallow: bool):
             if is_new:
                 clstemp.baseclass.append(res_type.get_default_ins())
         is_generic = is_generic or base_res.generic
+    clstemp.get_mro()
 
     if not shallow:
         resolve_cls_placeholder(clsdef, clsdef.def_prepinfo.errbox)

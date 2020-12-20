@@ -6,7 +6,7 @@ from pystatic.typesys import TypeIns, TypeType, any_type
 from pystatic.predefined import *
 from pystatic.result import Result
 from pystatic.symtable import SymTable
-from pystatic.TypeCompatible.simpleType import type_consistent
+from pystatic.consistence.simpleType import type_consistent
 
 ScopeType = Union[TypeType, TypeFuncIns, TypeModuleIns]
 
