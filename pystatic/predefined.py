@@ -58,12 +58,6 @@ class TypeNoneTemp(TypeTemp):
     ) -> Result["TypeType"]:
         return Result(self._cached_typetype)
 
-    def get_default_ins(self) -> Result["TypeIns"]:
-        return Result(self._cached_ins)
-
-    def get_default_typetype(self) -> "TypeType":
-        return self._cached_typetype
-
 
 class TypeUnionTemp(TypeTemp):
     def __init__(self):
@@ -334,12 +328,6 @@ class TypeTupleTemp(TypeClassTemp):
         except IndexError:
             return result
 
-    def get_default_ins(self) -> Result["TypeIns"]:
-        return Result(self._cached_ins)
-
-    def get_default_typetype(self) -> "TypeType":
-        return self._cached_typetype
-
 
 class TypeSetTemp(TypeClassTemp):
     def __init__(self) -> None:
@@ -377,12 +365,6 @@ class TypeEllipsisTemp(TypeClassTemp):
     @property
     def module_symid(self) -> str:
         return "builtins"
-
-    def get_default_typetype(self) -> "TypeType":
-        return self._cached_typetype
-
-    def get_default_ins(self) -> Result["TypeIns"]:
-        return Result(self._cached_ins)
 
     def str_expr(self, bindlist: BindList) -> str:
         return "..."
@@ -538,7 +520,7 @@ def _add_cls_to_symtable(name: str, def_sym: "SymTable"):
     symtable = def_sym.new_symtable(name, TableScope.CLASS)
     clstemp = TypeClassTemp(name, builtins_symtable, symtable)
     clstype = clstemp.get_default_typetype()
-    clsins = clstemp.get_default_ins().value
+    clsins = clstemp.get_default_ins()
 
     def_sym.add_entry(name, Entry(clstype))
     def_sym.add_type_def(name, clstemp)
@@ -554,7 +536,7 @@ def _add_spt_to_symtable(
     def_sym.add_type_def(spt_temp.name, spt_temp)
     spt_type = spt_temp.get_default_typetype()
     def_sym.add_entry(spt_temp.name, Entry(spt_type))
-    return spt_temp, spt_type, spt_temp.get_default_ins().value
+    return spt_temp, spt_type, spt_temp.get_default_ins()
 
 
 def _add_temp_to_symtable(
@@ -617,7 +599,7 @@ type_meta_temp = TypeClassTemp(
     builtins_symtable.new_symtable("type", TableScope.CLASS),
     None,
 )
-type_meta_ins = type_meta_temp.get_default_ins().value
+type_meta_ins = type_meta_temp.get_default_ins()
 type_meta_type = type_meta_temp.get_default_typetype()
 _add_temp_to_symtable("type", type_meta_temp, type_meta_type, builtins_symtable)
 _add_temp_to_symtable("list", list_temp, list_type, builtins_symtable)

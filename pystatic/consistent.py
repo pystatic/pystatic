@@ -32,9 +32,8 @@ def is_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
                 return True
         return False
     elif left_ins.temp == optional_temp:
-        if is_consistent(left_ins.bindlist[0], right_ins):
+        if is_consistent(left_ins.get_safe_bind(0), right_ins):
             return True
         return right_ins == none_ins
-    elif left_ins.temp == 
 
-    return False
+    return left_ins.equiv(right_ins)

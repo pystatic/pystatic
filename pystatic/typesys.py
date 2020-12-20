@@ -46,6 +46,15 @@ class TypeIns:
         # TODO: add error
         return self.temp.getitem(item, self.bindlist, node)
 
+    def get_safe_bind(self, i: int):
+        """Get ith bind element with implicit any"""
+        if self.bindlist:
+            try:
+                return self.bindlist[i]
+            except IndexError:
+                return any_ins
+        return any_ins
+
     def unaryop_mgf(self, op: Type, node: ast.AST) -> Result["TypeIns"]:
         """
         @param op: type of the operator.
@@ -188,7 +197,7 @@ class TypeTemp(ABC):
         return len(self.placeholders)
 
     def get_mro(self):
-        return [self]
+        return [self.get_default_ins()]
 
     # basic
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
@@ -339,8 +348,8 @@ class TypeTemp(ABC):
         else:
             return Result(TypeIns(self, bindlist))
 
-    def get_default_ins(self) -> Result["TypeIns"]:
-        return Result(self._cached_ins)
+    def get_default_ins(self) -> "TypeIns":
+        return self._cached_ins
 
     def get_type_attribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         """Get attribute that belong to the Type itself, mainly used for TypeType"""
@@ -418,7 +427,7 @@ class TypeClassTemp(TypeTemp):
 
         self.baseclass: "List[TypeIns]"
         self.baseclass = []
-        self.mro = None
+        self.mro: Optional[List[TypeIns]] = None
 
         self.metaclass = metaclass
 
@@ -465,6 +474,7 @@ class TypeClassTemp(TypeTemp):
         from pystatic.predefined import object_temp
 
         # TODO: avoid recursion
+        # TODO: report error if C3 fails
 
         # type parameter is not concerned
         if self.mro is not None:
@@ -476,37 +486,38 @@ class TypeClassTemp(TypeTemp):
                 to_merge.append(base_mro)
 
         if self.baseclass:
-            to_merge.append(
-                [base.temp for base in self.baseclass]
-            )  # append a copy of baseclasses
+            to_merge.append(list(self.baseclass))  # append a copy of baseclasses
         cur_ans = []
         while to_merge:
             listlen = len(to_merge)
             for i in range(listlen):
                 head = to_merge[i][0]
                 for j in range(i + 1, listlen):
-                    if head in to_merge[j][1:]:
-                        break
+                    for iter_ins in to_merge[j][1:]:
+                        if head.equiv(iter_ins):
+                            break
                 else:
                     cur_ans.append(head)
                     for j in range(listlen):
-                        try:
-                            to_merge[j].remove(head)
-                        except ValueError:
-                            pass
+                        leniter = len(to_merge[j])
+                        for iter_cnt in range(leniter):
+                            if head.equiv(to_merge[j][iter_cnt]):
+                                to_merge[j].pop(iter_cnt)
+                                break
                     break
             new_to_merge = [x for x in to_merge if x]
             to_merge = new_to_merge
 
-        self.mro = [self] + cur_ans
-        if self.mro[-1] is object_temp:
+        self.mro = [self.get_default_ins()] + cur_ans
+        if self.mro[-1].temp is object_temp:
             self.mro = self.mro[:-1]
         return list(self.mro)  # copy of self.mro
 
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         res = self.get_local_attr(name)
         if not res:
-            for basecls in self.baseclass:
+            assert self.mro
+            for basecls in self.mro[1:]:
                 res = basecls.getattribute(name, None).value
                 if res:
                     break
@@ -643,7 +654,7 @@ class TypeFuncIns(TypeIns):
 
 
 any_temp = TypeAnyTemp()
-any_ins = any_temp.get_default_ins().value
+any_ins = any_temp.get_default_ins()
 any_type = any_temp.get_default_typetype()
 
 func_temp = TypeFuncTemp()

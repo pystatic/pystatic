@@ -88,9 +88,9 @@ def test_exprparse_type_expr():
     g = manager.eval_expr(src, "g")
     A = manager.eval_expr(src, "A")
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
-    cur_union = union_temp.get_default_ins().value
+    cur_union = union_temp.get_default_ins()
     cur_union.bindlist = [int, str]
-    cur_optional = optional_temp.get_default_ins().value
+    cur_optional = optional_temp.get_default_ins()
     cur_optional.bindlist = [cur_union]
     assert a.equiv(cur_optional)
 

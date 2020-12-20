@@ -20,12 +20,12 @@ def test_typevar():
     assert module_ins.symid == symid
 
     int_typetype = manager.eval_expr("builtins", "int")
-    int_ins = int_typetype.temp.get_default_ins().value
+    int_ins = int_typetype.temp.get_default_ins()
     assert isinstance(int_typetype, TypeType)
     assert isinstance(int_ins, TypeIns)
 
     str_typetype = manager.eval_expr("builtins", "str")
-    str_ins = str_typetype.temp.get_default_ins().value
+    str_ins = str_typetype.temp.get_default_ins()
     assert isinstance(str_typetype, TypeType)
     assert isinstance(str_ins, TypeIns)
 
