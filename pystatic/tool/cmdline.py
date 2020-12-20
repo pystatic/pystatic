@@ -70,7 +70,7 @@ def cmdline_main():
             add_result.dump_to_box(cmdline_errbox)
 
         manager.preprocess()
-        # manager.infer()
+        manager.infer()
 
         cmdline_errbox.release(manager)
         for mod in cmd_res.module:

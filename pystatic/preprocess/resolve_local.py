@@ -34,7 +34,6 @@ def judge_typevar(prepinfo: "PrepInfo", node: AssignNode):
 
 def judge_typealias(prepinfo: "PrepInfo", node: AssignNode) -> Optional[TypeAlias]:
     if isinstance(node, ast.AnnAssign):
-        # assignment with type annotation is not a type alias.
         return None
 
     if node.value:

@@ -384,7 +384,7 @@ class TypeGenericTemp(TypeTemp):
 class TypeProtocolTemp(TypeTemp):
     def __init__(self) -> None:
         super().__init__("Protocol")
-    
+
     def arity(self) -> int:
         return INFINITE_ARITY
 
@@ -415,6 +415,7 @@ class TypeLiteralTemp(TypeTemp):
 
         items = itemarg.items
         if len(items) != 1:
+            # TODO: many false positive
             result.add_err(IndiceParamNumberMismatch(len(items), 1, node))
         constant = items[0].value
         constant_node = items[0].node

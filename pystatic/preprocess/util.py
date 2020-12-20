@@ -104,7 +104,7 @@ def analyse_import_stmt(
             ):  # 9 == len('.__init__')
                 # special case: __init__.py import a module under the same package
                 info_list.append(
-                    prep_impt(module_symid + attr_name, "", as_name, prepinfo, node)
+                    prep_impt(module_symid + '.' + attr_name, "", as_name, prepinfo, node)
                 )
             else:
                 info_list.append(

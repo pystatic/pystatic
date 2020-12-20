@@ -3,7 +3,6 @@ from collections import deque
 from typing import Deque
 from pystatic.exprparse import ExprParser, eval_expr
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.visitor import NoGenVisitor
 from pystatic.evalutil import ApplyArgs
 from pystatic.predefined import TypeVarIns, typevar_type, typevar_temp
 from pystatic.preprocess.prepinfo import *
@@ -94,6 +93,3 @@ class TypeVarFiller(ExprParser):
         else:
             return super().visit_Call(node)
 
-
-class TypeAliasFiller(NoGenVisitor):
-    pass

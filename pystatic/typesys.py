@@ -274,6 +274,7 @@ class TypeTemp(ABC):
         if arity == INFINITE_ARITY:
             return True
         elif arity != len_items:
+            # TODO: many false positive
             result.add_err(IndiceParamNumberMismatch(len_items, arity, node))
             return False
         else:

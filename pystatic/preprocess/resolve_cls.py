@@ -66,7 +66,7 @@ def resolve_cls_placeholder(clsdef: "prep_cls", errbox: "ErrorBox"):
 
 
 class _TypeVarVisitor(BaseVisitor):
-    """Get the list of TypeVar from baseclass nodes.
+    """Get the list of TypeVar from baseclass nodes
 
     Used to generate correct placeholders.
     """

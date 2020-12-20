@@ -88,7 +88,7 @@ def update_symtable_import_cache(
 ) -> Optional[TypeIns]:
     def set_prepinfo_impt(symid: SymId, moduleins: TypeModuleIns):
         if (cur_impt := prepinfo.impt.get(symid)) :
-            if not cur_impt.value:
+            if cur_impt.origin_name == "":
                 cur_impt.value = moduleins
         else:
             prepinfo.impt[symid] = prep_impt(
