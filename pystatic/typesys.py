@@ -391,6 +391,8 @@ class TypeTemp(ABC):
 class ModuleNamedTypeTemp(TypeTemp):
     """TypeTemp with module_symid set
 
+    Mainly used for test
+
     TypeTemp is an abstract class and ModuleNamedTypeTemp makes it convenient
     to create temporary TypeTemp.
     """
@@ -461,6 +463,8 @@ class TypeClassTemp(TypeTemp):
     def get_mro(self):
         """C3 algorithm"""
         from pystatic.predefined import object_temp
+
+        # TODO: avoid recursion
 
         # type parameter is not concerned
         if self.mro is not None:
@@ -638,9 +642,9 @@ class TypeFuncIns(TypeIns):
         return ret_result
 
 
-func_temp = TypeFuncTemp()
-module_temp = TypeModuleTemp()
-
 any_temp = TypeAnyTemp()
 any_ins = any_temp.get_default_ins().value
 any_type = any_temp.get_default_typetype()
+
+func_temp = TypeFuncTemp()
+module_temp = TypeModuleTemp()

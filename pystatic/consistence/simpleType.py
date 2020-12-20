@@ -1,28 +1,7 @@
 import enum
 from typing import Union
 from pystatic.typesys import TypeAnyTemp, TypeIns, TypeTemp, TypeClassTemp, TypeType
-from pystatic.predefined import (
-    TypeOptionalTemp,
-    TypeCallableTemp,
-    TypeNoneTemp,
-    TypeUnionTemp,
-    TypeVarTemp,
-)
-from pystatic.predefined import (
-    TypeListTemp,
-    TypeTupleTemp,
-    TypeSetTemp,
-    TypeDictTemp,
-)
-from pystatic.predefined import TypeLiteralIns, TypeLiteralTemp
-from pystatic.predefined import (
-    int_temp,
-    float_temp,
-    str_temp,
-    complex_temp,
-    byte_temp,
-    bool_temp,
-)
+from pystatic.predefined import *
 
 
 class compatibleState(enum.IntEnum):
@@ -64,6 +43,8 @@ class TypeCompatible:
         return False
 
     def TypeCompatible(self, a: TypeIns, b: TypeIns) -> bool:
+        if a == any_ins or b == any_ins:
+            return True
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
         if self.baseclassify(tempa, self.baseType):
@@ -84,6 +65,8 @@ class TypeCompatible:
         return False
 
     def TypeCompatibleStrict(self, a: TypeIns, b: TypeIns) -> bool:
+        if a == any_ins or b == any_ins:
+            return True
         tempa: TypeTemp = a.temp
         tempb: TypeTemp = b.temp
         if self.baseclassify(tempa, self.baseType):

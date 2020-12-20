@@ -45,7 +45,8 @@ def resolve_cls(clsdef: "prep_cls", shallow: bool):
                         errbox.add_err(DuplicateBaseclass(base_node))
                     break
             if is_new:
-                clstemp.baseclass.append(res_type.get_default_ins())
+                if res_type.temp != clstemp:
+                    clstemp.baseclass.append(res_type.get_default_ins())
         is_generic = is_generic or base_res.generic
     clstemp.get_mro()
 
