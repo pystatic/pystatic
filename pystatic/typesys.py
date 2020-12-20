@@ -22,6 +22,9 @@ class TypeIns:
         self.temp = temp
         self.bindlist = bindlist
 
+    def get_local_attr(self, name: str, node: Optional[ast.AST]) -> Optional["TypeIns"]:
+        return self.temp.get_local_attr(name, self.bindlist)
+
     def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
         result = Result(any_ins)
         ins_res = self.temp.getattribute(name, self.bindlist)
@@ -200,6 +203,9 @@ class TypeTemp(ABC):
         return [self.get_default_ins()]
 
     # basic
+    def get_local_attr(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
+        return None
+
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         return None
 
@@ -454,7 +460,7 @@ class TypeClassTemp(TypeTemp):
         assert self._def_symtable
         return self._def_symtable
 
-    def get_local_attr(self, name: str) -> Optional["TypeIns"]:
+    def get_local_attr(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         if name in self.var_attr:
             return self.var_attr[name]
         else:
@@ -514,13 +520,14 @@ class TypeClassTemp(TypeTemp):
         return list(self.mro)  # copy of self.mro
 
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
-        res = self.get_local_attr(name)
+        res = self.get_local_attr(name, bindlist)
         if not res:
-            assert self.mro
-            for basecls in self.mro[1:]:
-                res = basecls.getattribute(name, None).value
-                if res:
-                    break
+            assert self.mro is not None
+            if self.mro:
+                for basecls in self.mro[1:]:
+                    res = basecls.get_local_attr(name, None)
+                    if res:
+                        break
         return res
 
 
