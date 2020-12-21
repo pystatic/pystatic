@@ -467,6 +467,20 @@ class TypeClassTemp(TypeTemp):
         else:
             return self._inner_symtable.lookup_local(name)
 
+    def get_mro_attr(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
+        from pystatic.predefined import object_ins, object_temp
+
+        res = None
+        if self.mro:
+            for basecls in self.mro[1:]:
+                res = basecls.get_local_attr(name, None)
+                if res:
+                    break
+            if not res and self != object_temp:
+                if (res := object_ins.get_local_attr(name, None)) :
+                    return res
+        return None
+
     def get_type_attribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         res = self._inner_symtable.lookup_local(name)
         if not res:
@@ -521,6 +535,8 @@ class TypeClassTemp(TypeTemp):
         return list(self.mro)  # copy of self.mro
 
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
+        from pystatic.predefined import object_temp, object_ins
+
         res = self.get_local_attr(name, bindlist)
         if not res:
             if self.mro:
@@ -528,7 +544,19 @@ class TypeClassTemp(TypeTemp):
                     res = basecls.get_local_attr(name, None)
                     if res:
                         break
+            if not res and self != object_temp:
+                if (res := object_ins.get_local_attr(name, None)) :
+                    return res
         return res
+
+
+class TypeClassIns(TypeIns):
+    def __init__(self, temp: "TypeClassTemp", bindlist: BindList):
+        self.temp: "TypeClassTemp"
+        super().__init__(temp, bindlist)
+
+    def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
+        return super().getattribute(name, node)
 
 
 class TypeAnyTemp(TypeTemp):
@@ -622,6 +650,8 @@ class TypeFuncIns(TypeIns):
         self.funname = funname
         self.module_symid = module_symid
 
+        self.self_bind: Optional[Tuple["TypeIns", ast.AST]] = None  # used for 'self'
+
         self._inner_symtable = inner_symtable
         self._inner_symtable.param = argument
 
@@ -647,10 +677,13 @@ class TypeFuncIns(TypeIns):
 
     def get_func_name(self):
         return self.funname
-    
+
     def get_ret_type(self) -> "TypeIns":
         """Get return type"""
         return self.overloads[0].ret_type
+
+    def set_self_bind(self, typeins: "TypeIns", node: ast.AST):
+        self.self_bind = (typeins, node)
 
     def call(
         self, applyargs: "ApplyArgs", node: Optional[ast.AST]
@@ -659,6 +692,9 @@ class TypeFuncIns(TypeIns):
         from pystatic.arg import match_argument
 
         assert self.overloads
+        if self.self_bind:
+            applyargs.add_arg(self.self_bind[0], self.self_bind[1])
+
         error_list = match_argument(self.overloads[0].argument, applyargs, node)
         ret_result = Result(self.overloads[0].ret_type)
         ret_result.add_err_list(error_list)

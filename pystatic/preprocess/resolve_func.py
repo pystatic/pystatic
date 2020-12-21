@@ -108,7 +108,7 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argume
         nonlocal errbox, prepinfo
         new_arg = Arg(node.arg, any_ins)
         if node.annotation:
-            ann_result = infer_expr_ann(node.annotation, prepinfo)
+            ann_result = infer_expr_ann(node.annotation, prepinfo, True)
             ann_result.dump_to_box(errbox)
             new_arg.ann = ann_result.value
         return new_arg

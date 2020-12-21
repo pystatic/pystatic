@@ -319,7 +319,7 @@ class UnsupportedBinOperand(ErrorCode):
 
     def to_string(self) -> str:
         review = self.template.format(self.operand)
-        detail = f"'{self.left_type}' and {self.right_type}"
+        detail = f"{self.left_type} and {self.right_type}"
         return self.concat_msg(review, detail)
 
 
