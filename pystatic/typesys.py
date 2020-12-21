@@ -36,8 +36,8 @@ class TypeIns:
             result.set_value(ins_res)
         return result
 
-    def getattr(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
-        return self.getattribute(name, node)
+    def try_getattribute(self, name: str) -> Optional["TypeIns"]:
+        return self.temp.getattribute(name, self.bindlist)
 
     def call(
         self, applyargs: "ApplyArgs", node: Optional[ast.Call]
@@ -523,7 +523,6 @@ class TypeClassTemp(TypeTemp):
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         res = self.get_local_attr(name, bindlist)
         if not res:
-            assert self.mro is not None
             if self.mro:
                 for basecls in self.mro[1:]:
                     res = basecls.get_local_attr(name, None)
@@ -608,6 +607,7 @@ class OverloadItem:
         self.ret_type = ret_type
 
 
+# TODO: add overload matching
 class TypeFuncIns(TypeIns):
     def __init__(
         self,
@@ -647,6 +647,10 @@ class TypeFuncIns(TypeIns):
 
     def get_func_name(self):
         return self.funname
+    
+    def get_ret_type(self) -> "TypeIns":
+        """Get return type"""
+        return self.overloads[0].ret_type
 
     def call(
         self, applyargs: "ApplyArgs", node: Optional[ast.AST]

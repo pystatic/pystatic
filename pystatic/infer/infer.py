@@ -352,7 +352,7 @@ class InferVisitor(BaseVisitor):
         if container == any_ins:
             return False
         if container.bindlist is None:
-            self.errbox.add_err(NonIterative(node, container))
+            self.errbox.add_err(NotIterable(node, container))
             return False
         return True
 

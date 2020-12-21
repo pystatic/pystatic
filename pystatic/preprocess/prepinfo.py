@@ -3,7 +3,7 @@ from typing import Dict, Set, Final
 from pystatic.error.errorcode import *
 from pystatic.target import Target
 from pystatic.symid import SymId, symid2list
-from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins
+from pystatic.typesys import TypeAlias, TypeClassTemp, TypeIns, TypeType, any_ins, TypeTemp
 from pystatic.predefined import TypeVarIns, TypeFuncIns
 from pystatic.symtable import (
     ImportEntry,

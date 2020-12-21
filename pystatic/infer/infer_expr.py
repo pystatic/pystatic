@@ -49,6 +49,8 @@ class ExprInferer(NoGenVisitor):
         self.in_subs = False
         self.container = None
 
+        self.tmp_var = []  # temporary variables, used for comprehension and lambda
+
     def accept(self, node) -> Result[TypeIns]:
         self.errors = []
         tpins = self.visit(node)
@@ -75,7 +77,10 @@ class ExprInferer(NoGenVisitor):
         yield
         self.in_subs = old_in_subs
 
-    def add_err(self, errlist: Optional[List[ErrorCode]]):
+    def add_err(self, errcode: ErrorCode):
+        self.errors.append(errcode)
+
+    def add_errlist(self, errlist: Optional[List[ErrorCode]]):
         if errlist:
             self.errors.extend(errlist)
 
@@ -83,6 +88,39 @@ class ExprInferer(NoGenVisitor):
         """If under subscript node, then will add item to current container"""
         if self.in_subs:
             self.container.append(WithAst(item, node))
+
+    @contextlib.contextmanager
+    def new_scope(self):
+        self.tmp_var.append({})
+        yield
+        self.tmp_var.pop()
+
+    def _add_new_var(self, name: str, tp: TypeIns):
+        self.tmp_var[-1][name] = tp
+
+    def _assign(self, target: ast.AST, tp: TypeIns):
+        # mainly used for comprehension and lambda expression
+        # TODO: support more complex expression
+        if isinstance(target, ast.Name):
+            self._add_new_var(target.id, tp)
+        elif isinstance(target, ast.Tuple):
+            if tp.temp == tuple_temp:
+                if len(target.elts) > len(tp.bindlist):
+                    self.add_err(
+                        TooMoreValuesToUnpack(
+                            target, len(tp.bindlist), len(target.elts)
+                        )
+                    )
+                elif len(target.elts) < len(tp.bindlist):
+                    self.add_err(
+                        NeedMoreValuesToUnpack(
+                            target, len(tp.bindlist), len(target.elts)
+                        )
+                    )
+                else:
+                    for target_node, ins in zip(target.elts, tp.bindlist):
+                        if isinstance(target_node, ast.Name):
+                            self._add_new_var(target_node.id, ins)
 
     def get_type_from_astlist(
         self, typeins: Optional[TypeIns], astlist: Sequence[Optional[ast.AST]]
@@ -123,11 +161,15 @@ class ExprInferer(NoGenVisitor):
         return self.visit(node.value)
 
     def visit_Name(self, node: ast.Name) -> TypeIns:
-        name_result = self.consultant.getattribute(node.id, node)
-        assert isinstance(name_result, Result)
-        assert isinstance(name_result.value, TypeIns)
+        for cur_scope in reversed(self.tmp_var):
+            if (name_result := cur_scope.get(node.id)) :
+                break
+        else:
+            name_result = self.consultant.getattribute(node.id, node)
+            assert isinstance(name_result, Result)
+            assert isinstance(name_result.value, TypeIns)
 
-        self.add_err(name_result.errors)
+        self.add_errlist(name_result.errors)
 
         self.add_to_container(name_result.value, node)
         return name_result.value
@@ -162,7 +204,7 @@ class ExprInferer(NoGenVisitor):
             assert isinstance(res, TypeIns)
         attr_result = res.getattribute(node.attr, node)
 
-        self.add_err(attr_result.errors)
+        self.add_errlist(attr_result.errors)
 
         self.add_to_container(attr_result.value, node)
         return attr_result.value
@@ -175,7 +217,7 @@ class ExprInferer(NoGenVisitor):
             applyargs = self.generate_applyargs(node)
             call_result = left_ins.call(applyargs, node)
 
-            self.add_err(call_result.errors)
+            self.add_errlist(call_result.errors)
 
         self.add_to_container(call_result.value, node)
         return call_result.value
@@ -186,7 +228,7 @@ class ExprInferer(NoGenVisitor):
         assert isinstance(operand_ins, TypeIns)
 
         result = operand_ins.unaryop_mgf(type(node.op), node)
-        self.add_err(result.errors)
+        self.add_errlist(result.errors)
 
         self.add_to_container(result.value, node)
         return result.value
@@ -199,7 +241,7 @@ class ExprInferer(NoGenVisitor):
         assert isinstance(right_ins, TypeIns)
 
         result = left_ins.binop_mgf(right_ins, type(node.op), node)
-        self.add_err(result.errors)
+        self.add_errlist(result.errors)
 
         self.add_to_container(result.value, node)
         return result.value
@@ -227,7 +269,7 @@ class ExprInferer(NoGenVisitor):
         self.annotation = old_annotation
 
         self.add_to_container(result.value, node)
-        self.add_err(result.errors)
+        self.add_errlist(result.errors)
         return result.value
 
     def visit_List(self, node: ast.List):
@@ -292,7 +334,7 @@ class ExprInferer(NoGenVisitor):
                 assert isinstance(comparator_ins, TypeIns)
 
                 result = left_ins.binop_mgf(comparator_ins, type(op), node)  # type: ignore
-                self.add_err(result.errors)
+                self.add_errlist(result.errors)
                 left_ins = result.value
 
         # assert that left_ins is bool type?
@@ -313,8 +355,23 @@ class ExprInferer(NoGenVisitor):
         self.add_to_container(cur_ins, node)
         return cur_ins
 
+    def visit_comprehension(self, node: ast.comprehension):
+        with self.block_container():
+            iter_ins = self.visit(node.iter)
+            assert isinstance(iter_ins, TypeIns)
+            iter_type = get_iter_type(iter_ins)
+            if not iter_type:
+                self.add_err(NotIterable(node, iter_ins))
+                iter_type = any_ins
+            self._assign(node.target, iter_type)
+
     def visit_ListComp(self, node: ast.ListComp):
-        listins = list_type.get_default_ins()
+        with self.block_container():
+            with self.new_scope():
+                for gen in node.generators:
+                    self.visit(gen)
+                item_ins = self.visit(node.elt)
+                listins = list_temp.getins([item_ins]).value
         self.add_to_container(listins, node)
         return listins
 
@@ -331,7 +388,6 @@ class ExprInferer(NoGenVisitor):
         return any_ins
 
     def visit_JoinedStr(self, node: ast.JoinedStr):
-        # TODO: make this more accurate
         self.add_to_container(str_ins, node)
         return str_ins
 
@@ -342,3 +398,21 @@ class ExprInferer(NoGenVisitor):
     def visit_IfExp(self, node: ast.IfExp):
         # TODO: fix this
         return self.visit(node.body)
+
+
+def get_iter_type(itertype: TypeIns) -> Optional[TypeIns]:
+    iter_res = itertype.try_getattribute("__next__")
+    if iter_res and iter_res.temp == func_temp:
+        assert isinstance(iter_res, TypeFuncIns)
+        return iter_res.get_ret_type()
+
+    iter_res = itertype.try_getattribute("__iter__")
+    if iter_res and iter_res.temp == func_temp:
+        assert isinstance(iter_res, TypeFuncIns)
+        iterable_ins = iter_res.get_ret_type()
+        next_res = iterable_ins.try_getattribute("__next__")
+        if next_res and next_res.temp == func_temp:
+            assert isinstance(next_res, TypeFuncIns)
+            return next_res.get_ret_type()
+
+    return None

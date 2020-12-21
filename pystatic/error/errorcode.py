@@ -333,8 +333,8 @@ class CodeUnreachable(ErrorCode):
         return self.template
 
 
-class NonIterative(ErrorCode):
-    template = "type '{}' is non-iterative"
+class NotIterable(ErrorCode):
+    template = "type '{}' is not iterable"
 
     def __init__(self, node: Optional[ast.AST], fake_iter: "TypeIns"):
         super().__init__(Level.WARN, node)
