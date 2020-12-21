@@ -150,8 +150,8 @@ class ConditionInfer(BaseVisitor):
     def infer_value_of_condition(self, test: ast.expr) -> Reach:
         if hasattr(test, "reach"):
             res = test.reach
-            assert res != Reach.UNKNOWN
-            return res
+            if res != Reach.UNKNOWN:
+                return res
         if isinstance(test, ast.Constant):
             return self.infer_value_of_constant(test)
         elif isinstance(test, ast.UnaryOp):
@@ -164,6 +164,8 @@ class ConditionInfer(BaseVisitor):
             return self.infer_value_of_call(test)
         elif isinstance(test, ast.Name):
             return self.infer_value_of_name_node(test)
+        elif isinstance(test, (ast.List, ast.Tuple)):
+            return self.infer_value_of_construct(test)
         else:
             return Reach.UNKNOWN
 
@@ -205,6 +207,12 @@ class ConditionInfer(BaseVisitor):
     def visit_issubclass(self, node: ast.Call) -> Reach:
         # TODO
         return Reach.UNKNOWN
+
+    def infer_value_of_construct(self, test: Union[ast.List, ast.Tuple]):
+        if test.elts:
+            return Reach.ALWAYS_TRUE
+        else:
+            return Reach.ALWAYS_FALSE
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
         result: Result = infer_expr(test, self.recorder)

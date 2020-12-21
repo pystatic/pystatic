@@ -114,6 +114,7 @@ class SymbolRecorder:
         self.cur_scope.set_type(name, tp)
 
     def get_comment_type(self, name) -> TypeIns:
+        """Get type of symbol type of this scope"""
         scope = self.cur_scope
         table: SymTable = scope.tp.get_inner_symtable()
         tp = table.legb_lookup(name)
@@ -168,9 +169,9 @@ def literal_to_normal_type(literal_ins: TypeLiteralIns):
 def make_union_type(type_list) -> TypeIns:
     bindlist: List[TypeIns] = []
     for tp in type_list:
-        if tp.temp.name == "Union":
+        if tp.temp == union_temp:
             bindlist.extend(tp.bindlist)
-        elif isinstance(tp, TypeLiteralIns):
+        elif tp.temp == literal_temp:
             bindlist.append(literal_to_normal_type(tp))
         else:
             bindlist.append(tp)

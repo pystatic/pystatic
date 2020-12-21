@@ -1,7 +1,7 @@
 import logging
+from typing import Deque
 from contextlib import contextmanager
 from pystatic.infer.staticinfer import is_cmp_python_version
-from typing import Deque
 from pystatic.predefined import *
 from pystatic.target import FunctionTarget, Target, BlockTarget
 from pystatic.error.errorbox import ErrorBox
@@ -209,7 +209,7 @@ class InferVisitor(BaseVisitor):
                 )
                 self.accept_condition_stmt_list(node.body, ConditionStmtType.FUNC)
 
-                self.infer_return_value_of_func(node.returns)
+                self.infer_return_value_of_func()
                 self.recorder.clear_ret_val()
 
     def preprocess_in_func(self, node: ast.FunctionDef, func_type: TypeFuncIns):
@@ -218,6 +218,7 @@ class InferVisitor(BaseVisitor):
         self.manager.preprocess_block(func_target)
 
     def infer_argument(self, argument: Argument):
+        """Store arguments' type to a dict"""
         args = {}
         for arg in argument.posonlyargs:
             args[arg.name] = arg.ann
@@ -233,16 +234,11 @@ class InferVisitor(BaseVisitor):
             args[vararg.name] = vararg.ann
         return args
 
-    def infer_return_value_of_func(self, node: ast.AST):
-        ret_set = self.recorder.get_ret_type()
-        ret_list = list(ret_set)
+    def infer_return_value_of_func(self):
         ret_annotation = self.recorder.get_ret_annotation()
-        num = len(ret_list)
         if ret_annotation == any_ins:
             self.recorder.reset_ret_val()
             return
-        if num == 0 and not ret_annotation == none_ins:
-            self.errbox.add_err(ReturnValueExpected(node))
 
     def visit_Return(self, node: ast.Return):
         self.cond_infer.accept(node)
