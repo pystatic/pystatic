@@ -1,11 +1,11 @@
 import ast
 from collections import deque
 from typing import Deque
-from pystatic.exprparse import ExprParser, eval_expr
 from pystatic.typesys import TypeIns, TypeType
-from pystatic.evalutil import ApplyArgs
 from pystatic.predefined import TypeVarIns, typevar_type, typevar_temp
 from pystatic.preprocess.prepinfo import *
+from pystatic.infer.infer_expr import ExprInferer, infer_expr
+from pystatic.infer.util import ApplyArgs
 
 
 def resolve_typevar(prepinfo: "PrepInfo"):
@@ -33,7 +33,9 @@ def resolve_typealias(typealias_def: "prep_local"):
     assert assign_node, "TypeAlias definition shouldn't be empty"
     assert not isinstance(assign_node, ast.Constant)
     # TODO: add warning
-    typetype = eval_expr(assign_node, typealias_def.def_prepinfo, annotation=True).value
+    typetype = infer_expr(
+        assign_node, typealias_def.def_prepinfo, annotation=True
+    ).value
     assert isinstance(typetype, TypeType)
     typealias.bindlist = typetype.bindlist
 
@@ -51,9 +53,9 @@ def copy_typevar(src: "TypeVarIns", dst: "TypeVarIns"):
     dst.constraints = src.constraints
 
 
-class TypeVarFiller(ExprParser):
+class TypeVarFiller(ExprInferer):
     def __init__(self, typevar: "TypeVarIns", prepinfo: "PrepInfo") -> None:
-        super().__init__(prepinfo, False, False)
+        super().__init__(prepinfo, False)
         self.typevar = typevar
         self.outermost = True
 
@@ -92,4 +94,3 @@ class TypeVarFiller(ExprParser):
             return self.typevar
         else:
             return super().visit_Call(node)
-

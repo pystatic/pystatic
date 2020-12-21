@@ -6,8 +6,8 @@ from pystatic.target import FunctionTarget, Target, BlockTarget
 from pystatic.error.errorbox import ErrorBox
 from pystatic.arg import Argument
 from pystatic.error.errorcode import *
-from pystatic.exprparse import eval_expr
-from pystatic.evalutil import ApplyArgs
+from pystatic.infer.infer_expr import infer_expr
+from pystatic.infer.util import ApplyArgs
 from pystatic.result import Result
 from pystatic.opmap import get_funname, get_opstr
 from pystatic.config import Config
@@ -64,7 +64,7 @@ class InferVisitor(BaseVisitor):
         self.visit(self.root)
 
     def get_type(self, node: Optional[ast.AST]) -> TypeIns:
-        result = eval_expr(node, self.recorder)
+        result = infer_expr(node, self.recorder)
         result.dump_to_box(self.errbox)
         return result.value
 

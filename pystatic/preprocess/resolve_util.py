@@ -1,7 +1,7 @@
 import ast
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.result import Result
-from pystatic.exprparse import ExprParser, SupportGetAttribute, eval_expr
+from pystatic.infer.infer_expr import ExprInferer, SupportGetAttribute, infer_expr
 
 
 def eval_preptype(
@@ -10,29 +10,22 @@ def eval_preptype(
     return PrepTypeEvaluator(consultant, annotation, shallow).accept(node)
 
 
-def eval_expr_ann(node: ast.AST, consultant: SupportGetAttribute):
-    result = eval_expr(node, consultant, False, True)
-    value = result.value
-    if isinstance(value, TypeType):
-        result.value = value.get_default_ins()
-    return result
-
-
 class PrepTypeEvalResult:
-    def __init__(self, option_ins: Result[TypeIns], generic: bool) -> None:
-        self.option_ins = option_ins
+    def __init__(self, result: Result[TypeIns], generic: bool) -> None:
+        self.result = result
         self.generic = generic
 
 
-class PrepTypeEvaluator(ExprParser):
+class PrepTypeEvaluator(ExprInferer):
     """Evaluate a node's type and can run in shallow mode.
 
     shallow mode: won't dive inside subscript node
     """
+
     def __init__(
         self, consultant: SupportGetAttribute, annotation: bool, shallow: bool
     ) -> None:
-        super().__init__(consultant, False, annotation)
+        super().__init__(consultant, annotation)
         self.shallow = shallow
         self.generic = False
 

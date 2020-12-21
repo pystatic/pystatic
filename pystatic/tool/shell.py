@@ -114,7 +114,7 @@ class Shell:
                 try:
                     astnode = ast.parse(blk_str, mode="eval")
                     # input is an expression
-                    ins = self.manager.eval_expr(self.symid, blk_str)
+                    ins = self.manager.infer_expr(self.symid, blk_str)
                     if ins:
                         print(f"{ins}")
                     else:

@@ -21,7 +21,7 @@ def resolve_import(prepinfo: "PrepInfo", env: "PrepEnvironment"):
                 if module_ins:
                     module_prepinfo = env.get_prepinfo(entry.symid)
                     if module_prepinfo:
-                        # used for eval_expr because new symbols haven't been
+                        # used for infer_expr because new symbols haven't been
                         # added to module instance yet.
                         module_ins.set_consultant(module_prepinfo)
                     entry.value = module_ins

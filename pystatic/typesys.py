@@ -7,10 +7,11 @@ from pystatic.error.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.symtable import SymTable, FunctionSymTable
-    from pystatic.evalutil import ApplyArgs, GetItemArgs, WithAst
+    from pystatic.infer.util import ApplyArgs, GetItemArgs, WithAst
+    from pystatic.predefined import TypeVarIns
     from pystatic.arg import Argument
 
-BindList = Optional[List[Any]]
+BindList = List[Any]
 
 DEFAULT_TYPEVAR_NAME: Final[str] = "__unknown_typevar_name__"
 INFINITE_ARITY: Final[int] = -1
@@ -165,7 +166,7 @@ class TypeType(TypeIns):
         return self.temp._inner_symtable
 
     def __str__(self):
-        s = self.temp.str_expr(None)
+        s = self.temp.str_expr([])
         return "Type[" + s + "]"
 
 
@@ -181,10 +182,10 @@ class TypeAlias(TypeType):
 class TypeTemp(ABC):
     def __init__(self, name: str):
         self.name = name
-        self.placeholders = []
+        self.placeholders: List["TypeVarIns"] = []
 
-        self._cached_ins = TypeIns(self, None)
-        self._cached_typetype = TypeType(self, None)
+        self._cached_ins = TypeIns(self, [])
+        self._cached_typetype = TypeType(self, [])
 
     @property
     def basename(self) -> str:
@@ -234,7 +235,7 @@ class TypeTemp(ABC):
     def unaryop_mgf(
         self, typeins: "TypeIns", op: Type, node: ast.AST
     ) -> Result["TypeIns"]:
-        from pystatic.evalutil import ApplyArgs
+        from pystatic.infer.util import ApplyArgs
 
         result = Result(any_ins)
         func_name = get_funname(op)
@@ -254,7 +255,7 @@ class TypeTemp(ABC):
     def binop_mgf(
         self, typeins: "TypeIns", other: "TypeIns", op: Type, node: ast.AST
     ) -> Result["TypeIns"]:
-        from pystatic.evalutil import ApplyArgs
+        from pystatic.infer.util import ApplyArgs
 
         result = Result(any_ins)
         func_name = get_funname(op)
@@ -277,7 +278,7 @@ class TypeTemp(ABC):
         return None
 
     def _getitem_typetype_check_bindlist(self, bindlist, result: Result, node) -> bool:
-        if bindlist is not None:
+        if bindlist:
             result.add_err(NotSubscriptable(TypeIns(self, bindlist), node))
             return False
         return True
@@ -616,7 +617,7 @@ class TypeFuncIns(TypeIns):
         argument: "Argument",
         ret: TypeIns,
     ) -> None:
-        super().__init__(func_temp, None)
+        super().__init__(func_temp, [])
         self.overloads: List[OverloadItem] = [OverloadItem(argument, ret)]
         self.funname = funname
         self.module_symid = module_symid

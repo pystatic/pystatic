@@ -23,16 +23,16 @@ def test_import():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    banana = manager.eval_expr(symid, 'banana')
-    Banana = manager.eval_expr(symid, 'Banana')
-    vegetable = manager.eval_expr(symid, 'vegetable')
-    c = manager.eval_expr(symid, 'c')
+    banana = manager.infer_expr(symid, 'banana')
+    Banana = manager.infer_expr(symid, 'Banana')
+    vegetable = manager.infer_expr(symid, 'vegetable')
+    c = manager.infer_expr(symid, 'c')
     assert isinstance(banana, TypeIns)
     assert isinstance(Banana, TypeType)
     assert isinstance(c, TypeIns) and not isinstance(c, TypeType)
     assert banana.temp == Banana.temp
 
-    love_fruit = manager.eval_expr(symid, 'love_banana(banana)')
+    love_fruit = manager.infer_expr(symid, 'love_banana(banana)')
     assert isinstance(love_fruit, TypeIns)
     assert love_fruit.temp == Banana.temp
 
@@ -46,8 +46,8 @@ def test_star_import():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    a = manager.eval_expr(symid, 'a')
-    pack_type = manager.eval_expr(symid, 'Pack')
+    a = manager.infer_expr(symid, 'a')
+    pack_type = manager.infer_expr(symid, 'Pack')
     assert isinstance(a, TypeIns) and not isinstance(a, TypeType)
     assert isinstance(pack_type, TypeType)
     assert a.temp == pack_type.temp
@@ -61,8 +61,8 @@ def test_multidot_import():
     assert isinstance(module_ins, TypeModuleIns)
     assert module_ins.symid == symid
 
-    a = manager.eval_expr(symid, 'a')
-    apple_type = manager.eval_expr(symid, 'preprocess.pack.fruit.apple.Apple')
+    a = manager.infer_expr(symid, 'a')
+    apple_type = manager.infer_expr(symid, 'preprocess.pack.fruit.apple.Apple')
     assert_is_instance(a)
     assert isinstance(apple_type, TypeType)
     assert a.temp == apple_type.temp

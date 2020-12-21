@@ -4,7 +4,7 @@ from pystatic.error.errorcode import *
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
-    from pystatic.evalutil import ApplyArgs
+    from pystatic.infer.util import ApplyArgs
 
 
 class Arg(object):

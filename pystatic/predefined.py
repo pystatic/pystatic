@@ -4,7 +4,7 @@ from pystatic.typesys import *
 from pystatic.error.errorcode import *
 
 if TYPE_CHECKING:
-    from pystatic.evalutil import GetItemArgs, InsWithAst
+    from pystatic.infer.util import GetItemArgs, InsWithAst
 
 
 TypeVarList = List["TypeVarIns"]
@@ -26,60 +26,6 @@ typing_extensions_symtable.glob = typing_extensions_symtable
 INVARIANT: Final[int] = 1
 COVARIANT: Final[int] = 2
 CONTRAVARIANT: Final[int] = 3
-
-
-class TypeNoneTemp(TypeTemp):
-    def __init__(self):
-        super().__init__("None")
-
-    @property
-    def module_symid(self) -> str:
-        return "builtins"
-
-    def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
-        return None
-
-    def getitem(
-        self, item: "GetItemArgs", bindlist: BindList, node: Optional[ast.AST]
-    ) -> Result["TypeIns"]:
-        # TODO: warning here
-        res = Result(self._cached_ins)
-        res.add_err(NotSubscriptable(self._cached_ins, node))
-        return Result(self._cached_ins)
-
-    def getins(self, bindlist: BindList) -> Result["TypeIns"]:
-        return Result(self._cached_ins)
-
-    def getitem_typetype(
-        self,
-        bindlist: Optional[BindList],
-        item: Optional["GetItemArgs"],
-        node: Optional[ast.AST] = None,
-    ) -> Result["TypeType"]:
-        return Result(self._cached_typetype)
-
-
-class TypeUnionTemp(TypeTemp):
-    def __init__(self):
-        super().__init__("Union")
-        self.placeholders = [covariant_tpvar]
-
-    @property
-    def module_symid(self) -> str:
-        return "typing"
-
-    def arity(self) -> int:
-        return INFINITE_ARITY
-
-
-class TypeOptionalTemp(TypeTemp):
-    def __init__(self):
-        super().__init__("Optional")
-        self.placeholders = [covariant_tpvar]
-
-    @property
-    def module_symid(self) -> str:
-        return "typing"
 
 
 class TypeVarTemp(TypeClassTemp):
@@ -171,7 +117,7 @@ class TypeVarIns(TypeIns):
         bound: Optional["TypeIns"] = None,
         kind=INVARIANT,
     ):
-        super().__init__(typevar_temp, None)
+        super().__init__(typevar_temp, [])
         self.tpvar_name = tpvar_name
         self.bound = bound
         assert kind == INVARIANT or kind == COVARIANT or kind == CONTRAVARIANT
@@ -179,131 +125,40 @@ class TypeVarIns(TypeIns):
         self.constraints: List["TypeIns"] = list(*args)
 
 
-class TypeCallableTemp(TypeTemp):
+class TypeNoneTemp(TypeTemp):
     def __init__(self):
-        super().__init__("Callable")
+        super().__init__("None")
 
     @property
     def module_symid(self) -> str:
-        return "typing"
+        return "builtins"
 
-    def arity(self) -> int:
-        return 2
+    def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
+        return None
 
-    def getitem_typetype(
-        self, bindlist: BindList, itemarg: "GetItemArgs", node: Optional[ast.AST] = None
-    ) -> Result["TypeType"]:
-        res_bindlist = []
-        res = TypeType(self, [ellipsis_ins, any_ins])
-        result = Result(res)
-
-        if not self._getitem_typetype_check_bindlist(bindlist, result, node):
-            result.value = TypeType(self, bindlist)
-            return result
-
-        items = itemarg.items
-        callable_err = "Parameter list doesn't match Callable's structure"
-
-        if len(items) != 2:
-            result.add_err(IndiceGeneralError(callable_err, node))
-            return result
-        else:
-            arg_part = items[0]
-            ret_part = items[1]
-
-            if arg_part.value == ellipsis_ins:
-                res_bindlist.append(ellipsis_ins)
-            else:
-                if not isinstance(arg_part.value, (list, tuple)):
-                    result.add_err(IndiceGeneralError(callable_err, node))
-                    return result
-                arglist = []
-                for argitem in arg_part.value:
-                    self._getitem_typetype_accept_item(argitem, result, arglist)
-                res_bindlist.append(arglist)
-            self._getitem_typetype_accept_item(ret_part, result, res_bindlist)
-            res.bindlist = res_bindlist
-            return result
-
-
-class TypeGenericTemp(TypeTemp):
-    def __init__(self):
-        super().__init__("Generic")
-
-    @property
-    def module_symid(self) -> str:
-        return "typing"
-
-    def getitem_typetype(
-        self, bindlist: BindList, itemarg: "GetItemArgs", node: Optional[ast.AST]
-    ) -> Result["TypeType"]:
-        res_bindlist = []
-        res = TypeType(self, res_bindlist)
-        result = Result(res)
-
-        if not self._getitem_typetype_check_bindlist(bindlist, result, node):
-            result.value = TypeType(self, bindlist)
-            return result
-
-        items = itemarg.items
-        for item in items:
-            value = item.value
-            node = item.node
-            if not isinstance(value, TypeVarIns):
-                result.add_err(IndiceGeneralError("Expect a TypeVar", node))
-            else:
-                res_bindlist.append(value)
-        return result
-
-
-class TypeProtocolTemp(TypeTemp):
-    def __init__(self) -> None:
-        super().__init__("Protocol")
-
-    def arity(self) -> int:
-        return INFINITE_ARITY
-
-    @property
-    def module_symid(self) -> str:
-        return "typing"
-
-
-class TypeTypeAnnTemp(TypeTemp):
-    def __init__(self):
-        super().__init__("Type")
-
-    @property
-    def module_symid(self) -> str:
-        return "typing"
-
-    def arity(self) -> int:
-        return 1
+    def getitem(
+        self, item: "GetItemArgs", bindlist: BindList, node: Optional[ast.AST]
+    ) -> Result["TypeIns"]:
+        # TODO: warning here
+        res = Result(self._cached_ins)
+        res.add_err(NotSubscriptable(self._cached_ins, node))
+        return Result(self._cached_ins)
 
     def getins(self, bindlist: BindList) -> Result["TypeIns"]:
-        if not bindlist or len(bindlist) != 1:
-            # FIXME: add error here
-            return Result(any_ins)
+        return Result(self._cached_ins)
 
-        if not isinstance(bindlist[0], TypeIns):
-            raise NotImplementedError()
-
-        if isinstance(bindlist[0], TypeType):
-            return Result(bindlist[0])
-        else:
-            return Result(TypeType(bindlist[0].temp, None))
+    def getitem_typetype(
+        self,
+        bindlist: Optional[BindList],
+        item: Optional["GetItemArgs"],
+        node: Optional[ast.AST] = None,
+    ) -> Result["TypeType"]:
+        return Result(self._cached_typetype)
 
 
-class TypeListTemp(TypeClassTemp):
-    def __init__(self) -> None:
-        symtable = typing_symtable.new_symtable("List", TableScope.CLASS)
-        super().__init__("List", typing_symtable, symtable)
-        self.placeholders = [invariant_tpvar]
-
-
-class TypeTupleTemp(TypeClassTemp):
+class TypeUnionTemp(TypeTemp):
     def __init__(self):
-        symtable = typing_symtable.new_symtable("Tuple", TableScope.CLASS)
-        super().__init__("Tuple", typing_symtable, symtable)
+        super().__init__("Union")
         self.placeholders = [covariant_tpvar]
 
     @property
@@ -313,61 +168,15 @@ class TypeTupleTemp(TypeClassTemp):
     def arity(self) -> int:
         return INFINITE_ARITY
 
-    def getitem_typetype(
-        self, bindlist: BindList, itemarg: "GetItemArgs", node: Optional[ast.AST]
-    ) -> Result["TypeType"]:
-        result = super().getitem_typetype(bindlist, itemarg, node)
-        try:
-            if result.value.bindlist[0] == ellipsis_ins:
-                result.add_err(
-                    IndiceGeneralError(
-                        "'...' allowed only as the second of two arguments", node
-                    )
-                )
-            return result
-        except IndexError:
-            return result
 
-
-class TypeSetTemp(TypeClassTemp):
-    def __init__(self) -> None:
-        symtable = typing_symtable.new_symtable("Set", TableScope.CLASS)
-        super().__init__("Set", typing_symtable, symtable)
-        self.placeholders = [invariant_tpvar]
-
-    @property
-    def module_symid(self) -> str:
-        return "typing"
-
-    def get_default_typetype(self) -> "TypeType":
-        return self._cached_typetype
-
-
-class TypeDictTemp(TypeClassTemp):
+class TypeOptionalTemp(TypeTemp):
     def __init__(self):
-        symtable = typing_symtable.new_symtable("Dict", TableScope.CLASS)
-        super().__init__("Dict", typing_symtable, symtable)
-        self.placeholders = [invariant_tpvar, invariant_tpvar]
+        super().__init__("Optional")
+        self.placeholders = [covariant_tpvar]
 
     @property
     def module_symid(self) -> str:
         return "typing"
-
-    def get_default_typetype(self) -> "TypeType":
-        return self._cached_typetype
-
-
-class TypeEllipsisTemp(TypeClassTemp):
-    def __init__(self) -> None:
-        symtable = builtins_symtable.new_symtable("ellipsis", TableScope.CLASS)
-        super().__init__("ellipsis", builtins_symtable, symtable)
-
-    @property
-    def module_symid(self) -> str:
-        return "builtins"
-
-    def str_expr(self, bindlist: BindList) -> str:
-        return "..."
 
 
 class TypeLiteralTemp(TypeTemp):
@@ -471,9 +280,201 @@ class TypeLiteralIns(TypeIns):
             return fmt.format(str(value))
 
 
+class TypeCallableTemp(TypeTemp):
+    def __init__(self):
+        super().__init__("Callable")
+
+    @property
+    def module_symid(self) -> str:
+        return "typing"
+
+    def arity(self) -> int:
+        return 2
+
+    def getitem_typetype(
+        self, bindlist: BindList, itemarg: "GetItemArgs", node: Optional[ast.AST] = None
+    ) -> Result["TypeType"]:
+        res_bindlist = []
+        res = TypeType(self, [ellipsis_ins, any_ins])
+        result = Result(res)
+
+        if not self._getitem_typetype_check_bindlist(bindlist, result, node):
+            result.value = TypeType(self, bindlist)
+            return result
+
+        items = itemarg.items
+        callable_err = "Parameter list doesn't match Callable's structure"
+
+        if len(items) != 2:
+            result.add_err(IndiceGeneralError(callable_err, node))
+            return result
+        else:
+            arg_part = items[0]
+            ret_part = items[1]
+
+            if arg_part.value == ellipsis_ins:
+                res_bindlist.append(ellipsis_ins)
+            else:
+                if not isinstance(arg_part.value, (list, tuple)):
+                    result.add_err(IndiceGeneralError(callable_err, node))
+                    return result
+                arglist = []
+                for argitem in arg_part.value:
+                    self._getitem_typetype_accept_item(argitem, result, arglist)
+                res_bindlist.append(arglist)
+            self._getitem_typetype_accept_item(ret_part, result, res_bindlist)
+            res.bindlist = res_bindlist
+            return result
+
+
+class TypeGenericTemp(TypeTemp):
+    def __init__(self):
+        super().__init__("Generic")
+
+    @property
+    def module_symid(self) -> str:
+        return "typing"
+
+    def getitem_typetype(
+        self, bindlist: BindList, itemarg: "GetItemArgs", node: Optional[ast.AST]
+    ) -> Result["TypeType"]:
+        res_bindlist = []
+        res = TypeType(self, res_bindlist)
+        result = Result(res)
+
+        if not self._getitem_typetype_check_bindlist(bindlist, result, node):
+            result.value = TypeType(self, bindlist)
+            return result
+
+        items = itemarg.items
+        for item in items:
+            value = item.value
+            node = item.node
+            if not isinstance(value, TypeVarIns):
+                result.add_err(IndiceGeneralError("Expect a TypeVar", node))
+            else:
+                res_bindlist.append(value)
+        return result
+
+
+class TypeProtocolTemp(TypeTemp):
+    def __init__(self) -> None:
+        super().__init__("Protocol")
+
+    def arity(self) -> int:
+        return INFINITE_ARITY
+
+    @property
+    def module_symid(self) -> str:
+        return "typing"
+
+
+class TypeTypeAnnTemp(TypeTemp):
+    def __init__(self):
+        super().__init__("Type")
+        self.placeholders = [invariant_tpvar]
+
+    @property
+    def module_symid(self) -> str:
+        return "typing"
+
+    def arity(self) -> int:
+        return 1
+
+    def getins(self, bindlist: BindList) -> Result["TypeIns"]:
+        if not bindlist or len(bindlist) != 1:
+            # FIXME: add error here
+            return Result(any_ins)
+
+        if not isinstance(bindlist[0], TypeIns):
+            raise NotImplementedError()
+
+        if isinstance(bindlist[0], TypeType):
+            return Result(bindlist[0])
+        else:
+            return Result(TypeType(bindlist[0].temp, []))
+
+
+class TypeListTemp(TypeClassTemp):
+    def __init__(self) -> None:
+        symtable = typing_symtable.new_symtable("List", TableScope.CLASS)
+        super().__init__("List", typing_symtable, symtable)
+        self.placeholders = [invariant_tpvar]
+
+
+class TypeTupleTemp(TypeClassTemp):
+    def __init__(self):
+        symtable = typing_symtable.new_symtable("Tuple", TableScope.CLASS)
+        super().__init__("Tuple", typing_symtable, symtable)
+        self.placeholders = [covariant_tpvar]
+
+    @property
+    def module_symid(self) -> str:
+        return "typing"
+
+    def arity(self) -> int:
+        return INFINITE_ARITY
+
+    def getitem_typetype(
+        self, bindlist: BindList, itemarg: "GetItemArgs", node: Optional[ast.AST]
+    ) -> Result["TypeType"]:
+        result = super().getitem_typetype(bindlist, itemarg, node)
+        try:
+            if result.value.bindlist[0] == ellipsis_ins:
+                result.add_err(
+                    IndiceGeneralError(
+                        "'...' allowed only as the second of two arguments", node
+                    )
+                )
+            return result
+        except IndexError:
+            return result
+
+
+class TypeSetTemp(TypeClassTemp):
+    def __init__(self) -> None:
+        symtable = typing_symtable.new_symtable("Set", TableScope.CLASS)
+        super().__init__("Set", typing_symtable, symtable)
+        self.placeholders = [invariant_tpvar]
+
+    @property
+    def module_symid(self) -> str:
+        return "typing"
+
+    def get_default_typetype(self) -> "TypeType":
+        return self._cached_typetype
+
+
+class TypeDictTemp(TypeClassTemp):
+    def __init__(self):
+        symtable = typing_symtable.new_symtable("Dict", TableScope.CLASS)
+        super().__init__("Dict", typing_symtable, symtable)
+        self.placeholders = [invariant_tpvar, invariant_tpvar]
+
+    @property
+    def module_symid(self) -> str:
+        return "typing"
+
+    def get_default_typetype(self) -> "TypeType":
+        return self._cached_typetype
+
+
+class TypeEllipsisTemp(TypeClassTemp):
+    def __init__(self) -> None:
+        symtable = builtins_symtable.new_symtable("ellipsis", TableScope.CLASS)
+        super().__init__("ellipsis", builtins_symtable, symtable)
+
+    @property
+    def module_symid(self) -> str:
+        return "builtins"
+
+    def str_expr(self, bindlist: BindList) -> str:
+        return "..."
+
+
 class TypeModuleIns(TypeIns):
     def __init__(self, symtable: "SymTable", consultant=None) -> None:
-        super().__init__(module_temp, None)
+        super().__init__(module_temp, [])
         self._inner_symtable = symtable
         self.consultant = consultant
 

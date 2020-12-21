@@ -4,7 +4,7 @@ from pystatic.predefined import TypeFuncIns, TypeIns
 from pystatic.error.errorbox import ErrorBox
 from pystatic.arg import Argument, Arg
 from pystatic.typesys import any_ins
-from pystatic.preprocess.resolve_util import eval_expr_ann
+from pystatic.infer.infer_expr import infer_expr_ann
 from pystatic.preprocess.prepinfo import *
 
 
@@ -108,7 +108,7 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argume
         nonlocal errbox, prepinfo
         new_arg = Arg(node.arg, any_ins)
         if node.annotation:
-            ann_result = eval_expr_ann(node.annotation, prepinfo)
+            ann_result = infer_expr_ann(node.annotation, prepinfo)
             ann_result.dump_to_box(errbox)
             new_arg.ann = ann_result.value
         return new_arg
@@ -147,6 +147,6 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argume
 
 def eval_return_type(node, prepinfo: PrepInfo) -> Result[TypeIns]:
     if node:
-        return eval_expr_ann(node, prepinfo)
+        return infer_expr_ann(node, prepinfo)
     else:
         return Result(any_ins)

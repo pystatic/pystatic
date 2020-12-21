@@ -20,33 +20,36 @@ def resolve_cls(clsdef: "prep_cls", shallow: bool):
     errbox = clsdef.def_prepinfo.errbox
     clstemp.baseclass = []
     is_generic = True
+
     for base_node in clsdef.defnode.bases:
-        base_res = eval_preptype(base_node, clsdef.prepinfo, False, shallow)
-        res_type = base_res.option_ins.value
-        base_res.option_ins.dump_to_box(errbox)
+        base_res = eval_preptype(base_node, clsdef.prepinfo, True, shallow)
+        res_type = base_res.result.value
 
+        if not shallow:
+            base_res.result.dump_to_box(errbox)
+
+        assert res_type
         if res_type == any_ins:
-            continue
+            clstemp.baseclass.append(any_ins)
+        elif isinstance(res_type, TypeType):
+            result = Result(any_ins)
+            baseins = res_type.getins(result)
 
-        # TODO: re-implement here
-        # assert isinstance(res_type, TypeType)
-        if res_type:
-            if not isinstance(res_type, TypeType):
-                old_bindlist = res_type.bindlist
-                res_type = res_type.temp.get_default_typetype()
-                res_type.bindlist = old_bindlist
+            if not shallow:
+                result.dump_to_box(errbox)
 
-            res_ins = res_type.get_default_ins()
-            is_new = True
             for old_ins in clstemp.baseclass:
-                if res_ins.temp == old_ins.temp:
-                    is_new = False
+                if baseins.temp == old_ins.temp:
                     if not shallow:
                         errbox.add_err(DuplicateBaseclass(base_node))
                     break
-            if is_new:
-                if res_type.temp != clstemp:
-                    clstemp.baseclass.append(res_type.get_default_ins())
+            else:
+                if baseins.temp != clstemp:
+                    clstemp.baseclass.append(baseins)
+        else:
+            if shallow:
+                errbox.add_err(BaseNotType(base_node))
+
         is_generic = is_generic or base_res.generic
     clstemp.get_mro()
 

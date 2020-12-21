@@ -3,7 +3,7 @@ import logging
 from collections import deque
 from typing import Dict, Deque, Set
 from pystatic.config import Config
-from pystatic.exprparse import eval_expr
+from pystatic.infer.infer_expr import infer_expr
 from pystatic.error.errorcode import *
 from pystatic.error.errorbox import ErrorBox
 from pystatic.fsys import Filesys, FilePath, ModuleFindRes
@@ -279,14 +279,14 @@ class Manager:
     def infer(self):
         InferStarter(self.q_infer, self.config, self).start_infer()
 
-    def eval_expr(self, module_symid: SymId, expr: str) -> Optional["TypeIns"]:
+    def infer_expr(self, module_symid: SymId, expr: str) -> Optional["TypeIns"]:
         """Evaluate an expression of a in the environment of a module"""
         try:
             astnode = ast.parse(expr, mode="eval")
             module_ins = self.get_module_ins(module_symid)
             if not module_ins:
                 return None
-            result = eval_expr(astnode.body, module_ins)  # type: ignore
+            result = infer_expr(astnode.body, module_ins)  # type: ignore
             if result.haserr():
                 return None
             else:

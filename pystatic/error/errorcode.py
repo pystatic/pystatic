@@ -1,4 +1,5 @@
 import ast
+from logging import WARN, WARNING
 from pystatic.error.position import ast_to_position
 from typing import Sequence, Tuple, Optional, TYPE_CHECKING, Union, List, Protocol
 from pystatic.error.level import Level
@@ -349,6 +350,16 @@ class DuplicateBaseclass(ErrorCode):
 
     def __init__(self, node: Optional[ast.AST]) -> None:
         super().__init__(Level.ERROR, node)
+
+    def to_string(self) -> str:
+        return self.template
+
+
+class BaseNotType(ErrorCode):
+    template = "expression is not a type"
+
+    def __init__(self, node: Optional[ast.AST]):
+        super().__init__(Level.WARN, node)
 
     def to_string(self) -> str:
         return self.template

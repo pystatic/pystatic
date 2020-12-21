@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Dict
-from pystatic.exprparse import eval_expr
+from pystatic.infer.infer_expr import infer_expr
 from pystatic.result import Result
 from pystatic.predefined import TypeLiteralIns
 from pystatic.config import Config
@@ -178,8 +178,8 @@ class ConditionInfer(BaseVisitor):
 
     def visit_isinstance(self, node: ast.Call) -> Reach:
         args = node.args
-        first_type = self.dump_result(eval_expr(args[0], self.recorder))
-        second_typetype = self.dump_result(eval_expr(args[1], self.recorder))
+        first_type = self.dump_result(infer_expr(args[0], self.recorder))
+        second_typetype = self.dump_result(infer_expr(args[1], self.recorder))
         result = second_typetype.call(None, node)
 
         if not isinstance(args[0], ast.Name):
@@ -207,7 +207,7 @@ class ConditionInfer(BaseVisitor):
         return Reach.UNKNOWN
 
     def infer_value_of_constant(self, test: ast.Constant) -> Reach:
-        result: Result = eval_expr(test, self.recorder)
+        result: Result = infer_expr(test, self.recorder)
         literal_ins: TypeLiteralIns = self.dump_result(result)
         if result.haserr():
             return self.dispose_error_condition(result)
@@ -261,7 +261,7 @@ class ConditionInfer(BaseVisitor):
     def infer_value_of_name_node(self, test: ast.Name) -> Reach:
         if test.id == "TYPE_CHECKING":
             return Reach.TYPE_TRUE
-        result: Result = eval_expr(test, self.recorder)
+        result: Result = infer_expr(test, self.recorder)
         tp = self.dump_result(result)
         if result.haserr():
             return self.dispose_error_condition(result)
@@ -286,12 +286,12 @@ class ConditionInfer(BaseVisitor):
     def get_value_of_compare(
         self, left: ast.expr, right: ast.expr, op: ast.cmpop
     ) -> Reach:
-        # TODO: modify after eval_expr suppose compare
-        result: Result = eval_expr(left, self.recorder)
+        # TODO: modify after infer_expr suppose compare
+        result: Result = infer_expr(left, self.recorder)
         left_tp = self.dump_result(result)
         if result.haserr():
             return self.dispose_error_condition(result)
-        result = eval_expr(right, self.recorder)
+        result = infer_expr(right, self.recorder)
         right_tp = self.dump_result(result)
         if result.haserr():
             return self.dispose_error_condition(result)

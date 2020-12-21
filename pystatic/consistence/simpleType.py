@@ -1,6 +1,7 @@
 import enum
 from typing import Union
 from pystatic.typesys import TypeAnyTemp, TypeIns, TypeTemp, TypeClassTemp, TypeType
+from pystatic.consistence.consistent import is_consistent
 from pystatic.predefined import *
 
 
@@ -327,6 +328,7 @@ class TypeCompatible:
 
 def type_consistent(left_ins, right_ins) -> bool:
     """check left_ins = right_ins safety"""
+    return is_consistent(left_ins, right_ins)
     res = TypeCompatible().TypeCompatible(left_ins, right_ins)
     return res
 

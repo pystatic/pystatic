@@ -1,7 +1,7 @@
 import contextlib
 from typing import Protocol
 from pystatic.visitor import NoGenVisitor
-from pystatic.evalutil import ApplyArgs, WithAst, GetItemArgs, InsWithAst
+from pystatic.infer.util import ApplyArgs, WithAst, GetItemArgs, InsWithAst
 from pystatic.predefined import *
 
 
@@ -10,11 +10,8 @@ class SupportGetAttribute(Protocol):
         ...
 
 
-def eval_expr(
-    node: Optional[ast.AST],
-    attr_consultant: SupportGetAttribute,
-    explicit=False,
-    annotation=False,
+def infer_expr(
+    node: Optional[ast.AST], attr_consultant: SupportGetAttribute, annotation=False
 ):
     """
     @param node: target ast node.
@@ -30,18 +27,23 @@ def eval_expr(
     if not node:
         return Result(none_ins)
     else:
-        return ExprParser(attr_consultant, explicit, annotation).accept(node)
+        return ExprInferer(attr_consultant, annotation).accept(node)
 
 
-class ExprParser(NoGenVisitor):
-    def __init__(
-        self, consultant: SupportGetAttribute, explicit: bool, annotation: bool
-    ) -> None:
+def infer_expr_ann(node: ast.AST, consultant: SupportGetAttribute, annotation=False):
+    result = infer_expr(node, consultant, annotation)
+    value = result.value
+    if isinstance(value, TypeType):
+        result.value = value.getins(result)
+    return result
+
+
+class ExprInferer(NoGenVisitor):
+    def __init__(self, consultant: SupportGetAttribute, annotation: bool) -> None:
         """
         @param annotation: whether regard str as type annotation
         """
         self.consultant = consultant
-        self.explicit = explicit
         self.annotation = annotation
         self.errors = []
         self.in_subs = False
@@ -139,7 +141,7 @@ class ExprParser(NoGenVisitor):
         elif self.annotation and isinstance(node.value, str):
             try:
                 astnode = ast.parse(node.value, mode="eval")
-                result = eval_expr(astnode.body, self.consultant, self.explicit, True)
+                result = infer_expr(astnode.body, self.consultant, True)
                 # TODO: add warning here
                 res = result.value
             except SyntaxError:
@@ -254,8 +256,6 @@ class ExprParser(NoGenVisitor):
             for subnode in node.elts:
                 typeins = self.visit(subnode)
                 assert isinstance(typeins, TypeIns)
-                if not self.explicit and isinstance(typeins, TypeLiteralIns):
-                    typeins = typeins.get_value_type()
                 inner_type_list.append(typeins)
             return tuple_temp.getins(inner_type_list).value
 

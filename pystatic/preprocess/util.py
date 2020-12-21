@@ -1,6 +1,6 @@
 import ast
 from typing import Optional, TYPE_CHECKING, List
-from pystatic.exprparse import SupportGetAttribute
+from pystatic.infer.infer_expr import SupportGetAttribute
 from pystatic.typesys import TypeIns, TypeType
 from pystatic.predefined import TypeModuleIns, TypePackageIns, TypeClassTemp
 from pystatic.visitor import NoGenVisitor, VisitorMethodNotFound
@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 def omit_inst_typetype(
     node: ast.AST, consultant: SupportGetAttribute, allow_tuple: bool
 ) -> Optional[TypeType]:
-    """Get typetype a node represents while omitting instantiate args
+    """Get the typetype a node represents while omitting instantiate args
 
-    :param allow_tuple: allow analyse inside tuple node or not
+    @param allow_tuple: allow analyse inside tuple node or not
     """
     try:
         res = typetype_getter.accept(node, consultant, allow_tuple)
@@ -104,7 +104,9 @@ def analyse_import_stmt(
             ):  # 9 == len('.__init__')
                 # special case: __init__.py import a module under the same package
                 info_list.append(
-                    prep_impt(module_symid + '.' + attr_name, "", as_name, prepinfo, node)
+                    prep_impt(
+                        module_symid + "." + attr_name, "", as_name, prepinfo, node
+                    )
                 )
             else:
                 info_list.append(

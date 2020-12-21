@@ -1,5 +1,5 @@
 import ast
-from pystatic.evalutil import ApplyArgs
+from pystatic.infer.util import ApplyArgs
 from typing import List, Dict, Set, Union
 from pystatic.error.errorcode import SymbolUndefined
 from pystatic.typesys import TypeIns, TypeType, any_type

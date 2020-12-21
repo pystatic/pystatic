@@ -1,6 +1,6 @@
 import ast
 from pystatic.predefined import TypeVarTemp
-from pystatic.exprparse import eval_expr
+from pystatic.infer.infer_expr import infer_expr
 from pystatic.preprocess.resolve_spt import resolve_typealias
 from pystatic.preprocess.util import omit_inst_typetype
 from pystatic.preprocess.resolve_util import eval_preptype
@@ -15,7 +15,7 @@ def judge_typevar(prepinfo: "PrepInfo", node: AssignNode):
 
     value_node = node.value
     if isinstance(value_node, ast.Call):
-        f_ins = eval_expr(value_node.func, prepinfo).value
+        f_ins = infer_expr(value_node.func, prepinfo).value
         if isinstance(f_ins, TypeType) and isinstance(f_ins.temp, TypeVarTemp):
             if isinstance(node, ast.AnnAssign):
                 typevar_name = get_name(node)
@@ -89,9 +89,9 @@ def resolve_local(local: "prep_local", shallow: bool):
         return
 
     eval_res = eval_preptype(typenode, local.def_prepinfo, True, shallow)
-    typeins = eval_res.option_ins.value
+    typeins = eval_res.result.value
     if isinstance(typeins, TypeType):
-        local.value = typeins.get_default_ins()
+        local.value = typeins.getins(eval_res.result)
     else:
         local.value = typeins
     if shallow and eval_res.generic:
@@ -100,4 +100,4 @@ def resolve_local(local: "prep_local", shallow: bool):
         local.stage = PREP_COMPLETE
 
     if not shallow:
-        eval_res.option_ins.dump_to_box(local.def_prepinfo.errbox)
+        eval_res.result.dump_to_box(local.def_prepinfo.errbox)
