@@ -8,7 +8,7 @@ from pystatic.infer.staticinfer import cmp_by_op
 from pystatic.infer.recorder import SymbolRecorder, StoredType
 from pystatic.visitor import BaseVisitor
 from pystatic.reach import Reach, cal_neg, is_true
-from pystatic.consistence.simpleType import type_consistent
+from pystatic.consistent import is_consistent
 from pystatic.typesys import TypeIns
 from pystatic.error.errorbox import ErrorBox
 from pystatic.error.errorcode import *
@@ -189,7 +189,7 @@ class ConditionInfer(BaseVisitor):
         if result.haserr():
             assert "TODO"
         second_type = result.value
-        if type_consistent(first_type, second_type):
+        if is_consistent(first_type, second_type):
             if isinstance(args[0], ast.Name):
                 pre_type = self.recorder.get_run_time_type(name)
                 self.temp_type[name] = StoredType(pre_type, False)

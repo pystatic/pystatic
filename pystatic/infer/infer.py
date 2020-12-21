@@ -1,5 +1,6 @@
 import logging
 from contextlib import contextmanager
+from pystatic.infer.staticinfer import is_cmp_python_version
 from typing import Deque
 from pystatic.predefined import *
 from pystatic.target import FunctionTarget, Target, BlockTarget
@@ -14,12 +15,7 @@ from pystatic.config import Config
 from pystatic.visitor import BaseVisitor
 from pystatic.infer.recorder import SymbolRecorder
 from pystatic.infer.condition_infer import ConditionInfer, ConditionStmtType
-from pystatic.consistence.simpleType import (
-    TypeCompatible,
-    is_any,
-    is_none,
-    type_consistent,
-)
+from pystatic.consistent import is_consistent
 
 if TYPE_CHECKING:
     from pystatic.manager import Manager
@@ -41,7 +37,6 @@ class InferVisitor(BaseVisitor):
         self.root = node
         self.errbox = errbox
         self.symid = symid
-        self.type_comparator = TypeCompatible()
         self.recorder = SymbolRecorder(module)
         self.config = config
         self.cond_infer = ConditionInfer(self.recorder, self.errbox, self.config)
@@ -91,7 +86,7 @@ class InferVisitor(BaseVisitor):
         comment = self.recorder.get_comment_type(name)
         if not self.recorder.is_defined(name):
             self.recorder.record_type(target.id, comment)
-        if not type_consistent(comment, rtype):
+        if not is_consistent(comment, rtype):
             self.errbox.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
             self.record_type(name, rtype)
@@ -100,7 +95,7 @@ class InferVisitor(BaseVisitor):
         self, target: ast.AST, rtype: TypeIns, rnode: Optional[ast.AST]
     ):
         ltype = self.get_type(target)
-        if not type_consistent(ltype, rtype):
+        if not is_consistent(ltype, rtype):
             self.errbox.add_err(IncompatibleTypeInAssign(rnode, ltype, rtype))
 
     def check_multi_left_of_assign(
@@ -157,7 +152,7 @@ class InferVisitor(BaseVisitor):
         if not self.recorder.is_defined(name):  # var appear first time
             self.recorder.record_type(name, comment)
 
-        if not type_consistent(comment, rtype):
+        if not is_consistent(comment, rtype):
             self.errbox.add_err(IncompatibleTypeInAssign(rnode, comment, rtype))
         else:
             self.record_type(name, rtype)
@@ -243,10 +238,10 @@ class InferVisitor(BaseVisitor):
         ret_list = list(ret_set)
         ret_annotation = self.recorder.get_ret_annotation()
         num = len(ret_list)
-        if is_any(ret_annotation):
+        if ret_annotation == any_ins:
             self.recorder.reset_ret_val()
             return
-        if num == 0 and not is_none(ret_annotation):
+        if num == 0 and not ret_annotation == none_ins:
             self.errbox.add_err(ReturnValueExpected(node))
 
     def visit_Return(self, node: ast.Return):
@@ -259,8 +254,8 @@ class InferVisitor(BaseVisitor):
     def check_ret_type(
         self, annotation: TypeIns, ret_node: ast.Return, ret_type: TypeIns
     ):
-        if not type_consistent(annotation, ret_type):
-            if is_none(ret_type):
+        if not is_consistent(annotation, ret_type):
+            if ret_type == none_ins:
                 self.errbox.add_err(ReturnValueExpected(ret_node))
             else:
                 self.errbox.add_err(
@@ -353,7 +348,7 @@ class InferVisitor(BaseVisitor):
 
     def check_iterable(self, node: ast.AST, container: TypeIns) -> bool:
         # TODO: change to __iter__
-        if is_any(container):
+        if container == any_ins:
             return False
         if container.bindlist is None:
             self.errbox.add_err(NonIterative(node, container))

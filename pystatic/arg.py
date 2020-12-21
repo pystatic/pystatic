@@ -75,14 +75,14 @@ def copy_argument(argument: Argument):
 def match_argument(
     argument: Argument, applyargs: "ApplyArgs", callnode: Optional[ast.AST]
 ) -> List[ErrorCode]:
-    from pystatic.consistence.simpleType import type_consistent
+    from pystatic.consistent import is_consistent
 
     errorlist = []
     missing_args: List[str] = []
     too_more_arg = False
 
     def match_arg(arg: Arg, name: str, typeins: "TypeIns", node: ast.AST):
-        if not type_consistent(arg.ann, typeins):
+        if not is_consistent(arg.ann, typeins):
             errorlist.append(IncompatibleArgument(node, name, arg.ann, typeins))
 
     i_apply_arg = 0  # index of args scanned in applyargs argument list

@@ -6,7 +6,7 @@ from pystatic.typesys import TypeIns, TypeType, any_type
 from pystatic.predefined import *
 from pystatic.result import Result
 from pystatic.symtable import SymTable
-from pystatic.consistence.simpleType import type_consistent
+from pystatic.consistent import is_consistent
 
 ScopeType = Union[TypeType, TypeFuncIns, TypeModuleIns]
 
@@ -150,7 +150,7 @@ class SymbolRecorder:
                 # TODO: find out why this fails
                 pre_type = pre_type if pre_type else any_ins
                 cur_type = cur_type if cur_type else any_ins
-                if type_consistent(pre_type, cur_type):
+                if is_consistent(pre_type, cur_type):
                     self.record_type(name, cur_type)
                 else:
                     union_type = make_union_type([pre_type, cur_type])
