@@ -50,7 +50,7 @@ symid_list = [
 
 
 def test_check():
-    error_assert('check.check_reach')
+    error_assert('check.check_tuple')
     for symid in symid_list:
         error_assert(symid)
     # for src in file_list:

@@ -12,7 +12,7 @@ def is_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
     is_right_classins = isinstance(right_ins.temp, TypeClassTemp)
 
     if is_left_classins and is_right_classins:
-        return cls_consistent(right_ins, left_ins)
+        return cls_consistent(left_ins, right_ins)
 
     # one of left_ins and right_ins is special types
     if left_ins == right_ins == none_ins:
@@ -51,6 +51,13 @@ def is_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
 
 
 def cls_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
+    left_is_type = isinstance(left_ins, TypeType)
+    right_is_type = isinstance(right_ins, TypeType)
+    if left_is_type ^ right_is_type:
+        return False
+    if left_is_type and right_is_type:
+        return left_ins.temp == right_ins.temp
+
     if left_ins.temp != right_ins.temp:
         left_mro = left_ins.temp.get_mro()
         for inh in left_mro:
@@ -66,7 +73,6 @@ def cls_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
                 return False
             else:
                 fst_tpvar = left_ins.temp.placeholders[0]
-                assert isinstance
                 for left, right in zip(left_ins.bindlist, right_ins.bindlist):
                     if not consistent_with_tpvar(left, right, fst_tpvar):
                         return False
@@ -83,17 +89,16 @@ def cls_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
         return True
 
 
-def consistent_with_tpvar(
-    left_ins: "TypeIns", right_ins: "TypeIns", tpvar: "TypeVarIns"
-):
+def consistent_with_tpvar(left_ins: "TypeIns", right_ins: "TypeIns",
+                          tpvar: "TypeVarIns"):
     if tpvar.kind == INVARIANT:
         if not left_ins.equiv(right_ins):
             return False
     elif tpvar.kind == COVARIANT:
-        if not cls_consistent(left_ins, right_ins):
+        if not is_consistent(left_ins, right_ins):
             return False
     elif tpvar.kind == CONTRAVARIANT:
-        if not cls_consistent(right_ins, left_ins):
+        if not is_consistent(right_ins, left_ins):
             return False
     else:
         raise ValueError()
