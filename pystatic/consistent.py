@@ -44,6 +44,8 @@ def is_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
             return right_ins == none_ins
         elif left_ins.temp == literal_temp:
             assert isinstance(left_ins, TypeLiteralIns)
+            if right_ins.temp != literal_temp:
+                return False
             assert isinstance(right_ins, TypeLiteralIns)
             return right_ins.temp == literal_temp and left_ins.value == right_ins.value
 
@@ -89,8 +91,9 @@ def cls_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
         return True
 
 
-def consistent_with_tpvar(left_ins: "TypeIns", right_ins: "TypeIns",
-                          tpvar: "TypeVarIns"):
+def consistent_with_tpvar(
+    left_ins: "TypeIns", right_ins: "TypeIns", tpvar: "TypeVarIns"
+):
     if tpvar.kind == INVARIANT:
         if not left_ins.equiv(right_ins):
             return False
