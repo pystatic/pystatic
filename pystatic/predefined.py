@@ -269,6 +269,31 @@ class TypeLiteralIns(TypeIns):
 
         return True
 
+    def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
+        return self.get_value_type().getattribute(name, node)
+
+    def get_local_attr(self, name: str, node: Optional[ast.AST]) -> Optional["TypeIns"]:
+        return self.get_value_type().get_local_attr(name, node)
+
+    def try_getattribute(self, name: str) -> Optional["TypeIns"]:
+        return self.get_value_type().try_getattribute(name)
+
+    def call(
+        self, applyargs: "ApplyArgs", node: Optional[ast.Call]
+    ) -> Result["TypeIns"]:
+        return self.get_value_type().call(applyargs, node)
+
+    def getitem(
+        self, item: "GetItemArgs", node: Optional[ast.AST]
+    ) -> Result["TypeIns"]:
+        return self.get_value_type().getitem(item, node)
+
+    def unaryop_mgf(self, op: Type, node: ast.AST) -> Result["TypeIns"]:
+        return self.get_value_type().unaryop_mgf(op, node)
+
+    def binop_mgf(self, other: "TypeIns", op: Type, node: ast.AST) -> Result["TypeIns"]:
+        return self.get_value_type().binop_mgf(other, op, node)
+
     def __str__(self):
         assert self.bindlist
         assert len(self.bindlist) == 1

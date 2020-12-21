@@ -324,7 +324,10 @@ class InferVisitor(BaseVisitor):
                 bindlist = [any_ins]
             else:
                 bindlist = self.get_element_type_in_container(container)
-            self.record_type(name, bindlist[0])
+            if bindlist:
+                self.record_type(name, bindlist[0])
+            else:
+                self.record_type(name, any_ins)
             self.accept_condition_stmt_list(node.body, ConditionStmtType.LOOP)
             self.accept_condition_stmt_list(node.orelse, ConditionStmtType.IF)
             if len(bindlist) > 1:

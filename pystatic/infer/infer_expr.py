@@ -162,17 +162,17 @@ class ExprInferer(NoGenVisitor):
 
     def visit_Name(self, node: ast.Name) -> TypeIns:
         for cur_scope in reversed(self.tmp_var):
-            if (name_result := cur_scope.get(node.id)) :
+            if (name_ins := cur_scope.get(node.id)) :
                 break
         else:
             name_result = self.consultant.getattribute(node.id, node)
             assert isinstance(name_result, Result)
             assert isinstance(name_result.value, TypeIns)
+            self.add_errlist(name_result.errors)
+            name_ins = name_result.value
 
-        self.add_errlist(name_result.errors)
-
-        self.add_to_container(name_result.value, node)
-        return name_result.value
+        self.add_to_container(name_ins, node)
+        return name_ins
 
     def visit_Constant(self, node: ast.Constant) -> TypeIns:
         res = None
@@ -355,13 +355,13 @@ class ExprInferer(NoGenVisitor):
         self.add_to_container(cur_ins, node)
         return cur_ins
 
-    def visit_comprehension(self, node: ast.comprehension):
+    def cope_comprehension(self, node: ast.comprehension):
         with self.block_container():
             iter_ins = self.visit(node.iter)
             assert isinstance(iter_ins, TypeIns)
             iter_type = get_iter_type(iter_ins)
             if not iter_type:
-                self.add_err(NotIterable(node, iter_ins))
+                self.add_err(NotIterable(node.iter, iter_ins))
                 iter_type = any_ins
             self._assign(node.target, iter_type)
 
@@ -369,7 +369,8 @@ class ExprInferer(NoGenVisitor):
         with self.block_container():
             with self.new_scope():
                 for gen in node.generators:
-                    self.visit(gen)
+                    assert isinstance(gen, ast.comprehension)
+                    self.cope_comprehension(gen)
                 item_ins = self.visit(node.elt)
                 listins = list_temp.getins([item_ins]).value
         self.add_to_container(listins, node)
