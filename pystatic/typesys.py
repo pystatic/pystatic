@@ -1,3 +1,4 @@
+from ast import get_source_segment
 import copy
 from abc import ABC, abstractmethod
 from typing import Any, Final, Dict, Type
@@ -461,6 +462,15 @@ class TypeClassTemp(TypeTemp):
         assert self._def_symtable
         return self._def_symtable
 
+    def get_type_attribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
+        res = self._inner_symtable.lookup_local(name)
+        if not res:
+            for basecls in self.baseclass:
+                res = basecls.getattribute(name, None).value
+                if res:
+                    break
+        return res
+
     def get_local_attr(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         if name in self.var_attr:
             return self.var_attr[name]
@@ -480,15 +490,6 @@ class TypeClassTemp(TypeTemp):
                 if (res := object_ins.get_local_attr(name, None)) :
                     return res
         return None
-
-    def get_type_attribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
-        res = self._inner_symtable.lookup_local(name)
-        if not res:
-            for basecls in self.baseclass:
-                res = basecls.getattribute(name, None).value
-                if res:
-                    break
-        return res
 
     def get_mro(self):
         """C3 algorithm"""
@@ -556,7 +557,23 @@ class TypeClassIns(TypeIns):
         super().__init__(temp, bindlist)
 
     def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
-        return super().getattribute(name, node)
+        local_ins = self.temp.get_local_attr(name, self.bindlist)
+        if local_ins:
+            if local_ins.temp == func_temp:
+                assert isinstance(local_ins, TypeFuncIns)
+                arglist = local_ins.overloads[0].argument.args
+                if arglist:
+                    if arglist[0].ann.temp == self.temp:
+                        local_ins.set_self_bind(self, node)
+            return Result(local_ins)
+        else:
+            res = self.temp.get_mro_attr(name, self.bindlist)
+            if res:
+                return Result(res)
+            else:
+                result = Result(any_ins)
+                result.add_err(NoAttribute(node, self, name))
+                return result
 
 
 class TypeAnyTemp(TypeTemp):
