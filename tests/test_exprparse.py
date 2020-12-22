@@ -11,14 +11,17 @@ from pystatic.manager import Manager
 from pystatic.infer.infer_expr import infer_expr
 from .util import error_assert
 
+
 def parse_expr(expr: str):
     astnode = ast.parse(expr, mode="eval")
     return astnode.body  # type: ignore
 
 
-def parse_eval_check(
-    expr: str, module_ins, expect: TypeIns, equiv: bool, explicit=False
-):
+def parse_eval_check(expr: str,
+                     module_ins,
+                     expect: TypeIns,
+                     equiv: bool,
+                     explicit=False):
     astnode = parse_expr(expr)
     eval_option = infer_expr(astnode, module_ins, explicit)
     eval_res = eval_option.value
@@ -44,29 +47,31 @@ def test_exprparse_basic():
     parse_eval_check("1", typing_symtable, TypeLiteralIns(1), True)
     parse_eval_check("'hello'", typing_symtable, TypeLiteralIns("hello"), True)
     parse_eval_check("1 < 2", typing_symtable, bool_ins, False)
-    parse_eval_check("[1, 2]", typing_symtable, TypeIns(list_temp, [int_ins]), True)
-    parse_eval_check(
-        "[1, 'hello']", typing_symtable, TypeIns(list_temp, [any_ins]), True
-    )
-    parse_eval_check(
-        "(1, 2)", typing_symtable, TypeIns(tuple_temp, [int_ins, int_ins]), True
-    )
+    parse_eval_check("[1, 2]", typing_symtable,
+                     TypeClassIns(list_temp, [int_ins]), True)
+    parse_eval_check("[1, 'hello']", typing_symtable,
+                     TypeClassIns(list_temp, [any_ins]), True)
+    parse_eval_check("(1, 2)", typing_symtable,
+                     TypeClassIns(tuple_temp, [int_ins, int_ins]), True)
     parse_eval_check(
         "(1, 2)",
         typing_symtable,
-        TypeIns(tuple_temp, [TypeLiteralIns(1), TypeLiteralIns(2)]),
+        TypeClassIns(tuple_temp,
+                     [TypeLiteralIns(1), TypeLiteralIns(2)]),
         True,
         True,
     )
-    parse_eval_check("{1, 2}", typing_symtable, TypeIns(set_temp, [int_ins]), True)
+    parse_eval_check("{1, 2}", typing_symtable,
+                     TypeClassIns(set_temp, [int_ins]), True)
     parse_eval_check(
         '{1: "good", 2: "good"}',
         typing_symtable,
-        TypeIns(dict_temp, [int_ins, str_ins]),
+        TypeClassIns(dict_temp, [int_ins, str_ins]),
         True,
     )
 
-    parse_eval_ann_check("Type[int]", typing_symtable, TypeType(int_temp, None))
+    parse_eval_ann_check("Type[int]", typing_symtable,
+                         TypeType(int_temp, None))
 
 
 def test_exprparse_type_expr():
@@ -95,9 +100,8 @@ def test_exprparse_type_expr():
     assert a.equiv(cur_optional)
 
     assert len(b.bindlist) == 1
-    assert isinstance(b.bindlist[0], TypeIns) and not isinstance(
-        b.bindlist[0], TypeType
-    )
+    assert isinstance(b.bindlist[0],
+                      TypeIns) and not isinstance(b.bindlist[0], TypeType)
     assert b.bindlist[0].temp is A.temp
 
     assert len(c.bindlist) == 1

@@ -91,9 +91,8 @@ def cls_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
         return True
 
 
-def consistent_with_tpvar(
-    left_ins: "TypeIns", right_ins: "TypeIns", tpvar: "TypeVarIns"
-):
+def consistent_with_tpvar(left_ins: "TypeIns", right_ins: "TypeIns",
+                          tpvar: "TypeVarIns"):
     if tpvar.kind == INVARIANT:
         if not left_ins.equiv(right_ins):
             return False
@@ -106,3 +105,16 @@ def consistent_with_tpvar(
     else:
         raise ValueError()
     return True
+
+
+def nullable(ins: "TypeIns") -> bool:
+    """Whether the value of a type can be None"""
+    if ins == none_ins or ins == any_ins:
+        return True
+    elif ins.temp == optional_temp:
+        return True
+    elif ins.temp == union_temp:
+        for subins in ins.bindlist:
+            if nullable(subins):
+                return True
+    return False
