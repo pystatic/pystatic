@@ -361,7 +361,8 @@ class ExprInferer(NoGenVisitor):
             assert isinstance(iter_ins, TypeIns)
             iter_type = get_iter_type(iter_ins)
             if not iter_type:
-                self.add_err(NotIterable(node.iter, iter_ins))
+                if iter_ins != any_ins:
+                    self.add_err(NotIterable(node.iter, iter_ins))
                 iter_type = any_ins
             self._assign(node.target, iter_type)
 

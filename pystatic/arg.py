@@ -72,9 +72,8 @@ def copy_argument(argument: Argument):
     return new_argument
 
 
-def match_argument(
-    argument: Argument, applyargs: "ApplyArgs", callnode: Optional[ast.AST]
-) -> List[ErrorCode]:
+def match_argument(argument: Argument, applyargs: "ApplyArgs",
+                   callnode: Optional[ast.AST]) -> List[ErrorCode]:
     from pystatic.consistent import is_consistent
 
     errorlist = []
@@ -83,7 +82,8 @@ def match_argument(
 
     def match_arg(arg: Arg, name: str, typeins: "TypeIns", node: ast.AST):
         if not is_consistent(arg.ann, typeins):
-            errorlist.append(IncompatibleArgument(node, name, arg.ann, typeins))
+            errorlist.append(IncompatibleArgument(node, name, arg.ann,
+                                                  typeins))
 
     i_apply_arg = 0  # index of args scanned in applyargs argument list
     len_apply_arg = len(applyargs.args)
@@ -94,7 +94,8 @@ def match_argument(
             missing_args.append(arg.name)
         else:
             # match posonly arguments
-            match_arg(arg, arg.name, args[i_apply_arg].value, args[i_apply_arg].node)
+            match_arg(arg, arg.name, args[i_apply_arg].value,
+                      args[i_apply_arg].node)
             i_apply_arg += 1
 
     i_param_arg = 0  # index of args scanned in parameter argument list

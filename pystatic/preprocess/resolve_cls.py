@@ -75,7 +75,6 @@ class _TypeVarVisitor(BaseVisitor):
 
     Used to generate correct placeholders.
     """
-
     def __init__(self, prepinfo: "PrepInfo", errbox: "ErrorBox") -> None:
         self.prepinfo = prepinfo
         self.typevars: List["TypeVarIns"] = []
@@ -149,9 +148,8 @@ class _TypeVarVisitor(BaseVisitor):
         return left_value  # FIXME: bindlist is not set correctly
 
 
-def resolve_cls_method(
-    prepinfo: "PrepInfo", env: "PrepEnvironment", errbox: "ErrorBox"
-):
+def resolve_cls_method(prepinfo: "PrepInfo", env: "PrepEnvironment",
+                       errbox: "ErrorBox"):
     # TODO: symid here is not set correctly
     manager = env.manager
     queue: Deque["PrepInfo"] = deque()
@@ -182,7 +180,8 @@ def resolve_cls_method(
                 queue.append(subclsdef.prepinfo)
 
 
-def _resolve_cls_method(clsdef: "prep_cls", errbox: "ErrorBox") -> List[MethodTarget]:
+def _resolve_cls_method(clsdef: "prep_cls",
+                        errbox: "ErrorBox") -> List[MethodTarget]:
     targets = []  # method targets that need to be preprocessed
     clstemp = clsdef.clstemp
     symid = clstemp.name
@@ -201,9 +200,8 @@ def _resolve_cls_method(clsdef: "prep_cls", errbox: "ErrorBox") -> List[MethodTa
                     is_staticmethod = True
         return is_classmethod, is_staticmethod
 
-    def modify_argument(
-        argument: Argument, is_classmethod: bool, is_staticmethod: bool
-    ):
+    def modify_argument(argument: Argument, is_classmethod: bool,
+                        is_staticmethod: bool):
         if is_classmethod:
             argument.args[0].ann = clstemp.get_default_typetype()
         elif not is_staticmethod:
@@ -212,27 +210,30 @@ def _resolve_cls_method(clsdef: "prep_cls", errbox: "ErrorBox") -> List[MethodTa
                 default_ins = clstemp.get_default_ins()
                 argument.args[0].ann = default_ins
 
-    def add_func_def(
-        argument: Argument, ret: TypeIns, node: ast.FunctionDef
-    ) -> TypeFuncIns:
+    def add_func_def(argument: Argument, ret: TypeIns,
+                     node: ast.FunctionDef) -> TypeFuncIns:
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(argument, is_classmethod, is_staticmethod)
 
         name = node.name
         inner_symtable = symtable.new_symtable(name, TableScope.FUNC)
         assert isinstance(inner_symtable, FunctionSymTable)
-        func_ins = TypeFuncIns(name, symtable.glob_symid, inner_symtable, argument, ret)
+        func_ins = TypeFuncIns(name, symtable.glob_symid, inner_symtable,
+                               argument, ret)
+        func_ins.is_method = True
+        func_ins.is_classmethod = is_classmethod
+        func_ins.is_staticmethod = is_staticmethod
         # get attribute because of assignment of self
         if not is_staticmethod:
             symtb = func_ins.get_inner_symtable()
             method_symid = ".".join([symid, name])
-            targets.append(MethodTarget(method_symid, symtb, clstemp, node, errbox))
+            targets.append(
+                MethodTarget(method_symid, symtb, clstemp, node, errbox))
 
         return func_ins
 
-    def add_func_overload(
-        ins: TypeFuncIns, args: Argument, ret: TypeIns, node: ast.FunctionDef
-    ):
+    def add_func_overload(ins: TypeFuncIns, args: Argument, ret: TypeIns,
+                          node: ast.FunctionDef):
         is_classmethod, is_staticmethod = get_method_kind(node)
         modify_argument(args, is_classmethod, is_staticmethod)
         ins.add_overload(args, ret)

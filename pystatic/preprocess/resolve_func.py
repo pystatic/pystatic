@@ -10,10 +10,8 @@ from pystatic.preprocess.prepinfo import *
 
 def resolve_func(func: "prep_func"):
     """Resolve local function's TypeIns"""
-
-    def add_func_def(
-        argument: Argument, ret: TypeIns, node: ast.FunctionDef
-    ) -> TypeFuncIns:
+    def add_func_def(argument: Argument, ret: TypeIns,
+                     node: ast.FunctionDef) -> TypeFuncIns:
         nonlocal func
         def_symtable = func.def_prepinfo.symtable
         module_symid = def_symtable.glob_symid
@@ -21,9 +19,8 @@ def resolve_func(func: "prep_func"):
         new_symtable = def_symtable.new_symtable(fun_name, TableScope.FUNC)
         return TypeFuncIns(fun_name, module_symid, new_symtable, argument, ret)
 
-    def add_func_overload(
-        func_ins: TypeFuncIns, argument: Argument, ret: TypeIns, node: ast.FunctionDef
-    ):
+    def add_func_overload(func_ins: TypeFuncIns, argument: Argument,
+                          ret: TypeIns, node: ast.FunctionDef):
         func_ins.add_overload(argument, ret)
 
     errbox = func.def_prepinfo.errbox
@@ -31,7 +28,8 @@ def resolve_func(func: "prep_func"):
 
 
 TAddFunDef = Callable[[Argument, TypeIns, ast.FunctionDef], TypeFuncIns]
-TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef], None]
+TAddFunOverload = Callable[[TypeFuncIns, Argument, TypeIns, ast.FunctionDef],
+                           None]
 FunTuple = Tuple[Argument, TypeIns, ast.FunctionDef]
 
 
@@ -54,8 +52,7 @@ def resolve_func_template(
 
     overload_list: List[FunTuple] = []
     not_overload: Optional[
-        FunTuple
-    ] = None  # function def that's not decorated by overload
+        FunTuple] = None  # function def that's not decorated by overload
     for astnode in func.defnodes:
         is_overload = False
         for decs in astnode.decorator_list:
@@ -67,7 +64,8 @@ def resolve_func_template(
         else:
             if not_overload:
                 overload_list.append((*get_arg_ret(astnode), astnode))
-                errbox.add_err(SymbolRedefine(astnode, func.name, not_overload[-1]))
+                errbox.add_err(
+                    SymbolRedefine(astnode, func.name, not_overload[-1]))
                 setattr(astnode, "reach", Reach.REDEFINE)
             else:
                 not_overload = (*get_arg_ret(astnode), astnode)
@@ -91,7 +89,8 @@ def resolve_func_template(
     func.value = func_ins
 
 
-def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argument]:
+def eval_argument_type(node: ast.arguments,
+                       prepinfo: PrepInfo) -> Result[Argument]:
     """Gernerate an Argument instance according to an ast.arguments node"""
     errbox = prepinfo.errbox
     new_args = Argument()
@@ -114,7 +113,8 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argume
         return new_arg
 
     # parse a list of args
-    def add_to_list(target_list: List[Arg], order_list: List[Arg], args: List[ast.arg]):
+    def add_to_list(target_list: List[Arg], order_list: List[Arg],
+                    args: List[ast.arg]):
         nonlocal result
         for arg in args:
             newarg = resolve_arg_type(arg)
@@ -147,6 +147,6 @@ def eval_argument_type(node: ast.arguments, prepinfo: PrepInfo) -> Result[Argume
 
 def eval_return_type(node, prepinfo: PrepInfo) -> Result[TypeIns]:
     if node:
-        return infer_expr_ann(node, prepinfo)
+        return infer_expr_ann(node, prepinfo, True)
     else:
         return Result(any_ins)

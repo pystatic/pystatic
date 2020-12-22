@@ -27,9 +27,8 @@ class Scope:
 
 
 class FuncScope(Scope):
-    def __init__(
-        self, tp: TypeFuncIns, args: Dict[str, TypeIns], ret_annotation: TypeIns
-    ):
+    def __init__(self, tp: TypeFuncIns, args: Dict[str, TypeIns],
+                 ret_annotation: TypeIns):
         super().__init__(tp)
         self.type_map = args
         self.ret_annotation = ret_annotation
@@ -48,7 +47,6 @@ class ModuleScope(Scope):
 
 class SymbolRecorder:
     """record the appeared symbol"""
-
     def __init__(self, module):
         self.stack: List[Scope] = []
         self.stack.append(ModuleScope(module))
@@ -66,7 +64,8 @@ class SymbolRecorder:
     def leave_scope(self):
         self.stack.pop()
 
-    def enter_func(self, tp: TypeFuncIns, args: Dict[str, TypeIns], ret_annotation):
+    def enter_func(self, tp: TypeFuncIns, args: Dict[str, TypeIns],
+                   ret_annotation):
         self.stack.append(FuncScope(tp, args, ret_annotation))
 
     def leave_func(self):
@@ -163,8 +162,6 @@ def make_union_type(type_list) -> TypeIns:
 
     if not type_list:
         return any_ins
-    elif len(type_list) == 1:
-        return type_list[0]
 
     for tp in type_list:
         if tp.temp == union_temp:
@@ -175,4 +172,7 @@ def make_union_type(type_list) -> TypeIns:
         else:
             bindlist.append(tp)
     bindlist = list(set(bindlist))
+    if len(bindlist) == 1:
+        return bindlist[0]
+
     return union_temp.getins(bindlist).value

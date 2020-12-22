@@ -1,7 +1,6 @@
 import logging
 from typing import Deque
 from contextlib import contextmanager
-from pystatic.infer.staticinfer import is_cmp_python_version
 from pystatic.predefined import *
 from pystatic.target import FunctionTarget, Target, BlockTarget
 from pystatic.error.errorbox import ErrorBox
@@ -100,6 +99,8 @@ class InferVisitor(BaseVisitor):
 
     def check_multi_left_of_assign(self, target: List[ast.expr],
                                    rtype: TypeIns, rnode: Optional[ast.AST]):
+        if rtype == any_ins:
+            return
         type_list = rtype.bindlist
         if not type_list:  # a,b=()
             self.errbox.add_err(NeedMoreValuesToUnpack(rnode, len(target), 0))

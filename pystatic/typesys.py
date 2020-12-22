@@ -77,8 +77,14 @@ class TypeIns:
         """
         return self.temp.binop_mgf(self, other, op, node)
 
-    def equiv(self, other):
+    def equiv(self, other, relax: bool = False):
+        """
+        @param: relax: if True, Any is considered to equiv with any type
+        """
         # note that `isinstance(other, TypeIns)` won't reject typeins and typetype
+        if relax and (other == any_ins or self == any_ins):
+            return True
+
         if other.__class__ != self.__class__:
             return False
 
@@ -487,9 +493,11 @@ class TypeClassTemp(TypeTemp):
                 res = basecls.get_local_attr(name, None)
                 if res:
                     break
-            if not res and self != object_temp:
-                if (res := object_ins.get_local_attr(name, None)) :
-                    return res
+            else:
+                if self != object_temp:
+                    if (res := object_ins.get_local_attr(name, None)) :
+                        return res
+            return res
         return None
 
     def get_mro(self):
@@ -565,22 +573,21 @@ class TypeClassIns(TypeIns):
 
     def getattribute(self, name: str, node: Optional[ast.AST]) -> Result["TypeIns"]:
         local_ins = self.temp.get_local_attr(name, self.bindlist)
+        if not local_ins:
+            local_ins = self.temp.get_mro_attr(name, self.bindlist)
+
         if local_ins:
             if local_ins.temp == func_temp:
                 assert isinstance(local_ins, TypeFuncIns)
-                arglist = local_ins.overloads[0].argument.args
-                if arglist:
-                    if arglist[0].ann.temp == self.temp:
+                if local_ins.is_method and not local_ins.is_staticmethod:
+                    arglist = local_ins.overloads[0].argument.args
+                    if arglist:
                         local_ins.set_self_bind(self, node)
             return Result(local_ins)
         else:
-            res = self.temp.get_mro_attr(name, self.bindlist)
-            if res:
-                return Result(res)
-            else:
-                result = Result(any_ins)
-                result.add_err(NoAttribute(node, self, name))
-                return result
+            result = Result(any_ins)
+            result.add_err(NoAttribute(node, self, name))
+            return result
 
 
 class TypeAnyTemp(TypeTemp):
@@ -678,6 +685,10 @@ class TypeFuncIns(TypeIns):
 
         self._inner_symtable = inner_symtable
         self._inner_symtable.param = argument
+
+        self.is_method: bool = False
+        self.is_classmethod: bool = False
+        self.is_staticmethod: bool = False
 
     def add_overload(self, argument: "Argument", ret: TypeIns):
         self.overloads.append(OverloadItem(argument, ret))

@@ -8,18 +8,27 @@ def is_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
     if left_ins == any_ins or right_ins == any_ins:
         return True
 
-    is_left_classins = isinstance(left_ins.temp, TypeClassTemp)
-    is_right_classins = isinstance(right_ins.temp, TypeClassTemp)
+    if left_ins == none_ins:
+        return nullable(right_ins)
+    elif right_ins == none_ins:
+        return nullable(left_ins)
+
+    is_left_classins = isinstance(left_ins, TypeClassIns)
+    is_right_classins = isinstance(right_ins, TypeClassIns)
 
     if is_left_classins and is_right_classins:
         return cls_consistent(left_ins, right_ins)
 
-    # one of left_ins and right_ins is special types
-    if left_ins == right_ins == none_ins:
-        return True
-    elif left_ins == none_ins or right_ins == none_ins:
+    # check typetype
+    left_is_type = isinstance(left_ins, TypeType)
+    right_is_type = isinstance(right_ins, TypeType)
+    # implicitly invariant
+    if left_is_type ^ right_is_type:
         return False
+    if left_is_type and right_is_type:
+        return left_ins.temp == right_ins.temp or left_ins.temp == any_temp
 
+    # one of left_ins and right_ins is special types
     if is_left_classins:
         # left instance's type is normal class-defined type
         if right_ins.temp == union_temp:
@@ -53,18 +62,12 @@ def is_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
 
 
 def cls_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
-    left_is_type = isinstance(left_ins, TypeType)
-    right_is_type = isinstance(right_ins, TypeType)
-    if left_is_type ^ right_is_type:
-        return False
-    if left_is_type and right_is_type:
-        return left_ins.temp == right_ins.temp
 
     if left_ins.temp != right_ins.temp:
-        left_mro = left_ins.temp.get_mro()
-        for inh in left_mro:
-            if inh.temp == right_ins.temp:
-                return cls_consistent(inh, right_ins)
+        right_mro = right_ins.temp.get_mro()
+        for inh in right_mro:
+            if inh.temp == left_ins.temp:
+                return cls_consistent(left_ins, inh)
         return False
     else:
         arity = left_ins.temp.arity()
@@ -94,7 +97,7 @@ def cls_consistent(left_ins: "TypeIns", right_ins: "TypeIns"):
 def consistent_with_tpvar(left_ins: "TypeIns", right_ins: "TypeIns",
                           tpvar: "TypeVarIns"):
     if tpvar.kind == INVARIANT:
-        if not left_ins.equiv(right_ins):
+        if not left_ins.equiv(right_ins, True):
             return False
     elif tpvar.kind == COVARIANT:
         if not is_consistent(left_ins, right_ins):
