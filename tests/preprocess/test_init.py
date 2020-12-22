@@ -33,7 +33,7 @@ def test_init_typevar(init):
     _contravariant = typevar.getattribute("__contravariant__", None).value
 
     _bound_type = TypeIns(optional_temp, [any_type])
-    _constraints_type = TypeIns(tuple_temp, [any_ins, ellipsis_ins])
+    _constraints_type = TypeClassIns(tuple_temp, [any_ins, ellipsis_ins])
     assert _name is str_ins
     assert _covariant is bool_ins
     assert _contravariant is bool_ins

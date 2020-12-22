@@ -1,5 +1,5 @@
 a = 1
-a(3)  # E Literal[1] is not callable
+a(3)  # E int is not callable
 
 def foo1(a: int, b: int) -> str:
     return 'hello'

@@ -1,4 +1,3 @@
-from ast import get_source_segment
 import copy
 from abc import ABC, abstractmethod
 from typing import Any, Final, Dict, Type
@@ -432,6 +431,8 @@ class TypeClassTemp(TypeTemp):
         metaclass: Optional[TypeIns] = None,
     ):
         super().__init__(clsname)
+        self._cached_ins = TypeClassIns(self, [])
+        self._cached_typetype = TypeType(self, [])
 
         self.baseclass: "List[TypeIns]"
         self.baseclass = []
@@ -534,6 +535,12 @@ class TypeClassTemp(TypeTemp):
         if self.mro[-1].temp is object_temp:
             self.mro = self.mro[:-1]
         return list(self.mro)  # copy of self.mro
+
+    def getins(self, bindlist: BindList) -> Result["TypeIns"]:
+        if self.arity == 0 or not bindlist:
+            return Result(self._cached_ins)
+        else:
+            return Result(TypeClassIns(self, bindlist))
 
     def getattribute(self, name: str, bindlist: BindList) -> Optional["TypeIns"]:
         from pystatic.predefined import object_temp, object_ins
@@ -710,7 +717,7 @@ class TypeFuncIns(TypeIns):
 
         assert self.overloads
         if self.self_bind:
-            applyargs.add_arg(self.self_bind[0], self.self_bind[1])
+            applyargs.add_arg_front(self.self_bind[0], self.self_bind[1])
 
         error_list = match_argument(self.overloads[0].argument, applyargs, node)
         ret_result = Result(self.overloads[0].ret_type)

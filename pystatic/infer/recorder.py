@@ -158,23 +158,21 @@ class SymbolRecorder:
                     self.record_type(name, union_type)
 
 
-def literal_to_normal_type(literal_ins: TypeLiteralIns):
-    val = literal_ins.value
-    name = type(val).__name__
-    builtin_type = builtins_symtable.legb_lookup(name)
-    assert builtin_type
-    return builtin_type.call(ApplyArgs(), None).value
-
-
 def make_union_type(type_list) -> TypeIns:
     bindlist: List[TypeIns] = []
+
+    if not type_list:
+        return any_ins
+    elif len(type_list) == 1:
+        return type_list[0]
+
     for tp in type_list:
         if tp.temp == union_temp:
             bindlist.extend(tp.bindlist)
         elif tp.temp == literal_temp:
-            bindlist.append(literal_to_normal_type(tp))
+            assert isinstance(tp, TypeLiteralIns)
+            bindlist.append(tp.get_value_type())
         else:
             bindlist.append(tp)
     bindlist = list(set(bindlist))
-    tmp = TypeUnionTemp()
-    return TypeIns(tmp, bindlist)
+    return union_temp.getins(bindlist).value

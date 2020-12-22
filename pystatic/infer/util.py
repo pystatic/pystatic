@@ -1,26 +1,26 @@
 """Data structures and helper functions used in exprparse"""
 import ast
-from typing import (Generic, Optional, TYPE_CHECKING, List, Dict, TypeVar, Any)
+from typing import Generic, Optional, TYPE_CHECKING, List, Dict, TypeVar, Any
 
 if TYPE_CHECKING:
     from pystatic.typesys import TypeIns
 
-T = TypeVar('T', bound=Any)
+T = TypeVar("T", bound=Any)
 
 
 class WithAst(Generic[T]):
-    __slots__ = ['value', 'node']
+    __slots__ = ["value", "node"]
 
-    def __init__(self, value: 'T', node: ast.AST) -> None:
+    def __init__(self, value: "T", node: ast.AST) -> None:
         self.value = value
         self.node = node
 
 
-InsWithAst = WithAst['TypeIns']
+InsWithAst = WithAst["TypeIns"]
 
 
 class GetItemArgs:
-    __slots__ = ['items', 'node']
+    __slots__ = ["items", "node"]
 
     def __init__(self, items: List[WithAst], node: ast.AST) -> None:
         self.items = items
@@ -28,7 +28,7 @@ class GetItemArgs:
 
 
 class ApplyArgs:
-    __slots__ = ['args', 'kwargs', 'varkwarg', 'vararg']
+    __slots__ = ["args", "kwargs", "varkwarg", "vararg"]
 
     def __init__(self):
         self.args: List[InsWithAst] = []
@@ -36,8 +36,11 @@ class ApplyArgs:
         self.varkwarg: Optional[InsWithAst] = None
         self.vararg: Optional[InsWithAst] = None
 
-    def add_arg(self, tpins: 'TypeIns', node: ast.AST):
+    def add_arg(self, tpins: "TypeIns", node: ast.AST):
         self.args.append(InsWithAst(tpins, node))
 
-    def add_kwarg(self, name: str, tpins: 'TypeIns', node: ast.AST):
+    def add_arg_front(self, tpins: "TypeIns", node: ast.AST):
+        self.args = [InsWithAst(tpins, node)] + self.args
+
+    def add_kwarg(self, name: str, tpins: "TypeIns", node: ast.AST):
         self.kwargs[name] = InsWithAst(tpins, node)
